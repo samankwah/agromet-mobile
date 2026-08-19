@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,12 +44,31 @@ export function CalendarListScreen({ kind }: Props) {
   const copy = COPY[kind];
 
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
+  /** The calendar this screen has already opened for the current filters.
+   * Without it, returning from the detail screen would immediately push
+   * straight back into it — the filters are still complete, so the
+   * condition that opened it is still true, and Back becomes unusable. */
+  const [openedId, setOpenedId] = useState<string | null>(null);
 
   const { status, error, calendars, fallback, usingCachedFallback, cachedAt, refetch } = useCalendarList({ kind });
 
   const seasonRequired = kind === 'crop' && calendars.some((entry) => entry.seasons.length > 0);
   const ready = isComplete(filters, seasonRequired);
   const visible = useMemo(() => (ready ? calendars.filter((entry) => matchesFilters(entry, filters)) : []), [calendars, filters, ready]);
+
+  // Narrowing to season, crop, region and district usually leaves exactly
+  // one calendar, and making the farmer tap a single-item list to reach it
+  // is a step that carries no choice. Open it. More than one match still
+  // lists them, because then there is a choice to make.
+  const onlyMatch = ready && visible.length === 1 ? visible[0] : null;
+  const isOpening = onlyMatch !== null && onlyMatch.id !== openedId;
+
+  useEffect(() => {
+    if (onlyMatch && onlyMatch.id !== openedId) {
+      setOpenedId(onlyMatch.id);
+      router.push(`/calendar/${onlyMatch.id}`);
+    }
+  }, [onlyMatch, openedId]);
 
   return (
     <Screen>
@@ -68,9 +87,17 @@ export function CalendarListScreen({ kind }: Props) {
 
       <AsyncStateView status={status} error={error} onRetry={refetch}>
         <View style={{ gap: theme.spacing.lg }}>
-          <CalendarFilters kind={kind} calendars={calendars} value={filters} onChange={setFilters} />
+          <CalendarFilters
+            kind={kind}
+            calendars={calendars}
+            value={filters}
+            onChange={(next) => {
+              setOpenedId(null);
+              setFilters(next);
+            }}
+          />
 
-          {ready ? (
+          {ready && !isOpening ? (
             visible.length === 0 ? (
               <Card>
                 <Text variant="body" muted>

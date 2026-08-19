@@ -23,14 +23,21 @@ const TEST_SAFE_AREA_METRICS = {
   insets: { top: 0, left: 0, right: 0, bottom: 0 },
 };
 
-function renderScreen(node: React.ReactElement) {
-  return render(
+/** The real provider order, from app/_layout.tsx. Exposed separately so a
+ * rerender can re-wrap — rerendering the bare screen drops the providers
+ * and it throws out of useTheme. */
+function wrap(node: React.ReactElement) {
+  return (
     <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
       <ThemeProvider>
         <QueryClientProvider client={queryClient}>{node}</QueryClientProvider>
       </ThemeProvider>
-    </SafeAreaProvider>,
+    </SafeAreaProvider>
   );
+}
+
+function renderScreen(node: React.ReactElement) {
+  return render(wrap(node));
 }
 
 describe('FarmToolsScreen', () => {
@@ -145,7 +152,7 @@ describe('CalendarListScreen', () => {
     expect(screen.queryByText('Year')).toBeNull();
   });
 
-  it('opens a calendar once the filters are complete', async () => {
+  it('opens the calendar itself once the filters leave only one, with no extra tap', async () => {
     renderScreen(<CalendarListScreen kind="crop" />);
     await screen.findByText('Season');
 
@@ -153,9 +160,63 @@ describe('CalendarListScreen', () => {
     choose('Crop type *', 'Select crop', 'Tomato');
     choose('Region *', 'Select region', 'Ashanti Region');
     choose('District *', 'Select district', 'Adansi North');
-    fireEvent.press(screen.getByText('Tomato Calendar'));
 
+    // No tap on a result row — completing the filters is the whole action.
     expect(router.push).toHaveBeenCalledWith('/calendar/mock-tomato-adansi-north');
+  });
+
+  it('opens it exactly once, so Back is not swallowed by an immediate re-open', async () => {
+    // The filters are still complete after Back, so the condition that
+    // opened the calendar is still true. Without guarding, the screen would
+    // push straight back in and the user could never leave.
+    const { rerender } = renderScreen(<CalendarListScreen kind="crop" />);
+    await screen.findByText('Season');
+
+    choose('Season', 'Select season', 'Major Season');
+    choose('Crop type *', 'Select crop', 'Tomato');
+    choose('Region *', 'Select region', 'Ashanti Region');
+    choose('District *', 'Select district', 'Adansi North');
+
+    expect(router.push).toHaveBeenCalledTimes(1);
+
+    // Coming back re-renders this screen with the filters untouched. The
+    // effect must not fire again.
+    rerender(wrap(<CalendarListScreen kind="crop" />));
+
+    expect(router.push).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens it again if the filters are changed and re-completed', async () => {
+    // The guard must remember one specific calendar, not disable itself —
+    // picking a different district and coming back should still work.
+    renderScreen(<CalendarListScreen kind="crop" />);
+    await screen.findByText('Season');
+
+    choose('Season', 'Select season', 'Major Season');
+    choose('Crop type *', 'Select crop', 'Tomato');
+    choose('Region *', 'Select region', 'Ashanti Region');
+    choose('District *', 'Select district', 'Adansi North');
+    expect(router.push).toHaveBeenCalledTimes(1);
+
+    fireEvent.press(screen.getByLabelText('District *: Adansi North'));
+    // The name now appears twice — on the closed trigger and in the open
+    // menu. The menu option is the later of the two.
+    const options = screen.getAllByText('Adansi North');
+    fireEvent.press(options[options.length - 1]);
+
+    expect(router.push).toHaveBeenCalledTimes(2);
+  });
+
+  it('still lists results when more than one calendar matches', async () => {
+    // Two poultry calendars share a district; with no bird chosen there is
+    // a genuine choice to make, so the list stays.
+    renderScreen(<CalendarListScreen kind="poultry" />);
+    await screen.findByText('Bird type *');
+
+    choose('Region *', 'Select region', 'Greater Accra');
+    choose('District *', 'Select district', 'Accra Metropolitan');
+
+    expect(router.push).not.toHaveBeenCalled();
   });
 });
 
