@@ -79,13 +79,13 @@ describe('CalendarListScreen', () => {
 
   it('asks for season, crop, region and district before showing a calendar', async () => {
     renderScreen(<CalendarListScreen kind="crop" />);
-    await screen.findByText('Season');
+    await screen.findByText('Season *');
 
     // Nothing is shown on arrival — the same gate the web calendar has.
     expect(screen.queryByText('Tomato Calendar')).toBeNull();
     expect(screen.getByText(/Choose a season, a crop, region and district/)).toBeTruthy();
 
-    choose('Season', 'Select season', 'Major Season');
+    choose('Season *', 'Select season', 'Major Season');
     choose('Crop type *', 'Select crop', 'Tomato');
     choose('Region *', 'Select region', 'Ashanti Region');
     choose('District *', 'Select district', 'Adansi North');
@@ -99,10 +99,10 @@ describe('CalendarListScreen', () => {
 
     // A single production-cycle sheet, no major/minor split — offering the
     // choice would be a control that cannot do anything.
-    expect(screen.queryByText('Season')).toBeNull();
+    expect(screen.queryByText('Season *')).toBeNull();
 
     choose('Bird type *', 'Select bird', 'Broiler');
-    choose('Region *', 'Select region', 'Greater Accra');
+    choose('Region *', 'Select region', 'Greater Accra Region');
     choose('District *', 'Select district', 'Accra Metropolitan');
 
     expect(screen.getByText('Broiler Production Cycle')).toBeTruthy();
@@ -110,17 +110,44 @@ describe('CalendarListScreen', () => {
     expect(screen.queryByText('Layer Production Cycle')).toBeNull();
   });
 
-  it('narrows the district list to the chosen region', async () => {
+  it('offers the whole national catalogue, not only places with a calendar', async () => {
     renderScreen(<CalendarListScreen kind="poultry" />);
     await screen.findByText('Bird type *');
 
-    choose('Bird type *', 'Select bird', 'Layer');
+    // A farmer in a district with nothing published still has to be able to
+    // find their own district and be told so.
+    // Regions with no calendar at all are still offered. (The menu is a
+    // FlatList, so only the first page is rendered — these are within it.)
+    fireEvent.press(screen.getByLabelText('Region *: Select region'));
+    expect(screen.getByText('Ahafo Region')).toBeTruthy();
+    expect(screen.getByText('Central Region')).toBeTruthy();
+    expect(screen.getByText('Eastern Region')).toBeTruthy();
+  });
+
+  it('narrows districts to the chosen region, and asks for a region first', async () => {
+    renderScreen(<CalendarListScreen kind="poultry" />);
+    await screen.findByText('Bird type *');
+
+    expect(screen.getByLabelText('District *: Select a region first')).toBeTruthy();
+
+    choose('Region *', 'Select region', 'Ashanti Region');
     fireEvent.press(screen.getByLabelText('District *: Select district'));
 
-    // Only districts that actually have a Layer calendar are offered, so a
-    // farmer cannot select a combination that returns nothing.
-    expect(screen.getByText('Accra Metropolitan')).toBeTruthy();
-    expect(screen.queryByText('Adansi North')).toBeNull();
+    // A district belongs to exactly one region.
+    expect(screen.getByText('Adansi North')).toBeTruthy();
+    expect(screen.queryByText('Accra Metropolitan')).toBeNull();
+  });
+
+  it('says plainly when a real district has no calendar', async () => {
+    renderScreen(<CalendarListScreen kind="poultry" />);
+    await screen.findByText('Bird type *');
+
+    choose('Bird type *', 'Select bird', 'Broiler');
+    choose('Region *', 'Select region', 'Central Region');
+    choose('District *', 'Select district', 'Agona East');
+
+    expect(screen.getByText('No calendar for Agona East yet')).toBeTruthy();
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it('offers Year only where a year was recorded, and filters by it', async () => {
@@ -128,7 +155,7 @@ describe('CalendarListScreen', () => {
     await screen.findByText('Bird type *');
 
     choose('Bird type *', 'Select bird', 'Broiler');
-    choose('Region *', 'Select region', 'Greater Accra');
+    choose('Region *', 'Select region', 'Greater Accra Region');
     choose('District *', 'Select district', 'Accra Metropolitan');
 
     // The broiler cycle is a 2026 calendar.
@@ -141,9 +168,9 @@ describe('CalendarListScreen', () => {
     // The live Tomato row has year: null — a Year dropdown there could only
     // ever exclude the one calendar it is meant to find.
     renderScreen(<CalendarListScreen kind="crop" />);
-    await screen.findByText('Season');
+    await screen.findByText('Season *');
 
-    choose('Season', 'Select season', 'Major Season');
+    choose('Season *', 'Select season', 'Major Season');
     choose('Crop type *', 'Select crop', 'Tomato');
     choose('Region *', 'Select region', 'Ashanti Region');
     choose('District *', 'Select district', 'Adansi North');
@@ -154,9 +181,9 @@ describe('CalendarListScreen', () => {
 
   it('opens the calendar itself once the filters leave only one, with no extra tap', async () => {
     renderScreen(<CalendarListScreen kind="crop" />);
-    await screen.findByText('Season');
+    await screen.findByText('Season *');
 
-    choose('Season', 'Select season', 'Major Season');
+    choose('Season *', 'Select season', 'Major Season');
     choose('Crop type *', 'Select crop', 'Tomato');
     choose('Region *', 'Select region', 'Ashanti Region');
     choose('District *', 'Select district', 'Adansi North');
@@ -170,9 +197,9 @@ describe('CalendarListScreen', () => {
     // opened the calendar is still true. Without guarding, the screen would
     // push straight back in and the user could never leave.
     const { rerender } = renderScreen(<CalendarListScreen kind="crop" />);
-    await screen.findByText('Season');
+    await screen.findByText('Season *');
 
-    choose('Season', 'Select season', 'Major Season');
+    choose('Season *', 'Select season', 'Major Season');
     choose('Crop type *', 'Select crop', 'Tomato');
     choose('Region *', 'Select region', 'Ashanti Region');
     choose('District *', 'Select district', 'Adansi North');
@@ -190,9 +217,9 @@ describe('CalendarListScreen', () => {
     // The guard must remember one specific calendar, not disable itself —
     // picking a different district and coming back should still work.
     renderScreen(<CalendarListScreen kind="crop" />);
-    await screen.findByText('Season');
+    await screen.findByText('Season *');
 
-    choose('Season', 'Select season', 'Major Season');
+    choose('Season *', 'Select season', 'Major Season');
     choose('Crop type *', 'Select crop', 'Tomato');
     choose('Region *', 'Select region', 'Ashanti Region');
     choose('District *', 'Select district', 'Adansi North');
@@ -213,7 +240,7 @@ describe('CalendarListScreen', () => {
     renderScreen(<CalendarListScreen kind="poultry" />);
     await screen.findByText('Bird type *');
 
-    choose('Region *', 'Select region', 'Greater Accra');
+    choose('Region *', 'Select region', 'Greater Accra Region');
     choose('District *', 'Select district', 'Accra Metropolitan');
 
     expect(router.push).not.toHaveBeenCalled();

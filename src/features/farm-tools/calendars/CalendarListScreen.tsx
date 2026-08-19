@@ -19,12 +19,13 @@ const COPY: Record<CalendarKind, { title: string; subject: string; empty: string
   crop: {
     title: 'Crop Calendars',
     subject: 'Crop',
-    empty: 'No crop calendars have been published for these filters yet.',
+    empty:
+      'Nothing has been published for this crop, district and season. Try another season, or check back — district officers add calendars as they are prepared.',
   },
   poultry: {
     title: 'Poultry Calendars',
     subject: 'Bird',
-    empty: 'No poultry calendars have been published for these filters yet.',
+    empty: 'Nothing has been published for this bird and district yet. Check back — district officers add calendars as they are prepared.',
   },
 };
 
@@ -52,8 +53,7 @@ export function CalendarListScreen({ kind }: Props) {
 
   const { status, error, calendars, fallback, usingCachedFallback, cachedAt, refetch } = useCalendarList({ kind });
 
-  const seasonRequired = kind === 'crop' && calendars.some((entry) => entry.seasons.length > 0);
-  const ready = isComplete(filters, seasonRequired);
+  const ready = isComplete(filters, kind === 'crop');
   const visible = useMemo(() => (ready ? calendars.filter((entry) => matchesFilters(entry, filters)) : []), [calendars, filters, ready]);
 
   // Narrowing to season, crop, region and district usually leaves exactly
@@ -99,7 +99,8 @@ export function CalendarListScreen({ kind }: Props) {
 
           {ready && !isOpening ? (
             visible.length === 0 ? (
-              <Card>
+              <Card style={{ gap: theme.spacing.xs }}>
+                <Text variant="bodyStrong">No calendar for {filters.district} yet</Text>
                 <Text variant="body" muted>
                   {copy.empty}
                 </Text>
