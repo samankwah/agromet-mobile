@@ -189,7 +189,7 @@ describe('CalendarListScreen', () => {
     choose('District *', 'Select district', 'Adansi North');
 
     // No tap on a result row — completing the filters is the whole action.
-    expect(router.push).toHaveBeenCalledWith('/calendar/mock-tomato-adansi-north');
+    expect(router.push).toHaveBeenCalledWith('/calendar/sample-tomato-adansi-north');
   });
 
   it('opens it exactly once, so Back is not swallowed by an immediate re-open', async () => {
@@ -254,7 +254,7 @@ describe('CalendarDetailScreen', () => {
   });
 
   it('renders every activity of the real Tomato calendar', async () => {
-    renderScreen(<CalendarDetailScreen id="mock-tomato-adansi-north" />);
+    renderScreen(<CalendarDetailScreen id="sample-tomato-adansi-north" />);
 
     expect(await screen.findByText('Tomato Calendar')).toBeTruthy();
     expect(screen.getAllByText('nursing').length).toBeGreaterThan(0);
@@ -263,7 +263,7 @@ describe('CalendarDetailScreen', () => {
   });
 
   it('speaks every week range, so the grid is never colour-alone', async () => {
-    renderScreen(<CalendarDetailScreen id="mock-tomato-adansi-north" />);
+    renderScreen(<CalendarDetailScreen id="sample-tomato-adansi-north" />);
     await screen.findByText('Tomato Calendar');
 
     // The bars carry no text of their own at narrow widths, so the row's
@@ -275,7 +275,7 @@ describe('CalendarDetailScreen', () => {
   });
 
   it('offers the three views, including a list for screen-reader users', async () => {
-    renderScreen(<CalendarDetailScreen id="mock-tomato-adansi-north" />);
+    renderScreen(<CalendarDetailScreen id="sample-tomato-adansi-north" />);
     await screen.findByText('Tomato Calendar');
 
     expect(screen.getByText('Season')).toBeTruthy();
@@ -286,7 +286,7 @@ describe('CalendarDetailScreen', () => {
   });
 
   it('opens an activity with its full name and duration', async () => {
-    renderScreen(<CalendarDetailScreen id="mock-tomato-adansi-north" />);
+    renderScreen(<CalendarDetailScreen id="sample-tomato-adansi-north" />);
     await screen.findByText('Tomato Calendar');
 
     // The grid truncates this one; the sheet is where it is readable.
@@ -299,14 +299,61 @@ describe('CalendarDetailScreen', () => {
   it('does not present week numbers as dates when the calendar has no anchor', async () => {
     // The real Tomato row has year: null, so there is no date to show and
     // inventing one would tell a farmer to plant on the wrong day.
-    renderScreen(<CalendarDetailScreen id="mock-tomato-adansi-north" />);
+    renderScreen(<CalendarDetailScreen id="sample-tomato-adansi-north" />);
     await screen.findByText('Tomato Calendar');
 
     expect(screen.getByText(/counted from the start of the cycle/)).toBeTruthy();
   });
 
+  it('renders the maize schedule as the printed calendar does', async () => {
+    renderScreen(<CalendarDetailScreen id="sample-maize-ejura" />);
+    await screen.findByText('Maize Calendar');
+
+    // The published calendar's ten rows, including the two harvest blocks.
+    expect(screen.getAllByText('Site Selection').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Sowing / Planting').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('1st Fertilizer Application (NPK)').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Post-harvest Handling').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText(/^Harvesting\./)).toHaveLength(2);
+  });
+
+  it('labels the months across the season, like the desktop header', async () => {
+    renderScreen(<CalendarDetailScreen id="sample-maize-ejura" />);
+    await screen.findByText('Maize Calendar');
+
+    // 34 weeks from the first week of January run into August, so the
+    // merged month band has to span the whole season rather than restart.
+    for (const month of ['Jan', 'Mar', 'Jun', 'Aug']) {
+      expect(screen.getAllByText(month).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('adds week numbers and day ranges once the columns are wide enough', async () => {
+    renderScreen(<CalendarDetailScreen id="sample-maize-ejura" />);
+    await screen.findByText('Maize Calendar');
+
+    // The fitted view has no room for either; the Weeks view is where the
+    // printed calendar's "Week n" and "29-04" rows belong.
+    expect(screen.queryByText(/^\d{2}-\d{2}$/)).toBeNull();
+
+    fireEvent.press(screen.getByText('Weeks'));
+
+    expect(screen.getByText('1')).toBeTruthy();
+    expect(screen.getAllByText(/^\d{2}-\d{2}$/).length).toBeGreaterThan(10);
+  });
+
+  it('does not date a calendar that carries no anchor', async () => {
+    // The live Tomato row has no season start month, so week numbers stay
+    // relative rather than being dressed up as dates.
+    renderScreen(<CalendarDetailScreen id="sample-tomato-adansi-north" />);
+    await screen.findByText('Tomato Calendar');
+
+    fireEvent.press(screen.getByText('Weeks'));
+    expect(screen.queryByText(/^\d{2}-\d{2}$/)).toBeNull();
+  });
+
   it('labels sample data rather than passing it off as live', async () => {
-    renderScreen(<CalendarDetailScreen id="mock-broiler-cycle" />);
+    renderScreen(<CalendarDetailScreen id="sample-broiler-cycle" />);
 
     expect(await screen.findByText('Broiler Production Cycle')).toBeTruthy();
     expect(screen.getByText('Mock data')).toBeTruthy();

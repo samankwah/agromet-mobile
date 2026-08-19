@@ -51,10 +51,23 @@ export function CalendarListScreen({ kind }: Props) {
    * condition that opened it is still true, and Back becomes unusable. */
   const [openedId, setOpenedId] = useState<string | null>(null);
 
-  const { status, error, calendars, fallback, usingCachedFallback, cachedAt, refetch } = useCalendarList({ kind });
+  const { status, error, calendars, samples, fallback, usingCachedFallback, cachedAt, refetch } = useCalendarList({ kind });
 
   const ready = isComplete(filters, kind === 'crop');
-  const visible = useMemo(() => (ready ? calendars.filter((entry) => matchesFilters(entry, filters)) : []), [calendars, filters, ready]);
+
+  // Live calendars win for the selection at hand; samples stand in only
+  // where nothing has been published for it. Choosing between the two per
+  // request instead would hide every sample as soon as one real calendar
+  // existed anywhere.
+  const { visible, isSample } = useMemo(() => {
+    if (!ready) return { visible: [], isSample: false };
+    const live = calendars.filter((entry) => matchesFilters(entry, filters));
+    if (live.length > 0) return { visible: live, isSample: false };
+    return { visible: samples.filter((entry) => matchesFilters(entry, filters)), isSample: true };
+  }, [calendars, samples, filters, ready]);
+
+  // Offered as choices whether or not the backend carries them yet.
+  const selectable = useMemo(() => [...calendars, ...samples], [calendars, samples]);
 
   // Narrowing to season, crop, region and district usually leaves exactly
   // one calendar, and making the farmer tap a single-item list to reach it
@@ -89,7 +102,7 @@ export function CalendarListScreen({ kind }: Props) {
         <View style={{ gap: theme.spacing.lg }}>
           <CalendarFilters
             kind={kind}
-            calendars={calendars}
+            calendars={selectable}
             value={filters}
             onChange={(next) => {
               setOpenedId(null);
@@ -110,9 +123,9 @@ export function CalendarListScreen({ kind }: Props) {
             )
           ) : null}
 
-          {fallback ? (
+          {ready && visible.length > 0 && isSample ? (
             <>
-              <SampleDataNotice reason={fallback} />
+              <SampleDataNotice reason={fallback ?? 'empty'} />
               <MockDataTag />
             </>
           ) : null}

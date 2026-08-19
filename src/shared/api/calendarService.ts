@@ -30,6 +30,15 @@ export type FallbackReason = 'empty' | 'offline' | null;
 
 export type CalendarResult<T> = { data: T; fallback: FallbackReason };
 
+/**
+ * A list result keeps the live calendars and the samples apart rather than
+ * choosing between them up front. The backend may hold a calendar for one
+ * crop and district and nothing for the next; deciding "live or sample"
+ * for the whole request would hide every sample the moment a single real
+ * calendar existed. The screen picks per selection instead.
+ */
+export type CalendarListResult = { data: Calendar[]; samples: Calendar[]; fallback: FallbackReason };
+
 export type CalendarFilter = {
   kind: CalendarKind;
   commodity?: string;
@@ -54,18 +63,23 @@ function matchesFilter(entry: Calendar, filter: CalendarFilter): boolean {
 /** The wire shape carries the season only inside the uploaded workbook's
  * sheet names, so it is lifted onto the domain type here rather than left
  * for each screen to dig out of `fileData`. */
-type CalendarWire = Calendar & { fileData?: { sheets?: { name?: string }[] } };
+type CalendarWire = Calendar & {
+  fileData?: { sheets?: { name?: string }[] };
+  majorSeason?: { startMonth?: string };
+};
 
 function withSeasons(entry: CalendarWire): Calendar {
   const seasons = (entry.fileData?.sheets ?? []).map((sheet) => (sheet.name ?? '').trim()).filter((name) => name.length > 0);
-  return { ...entry, seasons: [...new Set(seasons)] };
+  return {
+    ...entry,
+    seasons: [...new Set(seasons)],
+    seasonStartMonth: entry.majorSeason?.startMonth ?? entry.seasonStartMonth ?? null,
+  };
 }
 
-function samplesFor(filter: CalendarFilter, reason: Exclude<FallbackReason, null>): CalendarResult<Calendar[]> {
-  return { data: mockFor(filter.kind).filter((entry) => matchesFilter(entry, filter)), fallback: reason };
-}
+export async function listCalendars(filter: CalendarFilter): Promise<CalendarListResult> {
+  const samples = mockFor(filter.kind).filter((entry) => matchesFilter(entry, filter));
 
-export async function listCalendars(filter: CalendarFilter): Promise<CalendarResult<Calendar[]>> {
   try {
     const data = await getJson<CalendarWire[]>('/api/enhanced-calendars', {
       calendarType: calendarTypeFor(filter.kind),
@@ -75,13 +89,11 @@ export async function listCalendars(filter: CalendarFilter): Promise<CalendarRes
       year: filter.year,
       search: filter.search,
     });
-
-    if (data.length > 0) return { data: data.map(withSeasons), fallback: null };
-    return samplesFor(filter, 'empty');
+    return { data: data.map(withSeasons), samples, fallback: null };
   } catch (error) {
     // A genuine server rejection (a 4xx) is a bug worth surfacing; an
     // unreachable server is an everyday condition in the field.
-    if (error instanceof NetworkError) return samplesFor(filter, 'offline');
+    if (error instanceof NetworkError) return { data: [], samples, fallback: 'offline' };
     throw error;
   }
 }

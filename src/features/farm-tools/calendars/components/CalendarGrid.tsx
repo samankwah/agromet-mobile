@@ -11,6 +11,7 @@ import {
   computeColumnWidth,
   computeNameColumnWidth,
   formatWeekRangeShort,
+  weekDateRange,
   type ActivityRun,
   type GridDensity,
   type WeekBand,
@@ -84,6 +85,11 @@ export function CalendarGrid({
 
   const { nameWidth, columnWidth, bodyWidth, viewportWidth, rowHeight, bandHeight, showWeekNumbers } = layout;
   const weekRowHeight = showWeekNumbers ? theme.typeScale.caption.lineHeight + 6 : 0;
+  // The printed calendars carry a day range under each week; it only fits
+  // once a column is wide enough, and only exists once the calendar is
+  // anchored to a real date.
+  const showDates = showWeekNumbers && weekOneDate !== null && columnWidth >= 30;
+  const dateRowHeight = showDates ? theme.typeScale.caption.lineHeight + 4 : 0;
 
   const rows = useMemo(
     () =>
@@ -110,7 +116,7 @@ export function CalendarGrid({
         <View
           style={{
             width: nameWidth,
-            height: bandHeight + weekRowHeight,
+            height: bandHeight + weekRowHeight + dateRowHeight,
             justifyContent: 'flex-end',
             paddingBottom: 4,
             borderRightWidth: 1,
@@ -150,6 +156,18 @@ export function CalendarGrid({
                   <View key={week} style={{ width: columnWidth, alignItems: 'center' }}>
                     <Text variant="caption" color={week === currentWeek ? theme.colors.accent : theme.colors.muted} numberOfLines={1}>
                       {week}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            {showDates ? (
+              <View style={{ flexDirection: 'row', height: dateRowHeight }}>
+                {weeks.map((week) => (
+                  <View key={week} style={{ width: columnWidth, alignItems: 'center' }}>
+                    <Text variant="caption" muted numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                      {weekDateRange(weekOneDate, week)}
                     </Text>
                   </View>
                 ))}

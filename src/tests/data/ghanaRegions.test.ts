@@ -1,3 +1,4 @@
+import { MOCK_CALENDARS, MOCK_CALENDAR_ACTIVITIES } from '../../shared/data/mockCalendars';
 import { districtsInRegion, GHANA_REGION_NAMES, GHANA_REGIONS } from '../../shared/data/ghanaRegions';
 
 describe('Ghana region catalogue', () => {
@@ -45,5 +46,53 @@ describe('Ghana region catalogue', () => {
   it('returns nothing for a region that does not exist, rather than throwing', () => {
     expect(districtsInRegion('Brong Ahafo Region')).toEqual([]);
     expect(districtsInRegion('')).toEqual([]);
+  });
+});
+
+describe('sample crop calendars', () => {
+  it('files every sample calendar under a district that exists', () => {
+    // A calendar filed under a district the catalogue does not list can
+    // never be reached through the filters.
+    for (const entry of MOCK_CALENDARS) {
+      expect(GHANA_REGION_NAMES).toContain(entry.region);
+      expect(districtsInRegion(entry.region)).toContain(entry.district);
+    }
+  });
+
+  it('covers the five crops in use', () => {
+    const crops = MOCK_CALENDARS.filter((c) => c.calendarType === 'seasonal').map((c) => c.crop);
+    expect(crops.sort()).toEqual(['Maize', 'Rice', 'Sorghum', 'Soybean', 'Tomato']);
+  });
+
+  it('keeps the maize schedule as transcribed, including its two harvest rows', () => {
+    const maize = MOCK_CALENDAR_ACTIVITIES['sample-maize-ejura'];
+    expect(maize).toHaveLength(10);
+
+    // The published calendar genuinely lists Harvesting twice, in
+    // consecutive blocks. Collapsing them would misreport the schedule.
+    const harvests = maize.filter((a) => a.activityName === 'Harvesting');
+    expect(harvests.map((a) => [a.startWeek, a.endWeek])).toEqual([
+      [27, 29],
+      [30, 31],
+    ]);
+    expect(new Set(maize.map((a) => a.id)).size).toBe(maize.length);
+  });
+
+  it('anchors the crop calendars so the grid can show months and dates', () => {
+    // Without a start month and year the grid can only label week blocks —
+    // the printed calendars show January..September and day ranges.
+    for (const entry of MOCK_CALENDARS.filter((c) => c.calendarType === 'seasonal' && c.id !== 'sample-tomato-adansi-north')) {
+      expect(entry.seasonStartMonth).toBeTruthy();
+      expect(entry.year).toBeTruthy();
+    }
+  });
+
+  it('keeps every activity inside its calendar length', () => {
+    for (const entry of MOCK_CALENDARS) {
+      for (const a of MOCK_CALENDAR_ACTIVITIES[entry.id] ?? []) {
+        expect(a.startWeek).toBeGreaterThanOrEqual(1);
+        expect(a.endWeek ?? a.startWeek).toBeLessThanOrEqual(entry.totalWeeks);
+      }
+    }
   });
 });

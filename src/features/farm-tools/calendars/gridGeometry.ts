@@ -141,6 +141,20 @@ export function formatWeekRange(startWeek: number, endWeek: number): string {
   return startWeek === endWeek ? `Week ${startWeek}` : `Weeks ${startWeek}–${endWeek}`;
 }
 
+/**
+ * A week's day range, as the printed calendars label it: "29-04" for the
+ * week beginning 29 December. Null without a date anchor, so no screen can
+ * imply a date the calendar does not carry.
+ */
+export function weekDateRange(weekOne: Date | null, week: number): string | null {
+  if (!weekOne) return null;
+  const start = weekStartDate(weekOne, week);
+  const end = new Date(start.getTime());
+  end.setDate(end.getDate() + 6);
+  const dd = (date: Date) => String(date.getDate()).padStart(2, '0');
+  return `${dd(start)}-${dd(end)}`;
+}
+
 /** Compact form for the frozen column, where space is scarce. */
 export function formatWeekRangeShort(startWeek: number, endWeek: number): string {
   return startWeek === endWeek ? `W${startWeek}` : `W${startWeek}–${endWeek}`;

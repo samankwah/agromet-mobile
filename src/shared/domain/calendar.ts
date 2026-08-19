@@ -39,6 +39,13 @@ export type Calendar = {
   breedType?: string | null;
   sampleActivities: string[];
   /**
+   * The month week 1 begins, e.g. "January". The backend keeps it in
+   * `majorSeason.startMonth`. Without it a calendar is a relative schedule
+   * ("week 4") and the grid can only label week blocks; with it, and a
+   * year, every week gets a real month and date range.
+   */
+  seasonStartMonth?: string | null;
+  /**
    * Which season sheets the uploaded workbook carried — "Major Season",
    * "Minor Season". Derived from `fileData.sheets[].name`, because the
    * backend has no season column; a crop calendar is uploaded as one sheet

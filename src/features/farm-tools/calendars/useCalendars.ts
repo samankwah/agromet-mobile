@@ -34,6 +34,7 @@ export function useCalendarList(filter: CalendarFilter) {
   return {
     ...query,
     calendars: query.data?.data ?? [],
+    samples: query.data?.samples ?? [],
     fallback: query.data?.fallback ?? null,
   };
 }

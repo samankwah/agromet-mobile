@@ -39,8 +39,13 @@ export function CalendarDetailScreen({ id }: Props) {
   // A running cycle is what turns week numbers into dates a farmer can act
   // on; without one the calendar is a relative schedule and stays that way.
   const weekOneDate = useMemo(
-    () => resolveWeekOneDate({ cycleStartDate: cycle?.startDate ?? null, seasonStartMonth: null, year: calendar?.year ?? null }),
-    [calendar?.year, cycle?.startDate],
+    () =>
+      resolveWeekOneDate({
+        cycleStartDate: cycle?.startDate ?? null,
+        seasonStartMonth: calendar?.seasonStartMonth ?? null,
+        year: calendar?.year ?? null,
+      }),
+    [calendar?.seasonStartMonth, calendar?.year, cycle?.startDate],
   );
   const currentWeek = cycle?.currentWeek ?? null;
 
