@@ -19,11 +19,13 @@ import { StartCycleForm } from './components/StartCycleForm';
 import { SampleDataNotice } from './components/SampleDataNotice';
 import { ActivityList } from './components/ActivityList';
 import { CalendarGrid } from './components/CalendarGrid';
-import { buildMonthBands, buildWeekBlockBands, resolveWeekOneDate, type GridDensity } from './gridGeometry';
+import { buildMonthBands, buildWeekBlockBands, resolveWeekOneDate } from './gridGeometry';
 import { useCalendarDetail } from './useCalendars';
 import { useProductionCycle } from './useProductionCycle';
 
-const VIEWS = ['Season', 'Weeks', 'List'];
+// Two views, not three. The third was a fitted whole-season grid that
+// gave each week 6px on a phone — see CalendarGrid for why it is gone.
+const VIEWS = ['Timeline', 'List'];
 
 type Props = { id: string };
 
@@ -55,8 +57,6 @@ export function CalendarDetailScreen({ id }: Props) {
     () => (weekOneDate ? buildMonthBands(totalWeeks, weekOneDate) : buildWeekBlockBands(totalWeeks)),
     [totalWeeks, weekOneDate],
   );
-
-  const density: GridDensity = viewIndex === 0 ? 'fit' : 'wide';
 
   return (
     <Screen>
@@ -121,7 +121,7 @@ export function CalendarDetailScreen({ id }: Props) {
 
             <SegmentedControl segments={VIEWS} selectedIndex={viewIndex} onChange={setViewIndex} accessibilityLabel="Calendar view" />
 
-            {viewIndex === 2 ? (
+            {viewIndex === 1 ? (
               <ActivityList
                 activities={activities}
                 totalWeeks={totalWeeks}
@@ -137,14 +137,11 @@ export function CalendarDetailScreen({ id }: Props) {
                   bands={bands}
                   weekOneDate={weekOneDate}
                   currentWeek={currentWeek}
-                  density={density}
                   selectedActivityId={selected?.id ?? null}
                   onSelectActivity={setSelected}
                 />
                 <Text variant="caption" muted>
-                  {density === 'fit'
-                    ? 'The whole cycle at a glance. Tap any activity for its weeks and dates.'
-                    : 'Swipe the chart sideways to see later weeks.'}
+                  Swipe the chart sideways for later weeks. Tap any activity for its dates. Switch to List to read the season in order.
                 </Text>
               </View>
             )}

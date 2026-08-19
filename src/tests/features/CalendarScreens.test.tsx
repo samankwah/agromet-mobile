@@ -274,12 +274,11 @@ describe('CalendarDetailScreen', () => {
     expect(screen.getByLabelText('transplanting. week 7 of 28.')).toBeTruthy();
   });
 
-  it('offers the three views, including a list for screen-reader users', async () => {
+  it('offers a timeline and a list, the list being the screen-reader path', async () => {
     renderScreen(<CalendarDetailScreen id="sample-tomato-adansi-north" />);
     await screen.findByText('Tomato Calendar');
 
-    expect(screen.getByText('Season')).toBeTruthy();
-    expect(screen.getByText('Weeks')).toBeTruthy();
+    expect(screen.getByText('Timeline')).toBeTruthy();
 
     fireEvent.press(screen.getByText('List'));
     expect(screen.getByText('Weeks 4–6')).toBeTruthy();
@@ -328,18 +327,25 @@ describe('CalendarDetailScreen', () => {
     }
   });
 
-  it('adds week numbers and day ranges once the columns are wide enough', async () => {
+  it('shows week numbers and day ranges, as the printed calendar does', async () => {
     renderScreen(<CalendarDetailScreen id="sample-maize-ejura" />);
     await screen.findByText('Maize Calendar');
 
-    // The fitted view has no room for either; the Weeks view is where the
-    // printed calendar's "Week n" and "29-04" rows belong.
-    expect(screen.queryByText(/^\d{2}-\d{2}$/)).toBeNull();
-
-    fireEvent.press(screen.getByText('Weeks'));
-
-    expect(screen.getByText('1')).toBeTruthy();
+    // Always present now — there is no compressed view left that has to
+    // drop them for want of room.
+    expect(screen.getByText('Stage of activity')).toBeTruthy();
     expect(screen.getAllByText(/^\d{2}-\d{2}$/).length).toBeGreaterThan(10);
+  });
+
+  it('tells the two Harvesting rows apart by their weeks', async () => {
+    renderScreen(<CalendarDetailScreen id="sample-maize-ejura" />);
+    await screen.findByText('Maize Calendar');
+
+    // Two rows share the name, so each carries its span; unique names are
+    // left uncluttered.
+    expect(screen.getByText('W27–29')).toBeTruthy();
+    expect(screen.getByText('W30–31')).toBeTruthy();
+    expect(screen.queryByText('W11–16')).toBeNull();
   });
 
   it('does not date a calendar that carries no anchor', async () => {
@@ -348,7 +354,6 @@ describe('CalendarDetailScreen', () => {
     renderScreen(<CalendarDetailScreen id="sample-tomato-adansi-north" />);
     await screen.findByText('Tomato Calendar');
 
-    fireEvent.press(screen.getByText('Weeks'));
     expect(screen.queryByText(/^\d{2}-\d{2}$/)).toBeNull();
   });
 

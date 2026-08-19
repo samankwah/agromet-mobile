@@ -204,23 +204,20 @@ export function activitiesInWeek(activities: CalendarActivity[], week: number, t
   return activities.filter((activity) => activityRuns(activity, totalWeeks).some((run) => week >= run.startWeek && week <= run.endWeek));
 }
 
-export type GridDensity = 'fit' | 'wide';
-
 /**
- * Column width for the two densities.
+ * One legible column width, always.
  *
- * `fit` squeezes the whole season onto one screen with no horizontal
- * scrolling — on a 360px phone that's the difference between grasping the
- * shape of a season at a glance and swiping blindly through 28 columns.
- * `wide` is the readable view, where week numbers fit.
+ * There used to be a "fit the whole season on screen" mode. On a 360px
+ * phone a 34-week calendar got 209px of body, which is 6px per week: a
+ * single-week activity became a 6px dot, most bars were too narrow to
+ * carry a label, and the month header was unreadable. The desktop version
+ * gives each week ~50px. A calendar compressed eight-fold is not a smaller
+ * calendar, it is a picture of one — so the grid now scrolls instead.
  */
-export function computeColumnWidth(availableWidth: number, totalWeeks: number, density: GridDensity): number {
-  if (density === 'wide') return 34;
-  if (totalWeeks < 1) return 34;
-  return Math.max(6, Math.floor(availableWidth / totalWeeks));
-}
+export const WEEK_COLUMN_WIDTH = 38;
 
-/** The frozen column: wide enough to read, narrow enough to leave a grid. */
+/** The frozen column. Wide enough for two lines of a real activity name,
+ * narrow enough to leave a usable strip of weeks beside it. */
 export function computeNameColumnWidth(screenWidth: number): number {
-  return Math.round(Math.min(150, Math.max(104, screenWidth * 0.33)));
+  return Math.round(Math.min(156, Math.max(112, screenWidth * 0.36)));
 }

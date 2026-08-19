@@ -4,7 +4,7 @@ import {
   activityRuns,
   buildMonthBands,
   buildWeekBlockBands,
-  computeColumnWidth,
+  WEEK_COLUMN_WIDTH,
   computeNameColumnWidth,
   formatActivityDates,
   monthNameToIndex,
@@ -226,27 +226,21 @@ describe('activitiesInWeek', () => {
 });
 
 describe('column sizing', () => {
-  it('fits a whole season on a 360px screen without horizontal scrolling', () => {
-    const nameW = computeNameColumnWidth(360);
-    const colW = computeColumnWidth(360 - nameW, 28, 'fit');
-
-    expect(colW * 28).toBeLessThanOrEqual(360 - nameW);
-    expect(colW).toBeGreaterThanOrEqual(6);
+  it('keeps every week wide enough to read, rather than fitting the season on screen', () => {
+    // A 34-week season squeezed into a 360px phone gives each week 6px:
+    // a one-week activity becomes a dot and no bar can hold a label. The
+    // grid scrolls instead, so this width is fixed.
+    expect(WEEK_COLUMN_WIDTH).toBeGreaterThanOrEqual(30);
   });
 
-  it('keeps a floor so a 52-week calendar stays visible rather than collapsing', () => {
-    expect(computeColumnWidth(240, 52, 'fit')).toBeGreaterThanOrEqual(6);
-  });
-
-  it('uses a fixed readable width in wide mode, independent of week count', () => {
-    expect(computeColumnWidth(240, 8, 'wide')).toBe(computeColumnWidth(240, 36, 'wide'));
-  });
-
-  it('leaves a usable grid beside the frozen column at every supported width', () => {
+  it('leaves a usable strip of weeks beside the frozen column at every supported width', () => {
     for (const screenWidth of [320, 360, 390, 430]) {
       const nameW = computeNameColumnWidth(screenWidth);
-      expect(nameW).toBeGreaterThanOrEqual(104);
-      expect(screenWidth - nameW).toBeGreaterThan(180);
+      const body = screenWidth - nameW - 32;
+      expect(nameW).toBeGreaterThanOrEqual(112);
+      // At least three weeks visible at once, or the timeline reads as a
+      // keyhole rather than a calendar.
+      expect(body / WEEK_COLUMN_WIDTH).toBeGreaterThanOrEqual(3);
     }
   });
 });
