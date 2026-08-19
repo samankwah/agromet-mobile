@@ -23,7 +23,48 @@ describe('Ghana region catalogue', () => {
   it('lists each district exactly once, under one region', () => {
     const all = GHANA_REGIONS.flatMap((region) => region.districts);
     expect(new Set(all).size).toBe(all.length);
-    expect(all.length).toBe(258);
+    expect(all.length).toBe(261);
+  });
+
+  it('matches the official MMDA count in every region', () => {
+    // Not just the 261 total — a right total can hide two errors that
+    // cancel out, which is exactly what happened before: Central carried a
+    // duplicate while Ashanti, Greater Accra and Volta were each short.
+    const official: Record<string, number> = {
+      'Ahafo Region': 6,
+      'Ashanti Region': 43,
+      'Bono Region': 12,
+      'Bono East Region': 11,
+      'Central Region': 22,
+      'Eastern Region': 33,
+      'Greater Accra Region': 29,
+      'North East Region': 6,
+      'Northern Region': 16,
+      'Oti Region': 9,
+      'Savannah Region': 7,
+      'Upper East Region': 15,
+      'Upper West Region': 11,
+      'Volta Region': 18,
+      'Western Region': 14,
+      'Western North Region': 9,
+    };
+
+    for (const region of GHANA_REGIONS) {
+      expect([region.name, region.districts.length]).toEqual([region.name, official[region.name]]);
+    }
+  });
+
+  it('carries the districts created in the 2018 restructuring', () => {
+    // Absent from both AgroMet sources; added from the boundaries dataset.
+    expect(districtsInRegion('Ashanti Region')).toEqual(expect.arrayContaining(['Adansi Akrofuom', 'Adansi Asokwa']));
+    expect(districtsInRegion('Greater Accra Region')).toContain('Korle Klottey Municipal');
+    expect(districtsInRegion('Volta Region')).toContain('Kpando Municipal');
+  });
+
+  it('does not carry Twifo Hemang Lower Denkyira twice under two names', () => {
+    const central = districtsInRegion('Central Region');
+    expect(central).toContain('Twifo Hemang Lower Denkyira');
+    expect(central).not.toContain('Hemang Lower Denkyira');
   });
 
   it('contains the districts the app and its data actually reference', () => {

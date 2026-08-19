@@ -8,13 +8,21 @@
  * duplicates all 29 of its districts under the Ahafo, Bono and Bono East
  * regions that replaced it.
  *
- * 16 regions, 258 districts. Ghana officially has 16 regions and 261
- * MMDAs; this source carries 258. The shortfall is naming, not missing
- * places — the same districts appear under different conventions across
- * datasets ("Accra Metropolis" vs "Accra Metropolitan", "Bolga East" vs
- * "Bolgatanga East"). No name is invented to reach 261: the backend
- * matches these strings exactly, so a district spelled from memory would
- * be worse than one left out.
+ * 16 regions, 261 districts — Ghana's full MMDA list.
+ *
+ * Reconciled against src/shared/data/ghanaBoundaries.json, which is newer.
+ * Four districts created in the 2018 restructuring were absent from both
+ * AgroMet sources and have been added: Adansi Akrofuom, Adansi Asokwa,
+ * Korle Klottey Municipal and Kpando Municipal. One duplicate was removed:
+ * "Hemang Lower Denkyira" is the same place as "Twifo Hemang Lower
+ * Denkyira", which both other datasets carry.
+ *
+ * Everything else that looked missing was a spelling variant, verified
+ * region by region — a region whose count already matched cannot be short
+ * of a district. "Accra Metropolis" is "Accra Metropolitan", "Bolga East"
+ * is "Bolgatanga East", "Assin Fosu" is "Assin Central Municipal" (Fosu is
+ * its capital). Naming follows the convention the backend stores, since it
+ * matches these strings exactly.
  *
  * Region names carry the " Region" suffix for the same reason — the
  * database holds "Ashanti Region", not "Ashanti".
@@ -41,6 +49,8 @@ export const GHANA_REGIONS: GhanaRegion[] = [
   {
     name: 'Ashanti Region',
     districts: [
+      'Adansi Akrofuom',
+      'Adansi Asokwa',
       'Adansi North',
       'Adansi South',
       'Afigya Kwabre North',
@@ -136,7 +146,6 @@ export const GHANA_REGIONS: GhanaRegion[] = [
       'Gomoa Central',
       'Gomoa East',
       'Gomoa West',
-      'Hemang Lower Denkyira',
       'Komenda Edina Eguafo Abirem Municipal',
       'Mfantseman Municipal',
       'Twifo Atti Morkwa',
@@ -203,6 +212,7 @@ export const GHANA_REGIONS: GhanaRegion[] = [
       'Ga North Municipal',
       'Ga South Municipal',
       'Ga West Municipal',
+      'Korle Klottey Municipal',
       'Kpone Katamanso Municipal',
       'Krowor Municipal',
       'La Dade Kotopon Municipal',
@@ -326,6 +336,7 @@ export const GHANA_REGIONS: GhanaRegion[] = [
       'Keta Municipal',
       'Ketu North Municipal',
       'Ketu South Municipal',
+      'Kpando Municipal',
       'North Dayi',
       'North Tongu',
       'South Dayi',
