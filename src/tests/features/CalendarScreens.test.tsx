@@ -313,7 +313,7 @@ describe('CalendarDetailScreen', () => {
     expect(screen.getAllByText('Sowing / Planting').length).toBeGreaterThan(0);
     expect(screen.getAllByText('1st Fertilizer Application (NPK)').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Post-harvest Handling').length).toBeGreaterThan(0);
-    expect(screen.getAllByLabelText(/^Harvesting\./)).toHaveLength(2);
+    expect(screen.getAllByLabelText(/^Harvesting\./)).toHaveLength(1);
   });
 
   it('labels the months across the season, like the desktop header', async () => {
@@ -337,15 +337,16 @@ describe('CalendarDetailScreen', () => {
     expect(screen.getAllByText(/^\d{2}-\d{2}$/).length).toBeGreaterThan(10);
   });
 
-  it('tells the two Harvesting rows apart by their weeks', async () => {
+  it('shows one harvest row covering the whole window', async () => {
     renderScreen(<CalendarDetailScreen id="sample-maize-ejura" />);
     await screen.findByText('Maize Calendar');
 
-    // Two rows share the name, so each carries its span; unique names are
-    // left uncluttered.
-    expect(screen.getByText('W27–29')).toBeTruthy();
-    expect(screen.getByText('W30–31')).toBeTruthy();
-    expect(screen.queryByText('W11–16')).toBeNull();
+    // The workbook splits it across two rows; the app joins them, so no
+    // row needs a week-span qualifier to be told from its twin.
+    // Anchored to a date, so the spoken label carries real dates too.
+    expect(screen.getByLabelText(/^Harvesting\. weeks 27 to 31 of 34\./)).toBeTruthy();
+    expect(screen.queryByText('W27–29')).toBeNull();
+    expect(screen.queryByText('W30–31')).toBeNull();
   });
 
   it('does not date a calendar that carries no anchor', async () => {

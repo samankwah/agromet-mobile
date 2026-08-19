@@ -91,8 +91,11 @@ const MAIZE = [
   activity('2nd Weed Control & Pest Management', 17, 21, C.weeds),
   activity('1st Weed Control & Pest Management', 18, 20, C.weeds),
   activity('2nd Fertilizer Application (Urea)', 19, 22, C.fertilizer),
-  activity('Harvesting', 27, 29, C.harvest),
-  activity('Harvesting', 30, 31, C.harvest),
+  // The published calendar draws this across two spreadsheet rows, both
+  // labelled "Harvesting" and both green, with no gap between them — one
+  // harvest window split by the workbook's layout rather than two
+  // distinct activities. Joined here as weeks 27-31.
+  activity('Harvesting', 27, 31, C.harvest),
   activity('Post-harvest Handling', 27, 34, C.postHarvest),
 ];
 

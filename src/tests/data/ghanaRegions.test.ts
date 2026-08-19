@@ -105,18 +105,23 @@ describe('sample crop calendars', () => {
     expect(crops.sort()).toEqual(['Maize', 'Rice', 'Sorghum', 'Soybean', 'Tomato']);
   });
 
-  it('keeps the maize schedule as transcribed, including its two harvest rows', () => {
+  it('joins the maize harvest into the single window it describes', () => {
     const maize = MOCK_CALENDAR_ACTIVITIES['sample-maize-ejura'];
-    expect(maize).toHaveLength(10);
+    expect(maize).toHaveLength(9);
 
-    // The published calendar genuinely lists Harvesting twice, in
-    // consecutive blocks. Collapsing them would misreport the schedule.
+    // The workbook draws the harvest across two rows, both named
+    // "Harvesting", both green, running 27-29 and 30-31 with no gap. That
+    // is one window split by the spreadsheet's layout, not two activities.
     const harvests = maize.filter((a) => a.activityName === 'Harvesting');
-    expect(harvests.map((a) => [a.startWeek, a.endWeek])).toEqual([
-      [27, 29],
-      [30, 31],
-    ]);
+    expect(harvests.map((a) => [a.startWeek, a.endWeek])).toEqual([[27, 31]]);
     expect(new Set(maize.map((a) => a.id)).size).toBe(maize.length);
+  });
+
+  it('leaves no calendar with two activities of the same name', () => {
+    for (const [id, activities] of Object.entries(MOCK_CALENDAR_ACTIVITIES)) {
+      const names = activities.map((a) => a.activityName);
+      expect([id, new Set(names).size]).toEqual([id, names.length]);
+    }
   });
 
   it('anchors the crop calendars so the grid can show months and dates', () => {
