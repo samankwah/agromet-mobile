@@ -32,6 +32,18 @@ export type CachedQueryResult<T> = {
   refetch: () => void;
 };
 
+/**
+ * The longest `gcTime` that survives a `setTimeout`.
+ *
+ * TanStack Query schedules garbage collection with `setTimeout(gcTime)`, and
+ * Node and Hermes both store the delay as a signed 32-bit int — anything above
+ * 2^31-1 ms (~24.8 days) overflows and is clamped to **1 ms**, so a `gcTime` of
+ * 30 days collected the cache immediately on unmount, the exact opposite of
+ * what was asked for. Callers may state whatever retention they mean; it is
+ * capped here so the ceiling lives in one place instead of in each call site.
+ */
+const MAX_GC_TIME = 21 * 24 * 60 * 60 * 1000;
+
 export function useCachedQuery<T>(params: {
   queryKey: QueryKey;
   queryFn: () => Promise<T>;
@@ -46,7 +58,13 @@ export function useCachedQuery<T>(params: {
   const queryClient = useQueryClient();
   const [fallback, setFallback] = useState<{ value: T; cachedAt: string } | null>(null);
 
-  const query = useQuery({ queryKey, queryFn, enabled, staleTime, gcTime });
+  const query = useQuery({
+    queryKey,
+    queryFn,
+    enabled,
+    staleTime,
+    gcTime: gcTime === undefined ? undefined : Math.min(gcTime, MAX_GC_TIME),
+  });
 
   useEffect(() => {
     if (query.status === 'success' && query.data !== undefined) {

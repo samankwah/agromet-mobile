@@ -70,7 +70,7 @@ const PLACEHOLDER_SUBSEASONAL: SubseasonalOutlook = {
   temperatureOutlook: { category: 'normal', probabilityPct: 45 },
   confidenceLevel: 'moderate',
   plainLanguageSummary:
-    'Rainfall in weeks 2-4 is more likely than not to be above the long-term average, but this is a probability, not a certainty — conditions can still turn out drier than expected.',
+    'Rainfall in weeks 2-4 is more likely than not to be above the long-term average, but this is a probability, not a certainty. Conditions can still turn out drier than expected.',
   farmerActionCard: {
     headline: 'Plan with flexibility',
     actions: ['Keep planting windows flexible over the next month.', 'Monitor weekly bulletins rather than acting on this outlook alone.'],
@@ -88,7 +88,7 @@ const PLACEHOLDER_SEASONAL: SeasonalOutlook = {
   temperatureOutlook: { category: 'above-normal', probabilityPct: 50 },
   confidenceLevel: 'moderate',
   plainLanguageSummary:
-    'This is a probabilistic climate outlook for the whole season, not a weather forecast — treat it as a planning guide, and follow shorter-range forecasts for day-to-day decisions.',
+    'This is a probabilistic climate outlook for the whole season, not a weather forecast. Treat it as a planning guide, and follow shorter-range forecasts for day-to-day decisions.',
   farmerActionCard: {
     headline: 'Plan the season with contingencies',
     actions: ['Prepare drought-tolerant seed varieties as a backup.', 'Review seasonal advisories before committing to a planting date.'],

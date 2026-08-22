@@ -3,9 +3,20 @@ import { render } from '@testing-library/react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+
+
 import { HomeScreen } from '../../features/home/HomeScreen';
 import { queryClient } from '../../shared/api/queryClient';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
+
+/* Home's quick actions route via `router` and its carousel flows under
+   `useFocusEffect`; neither has a navigation context in a bare render. The flow
+   is stubbed out entirely — see CityCarousel.test.tsx for why an endless
+   animation must not run here. */
+jest.mock('expo-router', () => ({
+  router: { push: jest.fn(), back: jest.fn() },
+  useFocusEffect: () => {},
+}));
 
 // react-native-safe-area-context needs explicit initial metrics in Jest —
 // there's no native layout pass to derive them from, so SafeAreaProvider

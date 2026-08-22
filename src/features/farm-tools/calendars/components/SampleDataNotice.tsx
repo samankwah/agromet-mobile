@@ -25,7 +25,7 @@ export function SampleDataNotice({ reason }: { reason: FallbackReason }) {
       <Ionicons name={offline ? 'cloud-offline-outline' : 'information-circle-outline'} size={18} color={theme.colors.muted} />
       <Text variant="caption" muted style={{ flex: 1 }}>
         {offline
-          ? 'Could not reach the AgroMet server, so these are sample calendars. Check your connection — the published calendars for your district may differ.'
+          ? 'Could not reach the AgroMet server, so these are sample calendars. Check your connection. The published calendars for your district may differ.'
           : 'No calendars have been published for this yet, so these are samples to show what a calendar looks like.'}
       </Text>
     </Card>

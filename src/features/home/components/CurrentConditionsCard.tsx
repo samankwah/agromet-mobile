@@ -11,6 +11,7 @@ import { Text } from '../../../shared/ui/Text';
 import { formatRelativeTime } from '../../../shared/utils/formatRelativeTime';
 import { formatTemperature } from '../../../shared/utils/formatTemperature';
 import { formatWind } from '../../../shared/utils/formatWind';
+import { CurrentConditionsSkeleton } from './HomeSkeletons';
 
 type Props = {
   conditions: CurrentWeather | undefined;
@@ -23,7 +24,7 @@ export function CurrentConditionsCard({ conditions, status, error, onRetry }: Pr
   const theme = useTheme();
 
   return (
-    <AsyncStateView status={status} error={error} onRetry={onRetry}>
+    <AsyncStateView status={status} error={error} onRetry={onRetry} skeleton={<CurrentConditionsSkeleton />}>
       {conditions ? (
         <Card style={{ gap: theme.spacing.md }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>

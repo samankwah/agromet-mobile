@@ -11,6 +11,7 @@ import { AsyncStateView } from '../../../../shared/ui/AsyncStateView';
 import { Card } from '../../../../shared/ui/Card';
 import { SeverityBadge } from '../../../../shared/ui/SeverityBadge';
 import { Text } from '../../../../shared/ui/Text';
+import { AlertBannerSkeleton } from './AlertSkeletons';
 
 type Props = {
   alerts: WeatherAlert[];
@@ -36,7 +37,7 @@ export function AlertBanner({ alerts, status, error, onRetry, hasSavedDistricts,
   const theme = useTheme();
 
   return (
-    <AsyncStateView status={status} error={error} onRetry={onRetry}>
+    <AsyncStateView status={status} error={error} onRetry={onRetry} skeleton={<AlertBannerSkeleton />}>
       {alerts.length === 0 ? (
         <Card>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>

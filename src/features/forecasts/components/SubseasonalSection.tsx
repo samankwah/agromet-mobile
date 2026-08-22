@@ -25,7 +25,7 @@ export function SubseasonalSection({ outlook, status, error, onRetry }: Props) {
   return (
     <View style={{ gap: theme.spacing.lg }}>
       <Text variant="caption" muted>
-        A probability-based outlook for the next 2–4 weeks — not a day-to-day forecast. Use it to plan ahead, and follow the Today and 7-Day
+        A probability-based outlook for the next 2–4 weeks, not a day-to-day forecast. Use it to plan ahead, and follow the Today and 7-Day
         sections for immediate decisions.
       </Text>
       <SubseasonalOutlookCard outlook={outlook} status={status} error={error} onRetry={onRetry} />

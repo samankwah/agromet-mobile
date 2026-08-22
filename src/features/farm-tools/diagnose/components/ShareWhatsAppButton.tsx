@@ -25,9 +25,11 @@ export function ShareWhatsAppButton({ result, request }: Props) {
   return (
     <Button
       label="Share via WhatsApp"
-      variant="secondary"
+      // Outline, not secondary: `secondary` is surfaceStrong with no border,
+      // which is near-invisible against a surface-coloured background.
+      variant="outline"
       onPress={share}
-      icon={<Ionicons name="logo-whatsapp" size={18} color={theme.colors.text} />}
+      icon={<Ionicons name="logo-whatsapp" size={18} color={theme.colors.accent} />}
     />
   );
 }

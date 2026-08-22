@@ -9,6 +9,7 @@ import { Card } from '../../../shared/ui/Card';
 import { MockDataTag } from '../../../shared/ui/MockDataTag';
 import { Text } from '../../../shared/ui/Text';
 import { formatRelativeTime } from '../../../shared/utils/formatRelativeTime';
+import { NewsTeaserSkeleton } from './HomeSkeletons';
 
 type Props = {
   news: NewsUpdate | undefined;
@@ -23,9 +24,13 @@ export function NewsTeaserCard({ news, status, error, onRetry }: Props) {
   const theme = useTheme();
 
   return (
-    <AsyncStateView status={status} error={error} onRetry={onRetry}>
+    <AsyncStateView status={status} error={error} onRetry={onRetry} skeleton={<NewsTeaserSkeleton />}>
       {news ? (
-        <Pressable onPress={() => router.push('/(tabs)/library')} accessibilityRole="button" accessibilityLabel={`News: ${news.title}`}>
+        // Was Library, which no longer exists — that slot is the AgroMet AI
+        // tab now. Advisories rather than the assistant: the README already
+        // settles that bulletins and news reach farmers as the weekly advisory
+        // and its archive, and a chat screen cannot show a news item.
+        <Pressable onPress={() => router.push('/(tabs)/advisories')} accessibilityRole="button" accessibilityLabel={`News: ${news.title}`}>
           <Card style={{ gap: theme.spacing.xs }}>
             <Text variant="caption" muted>
               Latest news

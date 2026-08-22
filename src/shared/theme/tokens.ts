@@ -19,9 +19,40 @@ export type ColorScheme = 'light' | 'dark';
 
 export type ColorTokens = {
   bg: string;
+  /**
+   * The recessed navigation plane — the bottom tab bar's fill.
+   *
+   * Deliberately *darker* than `bg`, which is the opposite direction to
+   * `surface`. In the reference design cards sit forward of the page while the
+   * tab bar sits behind it (measured: page luma 25, bar luma 13, card lighter
+   * still), so chrome recedes and content advances. Paired with an
+   * `accentStrong` rim, that is what marks the bar as navigation rather than
+   * one more card.
+   */
+  chrome: string;
   surface: string;
   surfaceStrong: string;
   border: string;
+  /** Heavier hairline for cards that must be noticed first (Card's `raised`).
+   * Emphasis in a flat, outline-first system comes from border weight, so
+   * this exists rather than reusing `muted`, which is a text colour and too
+   * dark to read as an edge. */
+  borderStrong: string;
+  /*
+   * On the border pair above, note the two schemes run in *opposite*
+   * directions, and deliberately:
+   *
+   *   dark  — border is LIGHTER than `surface`, a rim light. Measured off the
+   *           reference design, whose card fill sits at luma 47 and whose edge
+   *           stroke sits at luma 100, a little over 2x. `dark.border` (~70 on
+   *           a ~35 surface) and `dark.borderStrong` (~102) reproduce that.
+   *   light — border is DARKER than `surface`. A rim light is invisible on a
+   *           pale fill; only a darker hairline reads.
+   *
+   * So do not "fix" one to match the other. Also note `ui/Skeleton.tsx` paints
+   * its placeholder blocks with `border`, so a large jump here makes every
+   * loading state louder.
+   */
   text: string;
   muted: string;
   accent: string;
@@ -35,6 +66,28 @@ export type ColorTokens = {
   onDanger: string;
   focus: string;
   onFocus: string;
+  /**
+   * The chat transcript's three surfaces.
+   *
+   * A conversation needs a colour language the rest of the app does not have:
+   * two bubble fills that say who spoke, readable against each other at a
+   * glance and across a whole screenful. The existing tokens cannot do it —
+   * `accent`/`onAccent` is the *button* language, and a message is not a
+   * control, while `dark.accent` is a bright mint this file already warns
+   * glares as a large fill.
+   *
+   * So `bubbleOut` is the accent hue taken deep in dark and pale in light,
+   * which is the one arrangement where plain `text` reads correctly on both and
+   * no `onBubble` token is needed. `bubbleIn` is the neutral partner, one step
+   * forward of `bg` in each scheme.
+   *
+   * `wallpaperInk` is the doodle pattern behind the transcript; it is drawn at
+   * low opacity, so this is deliberately a colour that stays a whisper rather
+   * than one that reads on its own.
+   */
+  bubbleIn: string;
+  bubbleOut: string;
+  wallpaperInk: string;
   /** Data-series colors for charts. Separate from `warning`/`teal` on
    * purpose: status colors are reserved for status, and reusing one as a
    * series color makes a neutral measurement read as an alert. Both pairs
@@ -46,9 +99,11 @@ export type ColorTokens = {
 
 const light: ColorTokens = {
   bg: '#e9eff4',
+  chrome: '#dbe4ec',
   surface: '#eef3f7',
   surfaceStrong: '#ffffff',
-  border: '#c9d6de',
+  border: '#c2d1db',
+  borderStrong: '#a3b7c4',
   text: '#20303b',
   muted: '#586b78',
   accent: '#23785c',
@@ -66,15 +121,20 @@ const light: ColorTokens = {
   // dark, near-black text reads correctly against either — not scheme-
   // dependent the way onAccent/onTeal are.
   onFocus: '#0c1f18',
+  bubbleIn: '#ffffff',
+  bubbleOut: '#d3ecdf',
+  wallpaperInk: '#c2d1db',
   chartTemp: '#c2610a',
   chartRain: '#0b7f9e',
 };
 
 const dark: ColorTokens = {
   bg: '#111a18',
+  chrome: '#0a1110',
   surface: '#1b2925',
   surfaceStrong: '#223330',
-  border: '#324540',
+  border: '#3a4f49',
+  borderStrong: '#55736a',
   text: '#ecf5ef',
   muted: '#a8b8ad',
   accent: '#60d394',
@@ -88,6 +148,12 @@ const dark: ColorTokens = {
   onDanger: '#2b0d0d',
   focus: '#6fd8a8',
   onFocus: '#0c1f18',
+  bubbleIn: '#1b2925',
+  // Deep, not bright: `accent` pulled down towards `bg` until a bubble-sized
+  // fill sits quiet behind light text. Roughly tint(accent, bg, 0.3), nudged
+  // back towards green so it does not read grey.
+  bubbleOut: '#1c5745',
+  wallpaperInk: '#3a4f49',
   // Deliberately *not* brighter than their light-mode counterparts. A
   // saturated fill this size glares against the near-black `bg`, so these
   // sit in the dark lightness band (OKLCH L 0.48-0.67) rather than above
@@ -126,30 +192,62 @@ export const spacing = {
   '3xl': 32,
 } as const;
 
+/** Two card tiers, matching the reference design: `lg` is the outer card
+ * edge, `md` the blocks nested inside one (and the controls, which share the
+ * nested radius so an input lines up optically with the block beside it).
+ * `sm` stays for chips and small inline marks. */
 export const radii = {
   sm: 8,
-  md: 14,
+  md: 12,
   lg: 20,
 } as const;
 
-/** Flat elevation presets replacing the web app's neumorphic shadows.
- * `card` for resting surfaces, `raised` for anything the user taps
- * (buttons, the alert banner). Cross-platform: `elevation` drives Android,
- * `shadow*` drives iOS. */
+/**
+ * The card silhouette, measured off the reference design. Every corner is a
+ * straight 45-degree cut, none is rounded: `chamfer` on the top-left and
+ * bottom-right, the smaller `minorChamfer` on the top-right and bottom-left.
+ * Rendered as an SVG path (see ui/cardShape.ts) because `borderRadius` cannot
+ * cut a corner straight.
+ *
+ * `nestedChamfer` is the smaller cut for blocks sitting inside a card; in the
+ * reference those pair their chamfer with genuinely *square* corners, so pass
+ * `minorChamfer: 0` for them.
+ *
+ * Values are dp, converted from a 591x1280 screenshot of the reference. The
+ * scale (~1.45 px/dp) is not guessed: the reference's floating tab bar is
+ * inset 23px from each screen edge, which at 1.45 is exactly 16dp — the
+ * standard margin, and the same one `spacing.lg` uses. Raw 1x measurements,
+ * least-squares fitted over the corner profiles, were 16.5/18.3px for the
+ * major pair and 7.0/8.2px for the minor — a 2:1 ratio.
+ */
+export const cardShape = {
+  chamfer: 10,
+  minorChamfer: 5,
+  nestedChamfer: 8,
+} as const;
+
+/**
+ * No elevation. Surfaces are outline-first: a 1px `border` plus the
+ * `surface`/`bg` fill difference does all the separating, at two radii
+ * (see `radii`). Emphasis and state are carried by colour — a stronger
+ * border, or an `accent` fill — never by a shadow or a lift.
+ *
+ * These presets are kept (rather than deleted) because ~9 call sites spread
+ * them into styles; zeroing them here flattens every one at once. Do not
+ * reintroduce shadow values: if a surface reads flat against its
+ * background, strengthen `colors.border` instead. As a bonus this removes
+ * the Android elevation-bleed that `theme/blend.ts`, `AdvisoryPanels` and
+ * `ForecastTable` all work around — those opaque-fill comments describe a
+ * problem that no longer has a cause.
+ */
 export const elevation = {
   card: {
-    elevation: 2,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
+    elevation: 0,
+    shadowOpacity: 0,
   },
   raised: {
-    elevation: 4,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
+    elevation: 0,
+    shadowOpacity: 0,
   },
 } as const;
 

@@ -60,7 +60,7 @@ const TEMPLATES: DiagnosisTemplate[] = [
     immediateActions: [
       'Remove and destroy affected lower leaves to slow spread.',
       'Apply an approved fungicide, following the label rate and interval.',
-      'Avoid overhead watering — water at the base of the plant instead.',
+      'Avoid overhead watering. Water at the base of the plant instead.',
     ],
     preventionGuidance: [
       'Space plants to improve airflow and reduce leaf wetness.',

@@ -8,6 +8,7 @@ import { AsyncStateView } from '../../../shared/ui/AsyncStateView';
 import { Card } from '../../../shared/ui/Card';
 import { Text } from '../../../shared/ui/Text';
 import { formatRelativeTime } from '../../../shared/utils/formatRelativeTime';
+import { MapPreviewSkeleton } from './ForecastSkeletons';
 
 type Props = {
   layers: ForecastMapLayer[] | undefined;
@@ -29,7 +30,7 @@ export function MapPreviewCard({ layers, status, error, onRetry }: Props) {
   const layer = layers?.[0];
 
   return (
-    <AsyncStateView status={status} error={error} onRetry={onRetry} isEmpty={layers?.length === 0} emptyTitle="No map layers available">
+    <AsyncStateView status={status} error={error} onRetry={onRetry} isEmpty={layers?.length === 0} emptyTitle="No map layers available" skeleton={<MapPreviewSkeleton />}>
       {layer ? (
         <Card translucent style={{ gap: theme.spacing.sm }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>

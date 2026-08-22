@@ -10,6 +10,7 @@ import { MockDataTag } from '../../../shared/ui/MockDataTag';
 import { Text } from '../../../shared/ui/Text';
 import { formatRelativeTime } from '../../../shared/utils/formatRelativeTime';
 import { formatTemperature } from '../../../shared/utils/formatTemperature';
+import { FeaturedForecastSkeleton } from './HomeSkeletons';
 
 type Props = {
   forecast: WeeklyForecast | undefined;
@@ -28,7 +29,7 @@ export function FeaturedForecastCard({ forecast, status, error, onRetry }: Props
   const theme = useTheme();
 
   return (
-    <AsyncStateView status={status} error={error} onRetry={onRetry}>
+    <AsyncStateView status={status} error={error} onRetry={onRetry} skeleton={<FeaturedForecastSkeleton />}>
       {forecast ? (
         <Pressable
           onPress={() => router.push('/(tabs)/forecasts')}

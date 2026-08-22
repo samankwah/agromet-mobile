@@ -56,11 +56,26 @@ describe('FarmToolsScreen', () => {
     expect(router.push).toHaveBeenCalledWith('/calendars/poultry');
   });
 
-  it('still marks the genuinely unbuilt tools as coming soon', () => {
+  it('sends the market tool to the market rather than a placeholder', () => {
     renderScreen(<FarmToolsScreen />);
 
-    expect(screen.getByText('Market prices & trends')).toBeTruthy();
-    expect(screen.getByText('Farm reminders')).toBeTruthy();
+    fireEvent.press(screen.getByText('Browse market prices'));
+    expect(router.push).toHaveBeenCalledWith('/market');
+  });
+
+  it('sends the reminders tool to the reminders list rather than a placeholder', () => {
+    renderScreen(<FarmToolsScreen />);
+
+    fireEvent.press(screen.getByText('Open reminders'));
+    expect(router.push).toHaveBeenCalledWith('/reminders');
+  });
+
+  /* Every tool on this screen is now built, so nothing should still be
+     wearing a "Coming soon" pill. */
+  it('has no coming-soon placeholders left', () => {
+    renderScreen(<FarmToolsScreen />);
+
+    expect(screen.queryByText('Coming soon')).toBeNull();
   });
 });
 

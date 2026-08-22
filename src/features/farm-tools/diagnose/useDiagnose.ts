@@ -89,8 +89,16 @@ export function useDiagnose() {
     [isOnline, mutation, refreshQueueCount],
   );
 
+  /** Back to a blank form. The queue is untouched — a queued submission is
+   * still going to send, and clearing the screen must not cancel it. */
+  const reset = useCallback(() => {
+    setResult(null);
+    setLastOutcome(null);
+  }, []);
+
   return {
     submit,
+    reset,
     result,
     lastOutcome,
     isSubmitting: mutation.isPending,

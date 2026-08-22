@@ -15,11 +15,14 @@ type Action = {
 const ACTIONS: Action[] = [
   { label: '7-Day Forecast', icon: 'cloud-outline', route: '/(tabs)/forecasts' },
   { label: 'Advisories', icon: 'megaphone-outline', route: '/(tabs)/advisories' },
-  { label: 'Diagnose Crop', icon: 'leaf-outline', route: '/diagnose' },
+  // A camera, not a leaf: diagnosis is driven by photographing the crop, and
+  // it matches both the web header's icon and the Diagnose screen's own.
+  { label: 'Diagnose Crop', icon: 'camera-outline', route: '/diagnose' },
   // One tile per distinct destination rather than a second tile also
-  // pointing at Farm Tools (which the Diagnose tile already covers) —
-  // Maps is a concrete, glanceable "quick tool" that lives in Library.
-  { label: 'Maps', icon: 'map-outline', route: '/(tabs)/library' },
+  // pointing at Farm Tools, which the Diagnose tile already covers.
+  // Forecasts: the spatial-outlook choropleth is the app's map, and it ships
+  // there. This tile used to land on the old Library tab's placeholder.
+  { label: 'Maps', icon: 'map-outline', route: '/(tabs)/forecasts' },
 ];
 
 export function QuickActionsRow() {

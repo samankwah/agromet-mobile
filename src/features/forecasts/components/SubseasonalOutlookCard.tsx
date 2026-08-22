@@ -10,6 +10,7 @@ import { ConfidenceBadge } from '../../../shared/ui/ConfidenceBadge';
 import { MockDataTag } from '../../../shared/ui/MockDataTag';
 import { Text } from '../../../shared/ui/Text';
 import { OutlookCategoryStat } from './OutlookCategoryStat';
+import { SubseasonalOutlookSkeleton } from './ForecastSkeletons';
 
 type Props = {
   outlook: SubseasonalOutlook | undefined;
@@ -28,7 +29,7 @@ export function SubseasonalOutlookCard({ outlook, status, error, onRetry }: Prop
   const theme = useTheme();
 
   return (
-    <AsyncStateView status={status} error={error} onRetry={onRetry}>
+    <AsyncStateView status={status} error={error} onRetry={onRetry} skeleton={<SubseasonalOutlookSkeleton />}>
       {outlook ? (
         <Card style={{ gap: theme.spacing.sm, borderStyle: 'dashed', borderWidth: 1, borderColor: theme.colors.border }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>

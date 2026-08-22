@@ -1,7 +1,9 @@
-import React from 'react';
-import { Pressable, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Easing, Pressable, ScrollView, View } from 'react-native';
 import { useQueries } from '@tanstack/react-query';
+import { useFocusEffect } from 'expo-router';
 
+import { useReduceMotion } from '../../../shared/a11y/useReduceMotion';
 import { getCurrentConditions } from '../../../shared/api/weatherService';
 import { HOME_LOCATIONS } from '../../../shared/data/mockWeather';
 import { useLocationStore } from '../../../shared/state/locationStore';
@@ -9,49 +11,173 @@ import { useSettingsStore } from '../../../shared/state/settingsStore';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Text } from '../../../shared/ui/Text';
 import { formatTemperature } from '../../../shared/utils/formatTemperature';
+import {
+  MARQUEE_SPEED_PPS,
+  cityCardWidth,
+  citySnapOffsets,
+  marqueeCycleWidth,
+  marqueeOffsetAt,
+} from '../cityCarouselLayout';
 
 /**
- * Replaces the previous increment's LocationSelector — one town-selection
- * mechanism instead of two doing the same job. Each card shows name +
- * condition + current temp at a glance; tap-to-select writes
- * locationStore directly (same interaction LocationSelector had).
+ * Which town the rest of Home — and the whole Forecasts tab — is describing.
  *
- * Data-saver behavior: when enabled, only the selected town's query runs
- * eagerly — the rest stay disabled (showing a lightweight "…" placeholder)
- * until the farmer actually taps them, rather than fetching all 10 towns'
- * conditions up front.
+ * **Even cards, name and temperature only.** The card used to carry the weather
+ * condition too, with no width cap, so the string set the width — "Thunderstorms
+ * likely" made Tamale's card half again as wide as Accra's "Partly cloudy" and
+ * the strip scanned as a ragged pile rather than a row. The condition has not
+ * been lost: `CurrentConditionsCard`, immediately below, shows it in full for
+ * whichever town is selected. Even widths are also what let every distance here
+ * be arithmetic rather than measured — see `cityCarouselLayout.ts`.
+ *
+ * **It flows.** Left alone, the towns stream past continuously at a slow,
+ * constant speed rather than hopping one card at a time. Two consequences shape
+ * the implementation:
+ *
+ *   - The row renders the towns **twice** and translates by exactly one cycle,
+ *     so the loop restarts on an identical frame. A single copy would have to
+ *     rewind visibly at the end.
+ *   - Motion is a `transform` on the native driver, not a scroll position
+ *     nudged from JavaScript. A JS-driven scroll at sixty frames a second is
+ *     precisely what stutters on the low-end Android this app targets, and a
+ *     stuttering carousel is worse than a still one.
+ *
+ * **It never chooses for you.** `selectedLocationId` is untouched by the flow,
+ * so nothing below reloads and the town the farmer picked stays picked.
+ * Advancing the selection on a timer would silently re-fetch conditions,
+ * forecast and advisory over and over; on a metered rural connection that is a
+ * bill, not a flourish.
+ *
+ * **The first touch hands over to a real scroller.** Flowing content cannot
+ * also be swiped or snapped, so touching the strip stops the flow for good and
+ * swaps in a snapping `ScrollView` — starting at the offset the flow had
+ * reached, so nothing jumps. From then on it behaves as a normal strip: flick
+ * and it settles flush, tap a town and it glides to the front. A flow that
+ * resumed after the farmer took hold of it would be fighting them.
+ *
+ * With reduced motion requested, the flow never starts and the scroller is what
+ * renders from the outset.
+ *
+ * Data-saver behaviour: when enabled, only the selected town's query runs
+ * eagerly — the rest stay disabled (showing a "…" placeholder) until the farmer
+ * taps them, rather than fetching all ten towns' conditions up front.
  */
 export function CityCarousel() {
   const theme = useTheme();
+  const scrollRef = useRef<ScrollView>(null);
+  const hasPositioned = useRef(false);
+  const reduceMotion = useReduceMotion();
+
+  const [interacted, setInteracted] = useState(false);
+  const translateX = useRef(new Animated.Value(0)).current;
+  const flowStartedAt = useRef(0);
+  const handoffOffset = useRef(0);
+
   const selectedLocationId = useLocationStore((state) => state.selectedLocationId);
   const setSelectedLocationId = useLocationStore((state) => state.setSelectedLocationId);
+  const hasHydrated = useLocationStore((state) => state.hasHydrated);
   const dataSaverEnabled = useSettingsStore((state) => state.dataSaverEnabled);
 
   const results = useQueries({
     queries: HOME_LOCATIONS.map((location) => ({
       queryKey: ['currentConditions', location.id],
       queryFn: () => getCurrentConditions(location.id),
-      enabled: !dataSaverEnabled || location.id === selectedLocationId,
+      // `hasHydrated` matches every other Home consumer (useHomeData.ts). Without
+      // it a cold start with data-saver on fetches the default town first and the
+      // restored one second.
+      enabled: hasHydrated && (!dataSaverEnabled || location.id === selectedLocationId),
     })),
   });
 
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: theme.spacing.sm }}>
-      {HOME_LOCATIONS.map((location, index) => {
-        const isSelected = location.id === selectedLocationId;
-        const conditions = results[index]?.data;
-        const fg = isSelected ? theme.colors.onAccent : theme.colors.text;
-        const fgMuted = isSelected ? theme.colors.onAccent : theme.colors.muted;
+  const gap = theme.spacing.sm;
+  const cardWidth = cityCardWidth(theme.typeScale.bodyStrong.fontSize);
+  const cycleWidth = marqueeCycleWidth(HOME_LOCATIONS.length, cardWidth, gap);
+  const snapOffsets = useMemo(
+    () => citySnapOffsets(HOME_LOCATIONS.length, cardWidth, gap),
+    [cardWidth, gap],
+  );
+  const selectedIndex = HOME_LOCATIONS.findIndex((location) => location.id === selectedLocationId);
+  const isFlowing = !interacted && !reduceMotion;
 
-        return (
-          <Pressable
-            key={location.id}
-            onPress={() => setSelectedLocationId(location.id)}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: isSelected }}
-            accessibilityLabel={`${location.name}${conditions ? `, ${formatTemperature(conditions.temperatureC)}, ${conditions.condition}` : ''}`}
+  /** Stops the flow and remembers where it had got to, so the scroller can
+   *  start from the same place instead of snapping back to the first town. */
+  const takeOver = useCallback(() => {
+    if (flowStartedAt.current > 0) {
+      handoffOffset.current = marqueeOffsetAt(Date.now() - flowStartedAt.current, cycleWidth);
+    }
+    setInteracted(true);
+  }, [cycleWidth]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isFlowing || cycleWidth <= 0) return;
+
+      translateX.setValue(0);
+      flowStartedAt.current = Date.now();
+
+      const loop = Animated.loop(
+        Animated.timing(translateX, {
+          toValue: -cycleWidth,
+          duration: (cycleWidth / MARQUEE_SPEED_PPS) * 1000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      );
+      loop.start();
+
+      return () => {
+        loop.stop();
+        // Elapsed time, not an Animated listener: a native-driven value only
+        // reaches JS by shipping every frame across the bridge, and the offset
+        // is derivable from the clock for nothing.
+        if (flowStartedAt.current > 0) {
+          handoffOffset.current = marqueeOffsetAt(Date.now() - flowStartedAt.current, cycleWidth);
+        }
+      };
+    }, [isFlowing, cycleWidth, translateX]),
+  );
+
+  useEffect(() => {
+    // Only meaningful once the scroller exists; while the strip is flowing there
+    // is no scroll position to set.
+    if (isFlowing || !hasHydrated || selectedIndex < 0) return;
+
+    // The first positioning is a jump, not a glide: the strip should simply
+    // already be where it belongs. Every later one is a selection the farmer
+    // just made, so it moves visibly and they can follow it.
+    const animated = hasPositioned.current && !reduceMotion;
+    hasPositioned.current = true;
+
+    scrollRef.current?.scrollTo({ x: snapOffsets[selectedIndex], y: 0, animated });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFlowing, hasHydrated, selectedIndex, cardWidth]);
+
+  const renderCard = (location: (typeof HOME_LOCATIONS)[number], index: number, copy = 0) => {
+    const isSelected = location.id === selectedLocationId;
+    const conditions = results[index]?.data;
+    const fg = isSelected ? theme.colors.onAccent : theme.colors.text;
+
+    return (
+      <Pressable
+        key={`${location.id}-${copy}`}
+        onPress={() => {
+          takeOver();
+          setSelectedLocationId(location.id);
+        }}
+        accessibilityRole="radio"
+        accessibilityState={{ selected: isSelected }}
+        accessibilityLabel={`${location.name}${conditions ? `, ${formatTemperature(conditions.temperatureC)}, ${conditions.condition}` : ''}`}
+      >
+        {({ pressed }) => (
+          // Chrome on a View, never on the Pressable — Button.tsx documents why:
+          // Android drops a Pressable's own background and border while still
+          // drawing its children. This component used to style the Pressable
+          // directly and got away with it only because the style was a static
+          // object; a pressed state makes it a function, which is the case that
+          // breaks.
+          <View
             style={{
-              minWidth: 96,
+              width: cardWidth,
               minHeight: theme.minTouchTarget + 16,
               borderRadius: theme.radii.md,
               borderWidth: 1,
@@ -60,29 +186,74 @@ export function CityCarousel() {
               paddingVertical: theme.spacing.sm,
               paddingHorizontal: theme.spacing.md,
               justifyContent: 'center',
-              gap: 2,
+              gap: theme.spacing.xs,
+              opacity: pressed ? 0.7 : 1,
             }}
           >
             <Text variant="bodyStrong" color={fg} numberOfLines={1}>
               {location.name}
             </Text>
-            {conditions ? (
-              <>
-                <Text variant="caption" color={fgMuted} numberOfLines={1}>
-                  {conditions.condition}
-                </Text>
-                <Text variant="body" color={fg}>
-                  {formatTemperature(conditions.temperatureC)}
-                </Text>
-              </>
-            ) : (
-              <Text variant="caption" color={fgMuted}>
-                …
-              </Text>
-            )}
-          </Pressable>
-        );
-      })}
+            <Text variant="body" color={fg}>
+              {conditions ? formatTemperature(conditions.temperatureC) : '…'}
+            </Text>
+          </View>
+        )}
+      </Pressable>
+    );
+  };
+
+  // Runs to both screen edges instead of stopping at the page gutter, so cards
+  // travel off the edge rather than vanishing at an invisible margin. The
+  // matching inner padding keeps the first card on the same gutter as the cards
+  // above and below.
+  const bleed = -theme.spacing.lg;
+
+  if (isFlowing) {
+    return (
+      <View
+        accessibilityRole="radiogroup"
+        accessibilityLabel="Choose a town"
+        style={{ marginHorizontal: bleed, overflow: 'hidden' }}
+        onTouchStart={takeOver}
+      >
+        <Animated.View
+          style={{
+            flexDirection: 'row',
+            gap,
+            paddingHorizontal: theme.spacing.lg,
+            transform: [{ translateX }],
+          }}
+        >
+          {HOME_LOCATIONS.map((location, index) => renderCard(location, index, 0))}
+          {/* The second pass exists only so the loop can restart without a
+              visible rewind, so it is hidden from assistive tech — a screen
+              reader should hear ten towns, not twenty. */}
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{ flexDirection: 'row', gap }}
+          >
+            {HOME_LOCATIONS.map((location, index) => renderCard(location, index, 1))}
+          </View>
+        </Animated.View>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      ref={scrollRef}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      accessibilityRole="radiogroup"
+      accessibilityLabel="Choose a town"
+      snapToOffsets={snapOffsets}
+      decelerationRate="fast"
+      contentOffset={{ x: handoffOffset.current, y: 0 }}
+      style={{ marginHorizontal: bleed }}
+      contentContainerStyle={{ paddingHorizontal: theme.spacing.lg, gap }}
+    >
+      {HOME_LOCATIONS.map((location, index) => renderCard(location, index, 0))}
     </ScrollView>
   );
 }

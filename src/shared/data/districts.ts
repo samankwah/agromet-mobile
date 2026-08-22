@@ -4,12 +4,15 @@
  * for the current-conditions view — see mockWeather.ts), so this is a
  * separate, purpose-built list rather than reusing the town list.
  *
- * Covers the districts of the 10 home towns plus the Northern/Savannah-region
- * districts the two required mock alerts are issued for. Not exhaustive —
- * the backend has no regions/districts table at all today (that catalog
- * only exists client-side in the web app's ghanaCodes.js, 261 districts);
- * this list only needs to be big enough to exercise saved-district
- * filtering meaningfully, and is trivially extendable.
+ * Covers the districts of the 10 home towns, plus one district in every
+ * remaining region so that all sixteen are selectable. That last part matters:
+ * flood and drought readings are published per region, and a region with no
+ * selectable district can never raise an alert for anyone.
+ *
+ * Still not exhaustive — Ghana has 261 MMDAs, listed in `ghanaRegions.ts`. That
+ * list is not used here because its region names carry a " Region" suffix the
+ * hazards API does not accept; the `region` strings below match the backend
+ * verbatim.
  *
  * Note: Koforidua itself is not a literal district name in the web app's
  * ghanaCodes.js (New Juaben North/South Municipal are) — it's included here
@@ -38,6 +41,20 @@ export const DISTRICTS: District[] = [
   { id: 'ho-municipal', name: 'Ho Municipal', region: 'Volta' },
   { id: 'yendi-municipal', name: 'Yendi Municipal', region: 'Northern' },
   { id: 'obuasi-municipal', name: 'Obuasi Municipal', region: 'Ashanti' },
+
+  /* The regional capitals of the eight regions the original ten towns did not
+     reach. Flood and drought readings are published for all sixteen regions,
+     and until these existed a farmer in Bono, Ahafo, Oti, Western, Western
+     North, Bono East, North East or Upper West could not select a district at
+     all — so could never receive an alert, however severe the reading. */
+  { id: 'sekondi-takoradi-metropolitan', name: 'Sekondi-Takoradi Metropolitan', region: 'Western' },
+  { id: 'sefwi-wiawso-municipal', name: 'Sefwi Wiawso Municipal', region: 'Western North' },
+  { id: 'sunyani-municipal', name: 'Sunyani Municipal', region: 'Bono' },
+  { id: 'techiman-municipal', name: 'Techiman Municipal', region: 'Bono East' },
+  { id: 'asunafo-north', name: 'Asunafo North (Goaso)', region: 'Ahafo' },
+  { id: 'krachi-east', name: 'Krachi East (Dambai)', region: 'Oti' },
+  { id: 'east-mamprusi', name: 'East Mamprusi (Nalerigu)', region: 'North East' },
+  { id: 'wa-municipal', name: 'Wa Municipal', region: 'Upper West' },
 ];
 
 export function getDistrictById(id: string): District | undefined {

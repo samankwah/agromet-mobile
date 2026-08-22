@@ -9,6 +9,7 @@ import { Card } from '../../../shared/ui/Card';
 import { MockDataTag } from '../../../shared/ui/MockDataTag';
 import { SeverityBadge } from '../../../shared/ui/SeverityBadge';
 import { Text } from '../../../shared/ui/Text';
+import { AdvisoryTeaserSkeleton } from './HomeSkeletons';
 
 type Props = {
   advisory: AgroAdvisory | undefined;
@@ -24,7 +25,7 @@ export function AdvisoryTeaserCard({ advisory, status, error, onRetry }: Props) 
   const theme = useTheme();
 
   return (
-    <AsyncStateView status={status} error={error} onRetry={onRetry}>
+    <AsyncStateView status={status} error={error} onRetry={onRetry} skeleton={<AdvisoryTeaserSkeleton />}>
       {advisory ? (
         <Pressable
           onPress={() => router.push('/(tabs)/advisories')}

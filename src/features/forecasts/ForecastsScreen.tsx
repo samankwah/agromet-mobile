@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemeProvider, useTheme } from '../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../shared/ui/AsyncStateView';
+import { useTabBarClearance } from '../../shared/ui/tabBarLayout';
 import { Screen } from '../../shared/ui/Screen';
 import { SegmentedControl } from '../../shared/ui/SegmentedControl';
 import { Text } from '../../shared/ui/Text';
@@ -12,6 +14,7 @@ import { TodaySection } from './components/TodaySection';
 import { WeekSection } from './components/WeekSection';
 import { SpatialOutlookView } from './spatial-outlook/SpatialOutlookView';
 import { useForecastsData } from './useForecastsData';
+import { ForecastSectionSkeleton } from './components/ForecastSkeletons';
 
 /** The four standard forecast timescales, in parallel construction — and,
  * deliberately, ordered from deterministic (Daily, Weekly) to probabilistic
@@ -35,6 +38,12 @@ export function ForecastsScreen() {
   const todayError = conditions.error ?? hourly.error ?? weekly.error;
   const today = weekly.data?.days[0];
   const isOutlook = segmentIndex === OUTLOOK_INDEX;
+
+  // The tab bar floats over this screen, so every scroll container here owns
+  // its own bottom clearance (Screen cannot add it: these all pass
+  // `padded={false}`).
+  const tabBarClearance = useTabBarClearance();
+  const insets = useSafeAreaInsets();
 
   const renderHeader = (onBackdrop: boolean) => (
     <>
@@ -63,7 +72,7 @@ export function ForecastsScreen() {
     return (
       <Screen scroll={false} padded={false}>
         <View style={{ paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.lg, gap: theme.spacing.lg }}>{header}</View>
-        <View style={{ flex: 1, marginTop: theme.spacing.lg }}>
+        <View style={{ flex: 1, marginTop: theme.spacing.lg, paddingBottom: tabBarClearance }}>
           <SpatialOutlookView seasonal={seasonal.data} />
         </View>
       </Screen>
@@ -97,10 +106,19 @@ export function ForecastsScreen() {
 
     if (ready && conditions.data) {
       return (
-        <Screen scroll={false} padded={false}>
+        <Screen scroll={false} padded={false} fullBleed>
           <WeatherBackdrop condition={conditions.data.condition} observedAt={conditions.data.observedAt}>
             <ThemeProvider forceScheme="dark">
-              <ScrollView contentContainerStyle={{ padding: theme.spacing.lg, gap: theme.spacing.lg }}>
+              <ScrollView
+                contentContainerStyle={{
+                  padding: theme.spacing.lg,
+                  // fullBleed released the top inset so the photograph runs
+                  // behind the status bar; the hero text still has to clear it.
+                  paddingTop: insets.top + theme.spacing.lg,
+                  paddingBottom: theme.spacing.lg + tabBarClearance,
+                  gap: theme.spacing.lg,
+                }}
+              >
                 {renderHeader(true)}
                 {segmentIndex === 0 ? (
                   <TodaySection
@@ -127,9 +145,15 @@ export function ForecastsScreen() {
 
     return (
       <Screen scroll={false} padded={false}>
-        <ScrollView contentContainerStyle={{ padding: theme.spacing.lg, gap: theme.spacing.lg }}>
+        <ScrollView
+          contentContainerStyle={{
+            padding: theme.spacing.lg,
+            paddingBottom: theme.spacing.lg + tabBarClearance,
+            gap: theme.spacing.lg,
+          }}
+        >
           {header}
-          <AsyncStateView status={sectionStatus} error={sectionError} onRetry={retry}>
+          <AsyncStateView status={sectionStatus} error={sectionError} onRetry={retry} skeleton={<ForecastSectionSkeleton />}>
             {null}
           </AsyncStateView>
         </ScrollView>
@@ -139,7 +163,13 @@ export function ForecastsScreen() {
 
   return (
     <Screen scroll={false} padded={false}>
-      <ScrollView contentContainerStyle={{ padding: theme.spacing.lg, gap: theme.spacing.lg }}>
+      <ScrollView
+        contentContainerStyle={{
+          padding: theme.spacing.lg,
+          paddingBottom: theme.spacing.lg + tabBarClearance,
+          gap: theme.spacing.lg,
+        }}
+      >
         {header}
 
         {segmentIndex === 2 ? (

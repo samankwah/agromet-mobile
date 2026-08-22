@@ -28,7 +28,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   favouriteDistrictIds: [],
   favouriteCrops: [],
   livestockType: 'none',
-  notificationPrefs: { alertsEnabled: true, advisoriesEnabled: true, bulletinsEnabled: true },
+  notificationPrefs: { alertsEnabled: true, advisoriesEnabled: true, bulletinsEnabled: true, remindersEnabled: true },
 };
 
 function toggleInArray(list: string[], value: string): string[] {

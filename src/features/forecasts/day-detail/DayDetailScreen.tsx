@@ -25,6 +25,7 @@ import { formatWind } from '../../../shared/utils/formatWind';
 import { getConditionIcon } from '../../../shared/utils/getConditionIcon';
 import { DayStrip } from './DayStrip';
 import { HourlyConditionStrip, hasVaryingConditions } from './HourlyConditionStrip';
+import { DayDetailSkeleton } from '../components/ForecastSkeletons';
 
 const X_LABELS = [
   { at: 0, label: '12AM' },
@@ -89,7 +90,12 @@ export function DayDetailScreen({ date }: Props) {
           gap: theme.spacing.lg,
         }}
       >
-        <AsyncStateView status={query.status} error={query.error} onRetry={query.refetch}>
+        <AsyncStateView
+          status={query.status}
+          error={query.error}
+          onRetry={query.refetch}
+          skeleton={<DayDetailSkeleton chartWidth={width - theme.spacing.lg * 2} />}
+        >
           {query.data ? (
             <DayDetail
               day={query.data.day}

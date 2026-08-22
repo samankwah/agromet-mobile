@@ -72,6 +72,47 @@ function roundCoordinates(node) {
   return node.map(roundCoordinates);
 }
 
+/**
+ * Drops the interior rings the dissolve leaves behind.
+ *
+ * Districts are simplified individually, above, and only then dissolved. That
+ * ordering is not topology-preserving: simplifying a shared border moves its
+ * vertices differently depending on which district is being simplified, so
+ * neighbours stop matching exactly and the union leaves a hairline gap along
+ * every internal boundary. Those gaps survive as holes and render as district
+ * seams cut through what should be one solid region -- 467 of them across the
+ * sixteen regions when this was first measured.
+ *
+ * Ghana has no region enclosing non-region territory, so an interior ring here
+ * is always an artefact. The proper fix is topology-aware simplification
+ * (mapshaper) or dissolving before simplifying; this is the cheap correct
+ * result in the meantime, and it is safe precisely because of that
+ * no-enclaves property.
+ */
+function ringArea(ring) {
+  let area = 0;
+  for (let i = 0; i < ring.length - 1; i += 1) {
+    area += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+  }
+  return Math.abs(area / 2);
+}
+
+function withoutSliverHoles(geometry) {
+  if (geometry.type === 'Polygon') {
+    return { type: 'Polygon', coordinates: [geometry.coordinates[0]] };
+  }
+  if (geometry.type !== 'MultiPolygon') return geometry;
+
+  // Outer ring of every part, then drop the parts too small to be real
+  // coastline. Unioning 260 independently-simplified districts leaves detached
+  // specks along the borders as well as interior slivers -- the national
+  // outline came out of this with 724 rings, 723 of them slivers, every one of
+  // which was being stroked across the map.
+  const parts = geometry.coordinates.map((part) => [part[0]]);
+  const largest = Math.max(...parts.map((part) => ringArea(part[0])));
+  return { type: 'MultiPolygon', coordinates: parts.filter((part) => ringArea(part[0]) > largest * 0.0005) };
+}
+
 function roundGeometry(geometry) {
   return { ...geometry, coordinates: roundCoordinates(geometry.coordinates) };
 }
@@ -139,7 +180,9 @@ function main() {
     return feature.geometry.coordinates.map((coords) => turf.polygon(coords, { region: feature.properties.region }));
   });
   const dissolved = turf.dissolve(turf.featureCollection(singlePolygonFeatures), { propertyName: 'region' });
-  const regionFeatures = dissolved.features.map((feature) => turf.feature(feature.geometry, { name: feature.properties.region }));
+  const regionFeatures = dissolved.features.map((feature) =>
+    turf.feature(withoutSliverHoles(feature.geometry), { name: feature.properties.region }),
+  );
 
   // Union everything into one national outline.
   let country = districtFeatures[0];
@@ -179,7 +222,7 @@ function main() {
     generatedAt: new Date().toISOString(),
     bounds: { minLng, minLat, maxLng, maxLat },
     gridResolutionDeg: GRID_RESOLUTION_DEG,
-    country: turf.feature(roundGeometry(countryFeature.geometry), countryFeature.properties),
+    country: turf.feature(roundGeometry(withoutSliverHoles(countryFeature.geometry)), countryFeature.properties),
     regions: regionFeatures.map((feature) => turf.feature(roundGeometry(feature.geometry), feature.properties)),
     districts: districtFeatures.map((feature) =>
       turf.feature(roundGeometry(feature.geometry), { name: feature.properties.name, region: feature.properties.region }),

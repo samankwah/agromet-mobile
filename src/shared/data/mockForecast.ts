@@ -40,8 +40,8 @@ function buildWeeklyForecast(locationId: string): WeeklyForecast {
       windKph: current.windKph,
       humidityPct: current.humidityPct,
       farmerInterpretation: isRainy
-        ? 'Expect rain — hold off on spraying or fertilizer application this day.'
-        : 'Dry conditions expected — a good window for fieldwork.',
+        ? 'Expect rain, so hold off on spraying or fertilizer application this day.'
+        : 'Dry conditions expected, a good window for fieldwork.',
     };
   });
 

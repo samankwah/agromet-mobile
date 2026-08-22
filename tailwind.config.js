@@ -27,8 +27,10 @@ module.exports = {
           danger: '#be4141',
         },
       },
+      // Mirrors tokens.ts `radii`: `neo` is the nested-block tier, `neo-lg`
+      // the outer card edge. Keep both in step with tokens.ts.
       borderRadius: {
-        neo: '14px',
+        neo: '12px',
         'neo-lg': '20px',
       },
     },

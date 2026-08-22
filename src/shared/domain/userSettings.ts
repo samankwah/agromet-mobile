@@ -14,6 +14,12 @@ export type NotificationPrefs = {
   alertsEnabled: boolean;
   advisoriesEnabled: boolean;
   bulletinsEnabled: boolean;
+  /**
+   * The only one of these that is wired to anything today: it gates whether
+   * farm reminders schedule an OS notification. Turning it off cancels every
+   * scheduled reminder; turning it on reschedules them.
+   */
+  remindersEnabled: boolean;
 };
 
 export type UserSettings = {

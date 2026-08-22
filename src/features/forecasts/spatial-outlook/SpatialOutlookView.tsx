@@ -17,6 +17,7 @@ import { MockDataTag } from '../../../shared/ui/MockDataTag';
 import { SegmentedControl } from '../../../shared/ui/SegmentedControl';
 import { Text } from '../../../shared/ui/Text';
 import { useSpatialOutlookData } from './useSpatialOutlookData';
+import { SpatialOutlookSkeleton } from '../components/ForecastSkeletons';
 
 const FORECAST_VIEW_SEGMENTS = ['Probability', 'Deterministic'];
 const GEOGRAPHY_SEGMENTS = ['Region', 'District'];
@@ -63,7 +64,7 @@ export function SpatialOutlookView({ seasonal }: Props) {
 
   return (
     <View style={{ flex: 1 }}>
-      <AsyncStateView status={status} error={error} onRetry={refetch}>
+      <AsyncStateView status={status} error={error} onRetry={refetch} skeleton={<SpatialOutlookSkeleton />}>
         {/* Online: MapLibre over a CARTO basemap, so the forecast reads
             against real place names and roads. Offline: fall back to the
             SVG renderer, which draws the same data from the boundary file

@@ -1,7 +1,7 @@
 # AgroMet Ghana — Mobile
 
 A native React Native + Expo app delivering agrometeorological alerts,
-advisories, forecasts, farm tools, and a bulletin library to Ghanaian
+advisories, forecasts, farm tools, and reference material to Ghanaian
 farmers. Part of the AgroMet monorepo, alongside `frontend/` (the web app /
 admin surface) and `backend/` (FastAPI). This is a native app, not a
 WebView wrapper.
@@ -14,13 +14,68 @@ Five bottom tabs, each covering a distinct area of the product:
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Home**       | Real — alert banner, city carousel, current conditions, quick actions, featured forecast, latest advisory, latest news                                                                                                     |
 | **Forecasts**  | Real — Today (hourly strip + stats + a farm-actionable card), 7-Day (expandable list with a min–max range bar), and Outlook (subseasonal + seasonal, marked as probabilistic), plus a lightweight, honest map preview card |
-| **Advisories** | Real Weather Alerts (relocated from the previous increment) + placeholder sections for crop-specific advisory, flood/drought monitoring, and the advisory archive                                                          |
-| **Farm Tools** | Real Crop Diagnose (relocated, reached via its own screen from a card here) + placeholder sections for crop/poultry calendars, market prices, and reminders                                                                |
-| **Library**    | Placeholder — bulletins, news, maps, FAQs, contacts, and settings are a future milestone                                                                                                                                   |
+| **Advisories** | Real — weather alerts derived from the hazard index, crop and poultry advisories, flood/drought monitoring, and a searchable advisory archive        |
+| **Farm Tools** | Crop Diagnose, crop/poultry calendars, market prices and farm reminders — every tool on this tab is built and routes out from here                                                                                        |
+| **AgroMet AI** | Real — a conversational assistant over the backend's `/api/chat`, in a messaging layout: multi-turn context, day-grouped tailed bubbles, starter questions, inline retry |
 
-Everything currently runs on mock data, clearly tagged in development (see
-"Mock data" below). See "Mock services" for how that's structured and how
-to swap in a real backend later.
+Settings live at `app/settings.tsx`, reached from the gear in the Home
+header. It is deliberately not a sixth tab: the five tabs run with
+`headerShown: false` and Home is the screen every session starts from, so that
+is the one place an app-level utility belongs.
+
+The fifth tab used to be **Library**, a single card of four FAQ answers. The
+assistant replaced it: the backend had been serving `/api/chat` all along with
+nothing in this app calling it, and a conversation is a better use of the slot
+than a static list. The FAQ *data layer* is deliberately retained, unused, for
+the planned Mobile Menu — see `src/features/library/useFaqs.ts`, which explains
+which five files that covers and why none of them is dead code.
+
+Several areas still run on mock data, clearly tagged in development (see
+"Mock data" below). See "Mock services" for which are real and which are
+not, and how to swap the rest in.
+
+## Farm reminders and notifications
+
+Reminders are **device-local**. There is no reminders table, scheduler or push
+infrastructure on the AgroMet backend, and a farmer with no signal is the case
+this app is built for — so `shared/state/reminderStore.ts` (zustand + persist,
+`agromet:zustand:reminders`) is the source of truth. The OS notification is a
+projection of it, not the record.
+
+A reminder can be created three ways: typed in on the reminders screen, from a
+crop or poultry calendar activity (which needs a started cycle, because a week
+number only becomes a date once one is running), or from a weather alert.
+
+### Notifications need a development build
+
+`expo-notifications` cannot deliver Android local notifications from **Expo Go**
+— support was removed in SDK 53. In Expo Go the reminders list works fully and
+the screen says plainly that alerts will not fire; it does not pretend the
+schedule was accepted. To get real alerts:
+
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest init      # writes extra.eas.projectId into app.json
+npx eas-cli@latest build --profile development --platform android
+npx expo start --dev-client
+```
+
+`eas.json`'s `development` profile already sets `developmentClient: true`, so no
+build configuration changes are needed.
+
+### Known limitation, stated rather than papered over
+
+On Android 12+ an exact alarm can still be deferred by OEM battery
+optimisation, which is common on exactly the low-end devices this app targets.
+`SCHEDULE_EXACT_ALARM` and `USE_EXACT_ALARM` are declared and the reminders
+channel is created at `HIGH` importance, which is as far as an app can go.
+**Reminders are best-effort at the OS level; the in-app list is the reliable
+record.** A row whose notification is not registered says "No alert" rather than
+looking identical to one that is.
+
+`reconcile()` re-registers notifications on launch, because the OS drops
+scheduled ones on reinstall and a reminder created while permission was denied
+never had one.
 
 ## Prerequisites
 
@@ -77,10 +132,11 @@ npx tsc --noEmit       # type-check
 
 ```
 app/                          Expo Router routes — thin, just render a screen
-  (tabs)/                      Home, Forecasts, Advisories, Farm Tools, Library tabs
+  (tabs)/                      Home, Forecasts, Advisories, Farm Tools, AgroMet AI tabs
   alert/[id].tsx                Alert details
   saved-districts.tsx           Manage which districts you get alerts for
   diagnose.tsx                  Crop Diagnose (reached from a Farm Tools card, not a tab itself)
+  settings.tsx                  App settings (reached from the gear in the Home header, not a tab)
   spatial-outlook.tsx           Seasonal Outlook's gridded map (reached from SeasonalOutlookCard, not a tab)
 src/
   features/
@@ -92,7 +148,11 @@ src/
       diagnose/                   Diagnose form, photo capture, result card, WhatsApp share
       FarmToolsScreen.tsx          Composed screen: live diagnose entry + stub sections
     forecasts/                   Today / 7-Day / Outlook segmented screen, useForecastsData, components/
-    library/                     Placeholder screen
+    chat/                        AgroMet AI: transcript reducer (useChat), tailed bubbles, doodle wallpaper,
+                                 contact header, pill composer + attachment grid, starter prompts
+    library/                     Retained FAQ layer (useFaqs, FaqItem, LibrarySkeleton) — no screen renders it
+                                 today; held for the planned Mobile Menu, not dead code
+    settings/                    App settings: appearance, text size, data saver, reminder alerts
   shared/
     domain/                      TypeScript types for every feature area (see "Domain models" below)
     data/                        Mock data — one file per domain, clearly the swap target for real content
@@ -102,9 +162,11 @@ src/
     net/                         Connectivity hook (NetInfo)
     theme/                       Design tokens (ported from the web app's palette) + ThemeProvider
     ui/                          Shared primitives — Screen, Card, Button, Text, AsyncStateView, EmptyState,
-                                  ComingSoon, ComingSoonCard, OfflineBanner, SeverityBadge, MockDataTag,
-                                  StatTile, BulletList, DetailRow, SegmentedControl, TemperatureRangeBar,
-                                  ConfidenceBadge, ChoroplethMap, ColorScaleLegend, Dropdown, Drawer
+                                  Skeleton, OfflineBanner, SeverityBadge, MockDataTag, StatTile, BulletList,
+                                  DetailRow, Divider, FieldLabel, TextField, DateTimeField, OptionSheet,
+                                  SegmentedControl, TemperatureRangeBar, ConfidenceBadge, ChoroplethMap,
+                                  MapLibreChoropleth, ColorScaleLegend, LineAreaChart, WeatherBackdrop,
+                                  Dropdown, Drawer
     utils/                       Formatting helpers
   tests/                        Jest tests, mirroring the src/ structure
 ```
@@ -124,6 +186,10 @@ Two different jobs, two different tools:
   - `settingsStore.ts` — theme override, text size, data-saver mode,
     language, favourite districts/crops, livestock type, notification
     preferences. Backs `ThemeProvider`'s dark-mode/text-size resolution.
+    Only four of these are wired to a consumer — theme, text size, data
+    saver and `notificationPrefs.remindersEnabled` — and `app/settings.tsx`
+    deliberately exposes only those four. See that screen's header comment
+    before adding a control for any of the others.
   - `authStore.ts` — a guest-only placeholder (`{ mode: 'guest', guestId }`)
     so later milestones don't have to retrofit an auth concept into
     stores/components that assumed a single implicit user.
@@ -156,10 +222,15 @@ no real map imagery), but the screens built against them are real, not
 stubs.
 
 **Signature + placeholder mock only, no UI yet** (types exist now so the
-milestone that builds their UI is pure UI work): `bulletinService`,
+milestone that builds their UI is pure UI work):
 `calendarService`, `poultryCalendarService`, `marketService`,
-`reminderService`, `mapService`, `settingsService` (a no-op sync
+`mapService`, `settingsService` (a no-op sync
 placeholder — settings are store-owned), `authService` (guest-only).
+
+`bulletinService` and its mock used to sit in that list. They were deleted
+rather than carried: there is no bulletins endpoint, and real bulletins
+already reach farmers as the weekly advisory and its archive under
+Advisories, so the placeholder only implied a feature that was not coming.
 
 Real-integration notes:
 
@@ -192,7 +263,7 @@ via a `kind` discriminant), `DiagnosisRequest`/`DiagnosisResult`/
 can't be rendered without also carrying its own uncertainty explanation),
 `ForecastMapLayer`/`MapLayer`, `CropCalendar`/`CropCalendarActivity`,
 `PoultryCalendar`/`PoultryGuidanceItem`, `MarketCommodity`/`MarketTrend`,
-`FarmReminder`, `Bulletin`, `NewsUpdate`, `UserSettings`, `Account`.
+`FarmReminder`, `NewsUpdate`, `UserSettings`, `Account`.
 
 `SpatialOutlookDataset`/`SpatialGridCell` (`shared/domain/spatialOutlook.ts`)
 back the Seasonal Outlook's gridded map — see "Seasonal Outlook spatial

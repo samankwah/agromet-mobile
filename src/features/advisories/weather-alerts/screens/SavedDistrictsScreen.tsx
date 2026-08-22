@@ -12,7 +12,7 @@ import { Text } from '../../../../shared/ui/Text';
 /**
  * The one place a farmer manages which districts they get alerts for —
  * reached from AlertBanner's empty state or AlertDetailsScreen, not
- * duplicated as a second nav entry elsewhere (e.g. the Library tab).
+ * duplicated as a second nav entry elsewhere.
  * Saved-district selection lives in `locationStore` (Zustand) —
  * this screen reads/writes it directly, no local component state needed.
  */
