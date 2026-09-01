@@ -49,24 +49,24 @@ describe('FarmToolsScreen', () => {
   it('offers both calendars as real destinations, not placeholders', () => {
     renderScreen(<FarmToolsScreen />);
 
-    fireEvent.press(screen.getByText('Browse crop calendars'));
+    fireEvent.press(screen.getByLabelText('Browse crop calendars'));
     expect(router.push).toHaveBeenCalledWith('/calendars/crop');
 
-    fireEvent.press(screen.getByText('Browse poultry calendars'));
+    fireEvent.press(screen.getByLabelText('Browse poultry calendars'));
     expect(router.push).toHaveBeenCalledWith('/calendars/poultry');
   });
 
   it('sends the market tool to the market rather than a placeholder', () => {
     renderScreen(<FarmToolsScreen />);
 
-    fireEvent.press(screen.getByText('Browse market prices'));
+    fireEvent.press(screen.getByLabelText('Browse market prices'));
     expect(router.push).toHaveBeenCalledWith('/market');
   });
 
   it('sends the reminders tool to the reminders list rather than a placeholder', () => {
     renderScreen(<FarmToolsScreen />);
 
-    fireEvent.press(screen.getByText('Open reminders'));
+    fireEvent.press(screen.getByLabelText('Open reminders'));
     expect(router.push).toHaveBeenCalledWith('/reminders');
   });
 

@@ -1,26 +1,30 @@
 import React from 'react';
 import { View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { Archive, Drop, Egg, Leaf } from 'phosphor-react-native';
 
 import { useLocationStore } from '../../shared/state/locationStore';
-import { useTheme } from '../../shared/theme/ThemeProvider';
-import { Button } from '../../shared/ui/Button';
-import { Card } from '../../shared/ui/Card';
+import { HubGrid, HubTile } from '../../shared/ui/HubGrid';
+import { AppHeader } from '../../shared/ui/AppHeader';
 import { Screen } from '../../shared/ui/Screen';
 import { Text } from '../../shared/ui/Text';
-import { AlertBanner } from './weather-alerts/components/AlertBanner';
+import { AlertBanner, alertBannerHasContent } from './weather-alerts/components/AlertBanner';
 import { useAlerts } from './weather-alerts/useAlerts';
 import { useHazardSummary } from './flood-drought/useHazards';
 
 /**
  * Composed screen. Weather Alerts is live inline, from the flood/drought index;
- * everything else is a card that routes out to its own screen — the weekly crop
- * and poultry advisories, the flood and drought monitor, and the archive.
+ * everything else is a tile in the grid below, routing out to its own screen —
+ * the weekly crop and poultry advisories, the flood and drought monitor, and
+ * the archive.
  *
- * Every row here now goes somewhere. The last two were placeholders holding
- * their place in the information architecture until the features existed,
- * which they now do.
+ * Every tile here goes somewhere. The last two were placeholders holding their
+ * place in the information architecture until the features existed, which they
+ * now do.
+ *
+ * The tiles carry no description. They used to, and it mostly restated the
+ * title in a longer form while pushing the fourth destination off the bottom of
+ * the screen. What survives is the live figure under Flood & drought, which is
+ * data the reader could not have guessed.
  */
 export function AdvisoriesScreen() {
   const savedDistrictIds = useLocationStore((state) => state.savedDistrictIds);
@@ -31,97 +35,64 @@ export function AdvisoriesScreen() {
   const hazards = useHazardSummary();
 
   return (
-    <Screen>
-      <Text variant="h1">Advisories</Text>
+    // `wallpaper`: same page ground as Home and the chat — see Screen's prop.
+    <Screen wallpaper>
+      <AppHeader title="Advisories" />
+      {/* Heading and card together, or neither. The banner renders nothing when
+          there is no alert to raise, and a "Weather Alerts" heading standing
+          over an empty gap reads as a section that failed to load.
 
-      <View>
-        <Text variant="h3" style={{ marginBottom: 8 }}>
-          Weather Alerts
-        </Text>
-        <AlertBanner
-          alerts={alerts.alerts}
-          status={alerts.status}
-          error={alerts.error}
-          onRetry={alerts.refetch}
-          hasSavedDistricts={savedDistrictIds.length > 0}
-          usingCachedFallback={alerts.usingCachedFallback}
-          cachedAt={alerts.cachedAt}
-        />
-      </View>
-
-      <AdvisoryCard
-        icon="leaf-outline"
-        title="Crop advisory"
-        message="This week’s weather for your crop and district, what it means, and what to do about it."
-        actionLabel="Open crop advisory"
-        route="/advisory/crop"
-      />
-      <AdvisoryCard
-        icon="egg-outline"
-        title="Poultry advisory"
-        message="Management targets and recommended actions for your flock this week."
-        actionLabel="Open poultry advisory"
-        route="/advisory/poultry"
-      />
-      <AdvisoryCard
-        icon="water-outline"
-        title="Flood & drought"
-        message="Current flood and drought conditions across Ghana's sixteen regions, measured against a thirty-year baseline."
-        hint={
-          hazards.national
-            ? `${hazards.national.floodElevated} on flood alert · ${hazards.national.droughtElevated} in drought stress`
-            : undefined
-        }
-        actionLabel="Open flood & drought"
-        route="/flood-drought"
-      />
-      <AdvisoryCard
-        icon="archive-outline"
-        title="Advisory archive"
-        message="Every advisory published for your region. Search by activity, or narrow it to a district and year."
-        actionLabel="Open the archive"
-        route="/advisory-archive"
-      />
-    </Screen>
-  );
-}
-
-/** One section of the tab: an icon, a sentence, an optional live figure, and a
- * button through to the feature. */
-function AdvisoryCard({
-  icon,
-  title,
-  message,
-  actionLabel,
-  route,
-  hint,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  message: string;
-  actionLabel: string;
-  route: '/advisory/crop' | '/advisory/poultry' | '/flood-drought' | '/advisory-archive';
-  /** A live figure from the section itself, when there is one worth showing
-   * before the reader taps through. */
-  hint?: string;
-}) {
-  const theme = useTheme();
-
-  return (
-    <Card style={{ gap: theme.spacing.sm }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-        <Ionicons name={icon} size={20} color={theme.colors.accent} />
-        <Text variant="h3">{title}</Text>
-      </View>
-      <Text variant="body" muted>
-        {message}
-      </Text>
-      {hint ? (
-        <Text variant="caption" muted>
-          {hint}
-        </Text>
+          Full width, above the grid: it is a live alert, not a destination. */}
+      {alertBannerHasContent({
+        status: alerts.status,
+        alerts: alerts.alerts,
+        hasSavedDistricts: savedDistrictIds.length > 0,
+      }) ? (
+        <View>
+          <Text variant="h3" style={{ marginBottom: 8 }}>
+            Weather Alerts
+          </Text>
+          <AlertBanner
+            alerts={alerts.alerts}
+            status={alerts.status}
+            error={alerts.error}
+            onRetry={alerts.refetch}
+            hasSavedDistricts={savedDistrictIds.length > 0}
+            usingCachedFallback={alerts.usingCachedFallback}
+            cachedAt={alerts.cachedAt}
+          />
+        </View>
       ) : null}
-      <Button label={actionLabel} variant="outline" onPress={() => router.push(route)} />
-    </Card>
+
+      <HubGrid>
+        <HubTile icon={Leaf} title="Crop advisory" linkLabel="Read advisory" actionLabel="Open crop advisory" route="/advisory/crop" />
+        <HubTile
+          icon={Egg}
+          title="Poultry advisory"
+          linkLabel="Read advisory"
+          actionLabel="Open poultry advisory"
+          route="/advisory/poultry"
+        />
+        <HubTile
+          icon={Drop}
+          title="Flood & drought"
+          hint={
+            hazards.national
+              ? `${hazards.national.floodElevated} on flood alert · ${hazards.national.droughtElevated} in drought stress`
+              : undefined
+          }
+          linkLabel="See conditions"
+          actionLabel="Open flood & drought"
+          route="/flood-drought"
+        />
+        <HubTile
+          icon={Archive}
+          title="Advisory archive"
+          linkLabel="Browse archive"
+          actionLabel="Open the archive"
+          route="/advisory-archive"
+        />
+      </HubGrid>
+    </Screen>
   );
 }
