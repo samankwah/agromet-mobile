@@ -1,6 +1,3 @@
-// NativeWind's global stylesheet — must be imported once, at the app root.
-import '../global.css';
-
 import { useCallback, useEffect } from 'react';
 import { LogBox, Pressable, View } from 'react-native';
 import { Stack, router } from 'expo-router';
@@ -188,10 +185,7 @@ function RootNavigator() {
               renames the header as the farmer moves through it. `headerRight`
               stays put, because past diagnoses is reachable from every step and
               is the only route back to a queued submission's answer. */}
-          <Stack.Screen
-            name="diagnose"
-            options={{ title: 'Add a photo', headerRight: () => <PastDiagnosesButton /> }}
-          />
+          <Stack.Screen name="diagnose" options={{ title: 'Add a photo', headerRight: () => <PastDiagnosesButton /> }} />
           <Stack.Screen name="diagnosis-history" options={{ title: 'Past diagnoses' }} />
           <Stack.Screen name="calendars/[kind]" options={{ title: 'Calendars' }} />
           <Stack.Screen name="calendar/[id]" options={{ title: 'Calendar' }} />

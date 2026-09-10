@@ -15,10 +15,9 @@ jest.mock('@react-native-async-storage/async-storage', () => require('@react-nat
 // and a bare View ref has no such method, so every screen embedding a map threw
 // on selection. The stub records nothing because there is no JS engine behind
 // it to run the script against.
-// Built out here rather than inside the factory: nativewind's babel transform
-// rewrites any component defined in there and jest then rejects the factory for
-// referencing its injected helper. A `mock`-prefixed name is the escape hatch
-// jest documents for exactly this.
+// Built out here rather than inside the factory: jest hoists `jest.mock` above
+// the file and forbids its factory from referencing an outer variable unless
+// the name is `mock`-prefixed, which is the escape hatch jest documents.
 const mockWebView = (() => {
   const React = require('react');
   const { View } = require('react-native');
@@ -78,8 +77,8 @@ jest.mock('expo-constants', () => ({
 // transcript, cancel discards) and none of that needs real audio.
 //
 // `mock`-prefixed and built outside the factory for the same reason the WebView
-// mock is: nativewind's babel transform otherwise injects a helper the factory
-// is not allowed to reference.
+// mock is: jest forbids a hoisted mock factory from referencing an outer
+// variable unless its name is `mock`-prefixed.
 const mockAudioRecorder = {
   prepareToRecordAsync: jest.fn(async () => {}),
   record: jest.fn(),
@@ -117,7 +116,7 @@ jest.mock('expo-sharing', () => ({
 // is exercised without a device.
 //
 // Defined outside the factory under a `mock`-prefixed name for the same reason
-// as the WebView stub above.
+// as the WebView stub above (jest's hoisted-factory scope rule).
 const mockTflite = (() => {
   const CLASS_COUNT = 5;
   const INPUT_SIZE = 224;

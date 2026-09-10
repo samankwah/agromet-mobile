@@ -9,10 +9,10 @@
  * low-end Android, so `elevation` below replaces it with flat, standard
  * shadow/elevation presets instead of porting the neumorphism.
  *
- * This file is plain TypeScript (not NativeWind classes) so it can be
- * imported anywhere a class name won't work — `StatusBar` style, the
- * `tabBarActiveTintColor` prop, chart colors, etc. `tailwind.config.js`
- * mirrors these same values under the `neo` namespace for NativeWind use.
+ * Styling is plain inline style objects plus `useTheme()`; this file is
+ * their single source. It stays plain TypeScript so it can also be imported
+ * where a style object won't reach — `StatusBar` style, the
+ * `tabBarActiveTintColor` prop, chart colors, etc.
  */
 
 export type ColorScheme = 'light' | 'dark';

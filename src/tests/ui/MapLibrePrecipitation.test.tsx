@@ -7,9 +7,8 @@ const mockInject = jest.fn();
    `injectJavaScript`. The whole contract under test here is what crosses that
    bridge, so it has to be observable.
    Built outside the factory with a `mock`-prefixed name for the reason
-   jest.setup.js documents: nativewind's babel transform rewrites a component
-   defined inside one, and jest then rejects the factory for referencing its
-   injected helper. */
+   jest.setup.js documents: jest hoists the factory and forbids it from
+   referencing an outer variable unless the name is `mock`-prefixed. */
 const mockWebViewComponent = (() => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- a jest mock factory cannot use ESM imports
   const ReactLocal = require('react');
@@ -56,11 +55,7 @@ function frame(validAt: string): PrecipFrame {
   };
 }
 
-const FRAMES = [
-  frame('2026-08-26T09:00:00.000Z'),
-  frame('2026-08-26T09:30:00.000Z'),
-  frame('2026-08-26T10:00:00.000Z'),
-];
+const FRAMES = [frame('2026-08-26T09:00:00.000Z'), frame('2026-08-26T09:30:00.000Z'), frame('2026-08-26T10:00:00.000Z')];
 
 function renderMap(index: number) {
   return render(
