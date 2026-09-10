@@ -9,6 +9,12 @@ import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 
 jest.mock('expo-router', () => ({ router: { push: jest.fn(), back: jest.fn() } }));
 
+// `mock`-prefixed so jest's hoisted factory is allowed to close over it.
+const mockOpenSettings = jest.fn();
+jest.mock('../../shared/location/locationClient', () => ({
+  openLocationSettings: () => mockOpenSettings(),
+}));
+
 // See HomeScreen.test.tsx for why initialMetrics is required in Jest.
 const TEST_SAFE_AREA_METRICS = {
   frame: { x: 0, y: 0, width: 360, height: 800 },
@@ -21,7 +27,14 @@ function renderBanner(props: Partial<React.ComponentProps<typeof AlertBanner>> =
   return render(
     <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
       <ThemeProvider>
-        <AlertBanner alerts={[]} status="success" onRetry={onRetry} hasSavedDistricts={false} {...props} />
+        <AlertBanner
+          alerts={[]}
+          status="success"
+          onRetry={onRetry}
+          hasDistrictScope={false}
+          locationPrompt={false}
+          {...props}
+        />
       </ThemeProvider>
     </SafeAreaProvider>,
   );
@@ -48,6 +61,7 @@ function alert(overrides: Partial<WeatherAlert> = {}): WeatherAlert {
 
 beforeEach(() => {
   onRetry.mockClear();
+  mockOpenSettings.mockClear();
 });
 
 describe('AlertBanner', () => {
@@ -85,7 +99,7 @@ describe('AlertBanner', () => {
     // reading stands for ten minutes against a six-hourly model, so that card
     // was what both Home and Advisories showed nearly all the time — a
     // permanent, prominent report of no news.
-    renderBanner({ status: 'success', alerts: [], hasSavedDistricts: true });
+    renderBanner({ status: 'success', alerts: [], hasDistrictScope: true });
     expect(screen.queryByText(/No active alerts/)).toBeNull();
   });
 
@@ -101,7 +115,7 @@ describe('AlertBanner', () => {
   });
 
   it('names both when a saved district pins the reading', () => {
-    renderBanner({ status: 'success', alerts: [alert({ district: 'Tamale Metropolitan' })], hasSavedDistricts: true });
+    renderBanner({ status: 'success', alerts: [alert({ district: 'Tamale Metropolitan' })], hasDistrictScope: true });
 
     expect(screen.getByText('Tamale Metropolitan, Northern')).toBeTruthy();
   });
@@ -147,8 +161,8 @@ describe('AlertBanner', () => {
      can never disagree about whether the section exists. */
   describe('when there is nothing to raise', () => {
     it('renders nothing at all', () => {
-      renderBanner({ status: 'success', alerts: [], hasSavedDistricts: true });
-      expect(alertBannerHasContent({ status: 'success', alerts: [], hasSavedDistricts: true })).toBe(false);
+      renderBanner({ status: 'success', alerts: [], hasDistrictScope: true });
+      expect(alertBannerHasContent({ status: 'success', alerts: [], locationPrompt: false })).toBe(false);
       expect(screen.queryByText(/alert/i)).toBeNull();
     });
 
@@ -156,30 +170,55 @@ describe('AlertBanner', () => {
       // The skeleton goes too. A placeholder promises content, and here the
       // content usually never comes — a card-shaped shimmer that collapses a
       // second later is a worse flicker than the card it stood in for.
-      renderBanner({ status: 'pending', alerts: [], hasSavedDistricts: true });
+      renderBanner({ status: 'pending', alerts: [], hasDistrictScope: true });
       expect(screen.queryByText(/alert/i)).toBeNull();
       expect(screen.queryByLabelText('Loading')).toBeNull();
     });
 
+    it('renders nothing while location detection is still running', () => {
+      // No saved district and no detected one yet, but detection has not
+      // finished — so there is nothing to say, and nothing shows. No flash of a
+      // prompt that is about to be answered.
+      renderBanner({ status: 'success', alerts: [], hasDistrictScope: false, locationPrompt: false });
+      expect(screen.queryByText(/Alerts for where you are/)).toBeNull();
+      expect(alertBannerHasContent({ status: 'success', alerts: [], locationPrompt: false })).toBe(false);
+    });
+
     it('still shows an alert when there is one', () => {
-      renderBanner({ status: 'success', alerts: [alert()], hasSavedDistricts: true });
+      renderBanner({ status: 'success', alerts: [alert()], hasDistrictScope: true });
       expect(screen.getByText('Severe flood risk in Northern')).toBeTruthy();
     });
 
     it('still reports a failure, because not knowing is not the same as nothing', () => {
-      renderBanner({ status: 'error', error: new NetworkError('nope'), hasSavedDistricts: true });
+      renderBanner({ status: 'error', error: new NetworkError('nope'), hasDistrictScope: true });
       expect(screen.getByText(/Alerts need a connection/)).toBeTruthy();
-      expect(alertBannerHasContent({ status: 'error', alerts: [], hasSavedDistricts: true })).toBe(true);
+      expect(alertBannerHasContent({ status: 'error', alerts: [], locationPrompt: false })).toBe(true);
     });
   });
 
-  /* The one empty state left. No saved districts is not an absence of news — it
-     is the reason there will be none, and the only thing worth the space. */
-  it('points a farmer with no saved districts at the place to set them', () => {
-    renderBanner({ status: 'success', alerts: [], hasSavedDistricts: false });
+  /* The one empty state left. Alerts follow the farmer's location; this shows
+     only once detection has tried and come up empty. */
+  describe('when alerts are not localised', () => {
+    it('invites the farmer to choose districts by hand when no fix was found', () => {
+      renderBanner({ status: 'success', alerts: [], locationPrompt: true, locationPermission: 'granted' });
 
-    expect(screen.getByText(/Save your districts/)).toBeTruthy();
-    expect(screen.queryByText(/No active alerts/)).toBeNull();
-    expect(alertBannerHasContent({ status: 'success', alerts: [], hasSavedDistricts: false })).toBe(true);
+      expect(screen.getByText(/Alerts for where you are/)).toBeTruthy();
+      expect(screen.getByText(/Choose districts manually/)).toBeTruthy();
+      expect(screen.queryByText(/No active alerts/)).toBeNull();
+      expect(alertBannerHasContent({ status: 'success', alerts: [], locationPrompt: true })).toBe(true);
+    });
+
+    it('offers system settings when the permission is denied', () => {
+      renderBanner({ status: 'success', alerts: [], locationPrompt: true, locationPermission: 'denied' });
+
+      fireEvent.press(screen.getByText(/Open settings/));
+      expect(mockOpenSettings).toHaveBeenCalledTimes(1);
+    });
+
+    it('gives way to a real alert the moment one arrives', () => {
+      renderBanner({ status: 'success', alerts: [alert()], locationPrompt: true });
+      expect(screen.getByText('Severe flood risk in Northern')).toBeTruthy();
+      expect(screen.queryByText(/Alerts for where you are/)).toBeNull();
+    });
   });
 });

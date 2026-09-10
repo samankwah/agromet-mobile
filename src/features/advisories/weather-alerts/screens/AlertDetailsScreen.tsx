@@ -9,7 +9,7 @@ import {
   type WeatherAlert,
 } from '../../../../shared/domain/weatherAlert';
 import { useHazardSummary } from '../../flood-drought/useHazards';
-import { useLocationStore } from '../../../../shared/state/locationStore';
+import { effectiveDistrictIds, useLocationStore } from '../../../../shared/state/locationStore';
 import { useTheme } from '../../../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../../../shared/ui/AsyncStateView';
 import { BulletList } from '../../../../shared/ui/BulletList';
@@ -38,23 +38,28 @@ export function AlertDetailsScreen({ alertId }: Props) {
   // every region and name no district at all — so the place line here silently
   // lost the district the banner had just shown.
   //
-  // But scoping *only* to saved districts would break the other direction: a
-  // reminder saved months ago, or a link shared between neighbours, points at a
-  // region the reader may not have saved, and that alert would read "no longer
-  // active" while it was still in force. So the scoped pass supplies the
-  // district when there is one, and the unscoped pass guarantees the alert
-  // resolves either way.
+  // But scoping *only* to the reader's districts would break the other
+  // direction: a reminder saved months ago, or a link shared between
+  // neighbours, points at a region the reader may not have, and that alert
+  // would read "no longer active" while it was still in force. So the scoped
+  // pass supplies the district when there is one, and the unscoped pass
+  // guarantees the alert resolves either way.
   const savedDistrictIds = useLocationStore((state) => state.savedDistrictIds);
+  const detectedDistrictId = useLocationStore((state) => state.detectedDistrictId);
+  const districtIds = useMemo(
+    () => effectiveDistrictIds(savedDistrictIds, detectedDistrictId),
+    [savedDistrictIds, detectedDistrictId],
+  );
   const alert = useMemo(() => {
     // Lapsed alerts are excluded here too, so a reminder that fires after the
     // hazard has passed opens the "no longer active" state rather than a warning
     // about weather that is over.
     const matches = (entry: WeatherAlert) => entry.id === alertId && isCurrent(entry);
     return (
-      synthesiseAlerts(query.data, savedDistrictIds).find(matches) ??
+      synthesiseAlerts(query.data, districtIds).find(matches) ??
       synthesiseAlerts(query.data, []).find(matches)
     );
-  }, [query.data, savedDistrictIds, alertId]);
+  }, [query.data, districtIds, alertId]);
 
   return (
     <Screen>

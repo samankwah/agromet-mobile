@@ -127,3 +127,10 @@ export function getDistrictNameForLocation(locationId: string): string | undefin
   const districtId = LOCATION_TO_DISTRICT_ID[locationId];
   return districtId ? getDistrictById(districtId)?.name : undefined;
 }
+
+/** The district id a Home-screen town sits in, or undefined for an unknown
+ * town. Used by the geolocation resolver (`shared/location/resolveDistrict.ts`)
+ * to turn "nearest town" into a district that alerts can target. */
+export function getDistrictIdForLocation(locationId: string): string | undefined {
+  return LOCATION_TO_DISTRICT_ID[locationId];
+}

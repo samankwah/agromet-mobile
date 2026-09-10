@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { getLatestAdvisoryTeaser } from '../../shared/api/advisoryService';
@@ -6,8 +7,9 @@ import { getLatestNewsTeaser } from '../../shared/api/newsService';
 import { getCurrentConditions } from '../../shared/api/weatherService';
 import { getDistrictNameForLocation } from '../../shared/data/districts';
 import { HOME_LOCATIONS } from '../../shared/data/mockWeather';
-import { useLocationStore } from '../../shared/state/locationStore';
+import { effectiveDistrictIds, useLocationStore } from '../../shared/state/locationStore';
 import { useAlerts } from '../advisories/weather-alerts/useAlerts';
+import { useDetectedDistrict } from '../advisories/weather-alerts/useDetectedDistrict';
 
 /**
  * Composes everything Home's cards need: the persisted town selection
@@ -21,7 +23,19 @@ export function useHomeData() {
   const locationId = useLocationStore((state) => state.selectedLocationId);
   const setLocationId = useLocationStore((state) => state.setSelectedLocationId);
   const savedDistrictIds = useLocationStore((state) => state.savedDistrictIds);
+  const detectedDistrictId = useLocationStore((state) => state.detectedDistrictId);
+  const locationPermission = useLocationStore((state) => state.locationPermission);
+  const locationResolved = useLocationStore((state) => state.locationResolved);
   const hasHydrated = useLocationStore((state) => state.hasHydrated);
+
+  // Ask for location and resolve a district the first time Home mounts with
+  // nothing saved. No-ops on every later mount.
+  useDetectedDistrict();
+
+  const districtIds = useMemo(
+    () => effectiveDistrictIds(savedDistrictIds, detectedDistrictId),
+    [savedDistrictIds, detectedDistrictId],
+  );
 
   const weather = useQuery({
     queryKey: ['currentConditions', locationId],
@@ -49,7 +63,7 @@ export function useHomeData() {
     enabled: hasHydrated,
   });
 
-  const alerts = useAlerts(savedDistrictIds, hasHydrated);
+  const alerts = useAlerts(districtIds, hasHydrated);
 
   return {
     locations: HOME_LOCATIONS,
@@ -60,6 +74,8 @@ export function useHomeData() {
     forecast,
     news,
     alerts,
-    hasSavedDistricts: savedDistrictIds.length > 0,
+    hasDistrictScope: districtIds.length > 0,
+    locationPrompt: hasHydrated && locationResolved && districtIds.length === 0,
+    locationPermission,
   };
 }

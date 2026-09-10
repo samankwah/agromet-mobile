@@ -1,14 +1,15 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View } from 'react-native';
 import { Archive, Drop, Egg, Leaf } from 'phosphor-react-native';
 
-import { useLocationStore } from '../../shared/state/locationStore';
+import { effectiveDistrictIds, useLocationStore } from '../../shared/state/locationStore';
 import { HubGrid, HubTile } from '../../shared/ui/HubGrid';
 import { AppHeader } from '../../shared/ui/AppHeader';
 import { Screen } from '../../shared/ui/Screen';
 import { Text } from '../../shared/ui/Text';
 import { AlertBanner, alertBannerHasContent } from './weather-alerts/components/AlertBanner';
 import { useAlerts } from './weather-alerts/useAlerts';
+import { useDetectedDistrict } from './weather-alerts/useDetectedDistrict';
 import { useHazardSummary } from './flood-drought/useHazards';
 
 /**
@@ -28,8 +29,22 @@ import { useHazardSummary } from './flood-drought/useHazards';
  */
 export function AdvisoriesScreen() {
   const savedDistrictIds = useLocationStore((state) => state.savedDistrictIds);
+  const detectedDistrictId = useLocationStore((state) => state.detectedDistrictId);
+  const locationPermission = useLocationStore((state) => state.locationPermission);
+  const locationResolved = useLocationStore((state) => state.locationResolved);
   const hasHydrated = useLocationStore((state) => state.hasHydrated);
-  const alerts = useAlerts(savedDistrictIds, hasHydrated);
+
+  // Ask for location and resolve a district the first time Advisories mounts
+  // with nothing saved. No-ops on every later mount (and on Home's copy).
+  useDetectedDistrict();
+
+  const districtIds = useMemo(
+    () => effectiveDistrictIds(savedDistrictIds, detectedDistrictId),
+    [savedDistrictIds, detectedDistrictId],
+  );
+  const locationPrompt = hasHydrated && locationResolved && districtIds.length === 0;
+
+  const alerts = useAlerts(districtIds, hasHydrated);
   // Same query key as the alerts banner and the monitor screen, so TanStack
   // serves all three from one request.
   const hazards = useHazardSummary();
@@ -46,7 +61,7 @@ export function AdvisoriesScreen() {
       {alertBannerHasContent({
         status: alerts.status,
         alerts: alerts.alerts,
-        hasSavedDistricts: savedDistrictIds.length > 0,
+        locationPrompt,
       }) ? (
         <View>
           <Text variant="h3" style={{ marginBottom: 8 }}>
@@ -57,7 +72,9 @@ export function AdvisoriesScreen() {
             status={alerts.status}
             error={alerts.error}
             onRetry={alerts.refetch}
-            hasSavedDistricts={savedDistrictIds.length > 0}
+            hasDistrictScope={districtIds.length > 0}
+            locationPrompt={locationPrompt}
+            locationPermission={locationPermission}
             usingCachedFallback={alerts.usingCachedFallback}
             cachedAt={alerts.cachedAt}
           />

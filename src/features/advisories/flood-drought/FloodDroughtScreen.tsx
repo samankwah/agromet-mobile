@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
 import type { HazardKind } from '../../../shared/domain/hazard';
-import { useLocationStore } from '../../../shared/state/locationStore';
+import { effectiveDistrictIds, useLocationStore } from '../../../shared/state/locationStore';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../../shared/ui/AsyncStateView';
 import { Card } from '../../../shared/ui/Card';
@@ -67,6 +67,11 @@ export function FloodDroughtScreen() {
   const hazard = HAZARDS[hazardIndex];
 
   const savedDistrictIds = useLocationStore((state) => state.savedDistrictIds);
+  const detectedDistrictId = useLocationStore((state) => state.detectedDistrictId);
+  const districtIds = useMemo(
+    () => effectiveDistrictIds(savedDistrictIds, detectedDistrictId),
+    [savedDistrictIds, detectedDistrictId],
+  );
   const summary = useHazardSummary();
 
   const openRegion = (region: string) =>
@@ -79,8 +84,8 @@ export function FloodDroughtScreen() {
   );
 
   const mine = useMemo(
-    () => regionsForDistricts(summary.regions, savedDistrictIds, hazard),
-    [summary.regions, savedDistrictIds, hazard],
+    () => regionsForDistricts(summary.regions, districtIds, hazard),
+    [summary.regions, districtIds, hazard],
   );
 
   return (

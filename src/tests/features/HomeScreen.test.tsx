@@ -39,7 +39,7 @@ const TEST_SAFE_AREA_METRICS = {
  */
 describe('HomeScreen', () => {
   it('renders the branded header without crashing', () => {
-    const { getByText } = render(
+    const { getByLabelText } = render(
       <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
         <ThemeProvider>
           <QueryClientProvider client={queryClient}>
@@ -49,6 +49,8 @@ describe('HomeScreen', () => {
       </SafeAreaProvider>,
     );
 
-    expect(getByText('AgroMet Ghana')).toBeTruthy();
+    // The header is the real logo lockup now (HomeHeader.tsx), not the words —
+    // it carries the app's name as its accessibility label.
+    expect(getByLabelText('AgroMet Ghana')).toBeTruthy();
   });
 });

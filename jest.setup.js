@@ -62,6 +62,17 @@ jest.mock('expo-notifications', () => {
   };
 });
 
+// expo-location is a native module. The default mock reports permission granted
+// and returns a fix over Kumasi, so the district-autodetect path runs its
+// primary branch in tests; a case that needs "denied" or "no fix" overrides
+// getForegroundPermissionsAsync / getCurrentPositionAsync per test.
+jest.mock('expo-location', () => ({
+  Accuracy: { Lowest: 1, Low: 2, Balanced: 3, High: 4, Highest: 5, BestForNavigation: 6 },
+  getForegroundPermissionsAsync: jest.fn(async () => ({ granted: true, canAskAgain: true, status: 'granted' })),
+  requestForegroundPermissionsAsync: jest.fn(async () => ({ granted: true, canAskAgain: true, status: 'granted' })),
+  getCurrentPositionAsync: jest.fn(async () => ({ coords: { latitude: 6.6885, longitude: -1.6244 } })),
+}));
+
 // expo-constants reports the Store client (Expo Go) by default in Jest, which
 // would make canScheduleNotifications() false and short-circuit every
 // scheduling test. Report a standalone build instead — the environment the

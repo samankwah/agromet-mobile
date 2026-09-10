@@ -22,7 +22,7 @@ import { useHomeData } from './useHomeData';
  * comment).
  */
 export function HomeScreen() {
-  const { weather, advisory, forecast, news, alerts, hasSavedDistricts } = useHomeData();
+  const { weather, advisory, forecast, news, alerts, hasDistrictScope, locationPrompt, locationPermission } = useHomeData();
   // Reads the alerts Home already has — no extra request, and it inherits the
   // lapse check and severity gate `useAlerts` applied.
   const popup = useAlertPopup(alerts.alerts);
@@ -40,7 +40,9 @@ export function HomeScreen() {
         status={alerts.status}
         error={alerts.error}
         onRetry={alerts.refetch}
-        hasSavedDistricts={hasSavedDistricts}
+        hasDistrictScope={hasDistrictScope}
+        locationPrompt={locationPrompt}
+        locationPermission={locationPermission}
         usingCachedFallback={alerts.usingCachedFallback}
         cachedAt={alerts.cachedAt}
       />

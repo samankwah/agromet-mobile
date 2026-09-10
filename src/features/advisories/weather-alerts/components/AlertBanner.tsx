@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { compareSeverityDesc, getSeverityMeta } from '../../../../shared/domain/alertSeverity';
 import { alertProvenanceLine, type WeatherAlert } from '../../../../shared/domain/weatherAlert';
 import { formatRelativeTime } from '../../../../shared/utils/formatRelativeTime';
+import { openLocationSettings, type LocationPermissionState } from '../../../../shared/location/locationClient';
 import { useTheme } from '../../../../shared/theme/ThemeProvider';
 import { Card } from '../../../../shared/ui/Card';
 import { SeverityBadge } from '../../../../shared/ui/SeverityBadge';
@@ -16,7 +17,13 @@ type Props = {
   status: 'pending' | 'error' | 'success';
   error?: unknown;
   onRetry: () => void;
-  hasSavedDistricts: boolean;
+  /** True when alerts are scoped to something — a saved district or one that
+   * geolocation resolved. */
+  hasDistrictScope: boolean;
+  /** True when there is no scope and location detection has finished trying,
+   * so the card should invite the farmer to turn location on or pick manually. */
+  locationPrompt: boolean;
+  locationPermission?: LocationPermissionState;
   usingCachedFallback?: boolean;
   cachedAt?: string;
 };
@@ -33,22 +40,23 @@ function highestSeverityAlert(alerts: WeatherAlert[]): WeatherAlert {
  * heading with a void beneath it is worse than either the heading or the card
  * alone.
  *
- * The one asymmetry: with no saved districts there is still something to say,
- * because the reason no alert will ever arrive is worth a line. That is a call
- * to action, not a null result.
+ * The one asymmetry: when alerts are not localised yet there is still something
+ * to say, because the reason no alert will arrive is worth a line. That is a
+ * call to action, not a null result. While geolocation is still resolving,
+ * though, there is nothing to say and nothing renders — no flash.
  */
 export function alertBannerHasContent({
   status,
   alerts,
-  hasSavedDistricts,
+  locationPrompt,
 }: {
   status: Props['status'];
   alerts: WeatherAlert[];
-  hasSavedDistricts: boolean;
+  locationPrompt: boolean;
 }): boolean {
   if (status === 'error') return true;
   if (alerts.length > 0) return true;
-  return !hasSavedDistricts;
+  return locationPrompt;
 }
 
 /**
@@ -85,7 +93,8 @@ export function AlertBanner({
   status,
   error,
   onRetry,
-  hasSavedDistricts,
+  locationPrompt,
+  locationPermission,
   usingCachedFallback,
   cachedAt,
 }: Props) {
@@ -93,36 +102,60 @@ export function AlertBanner({
     return <AlertsUnavailable onRetry={onRetry} />;
   }
 
-  if (!alertBannerHasContent({ status, alerts, hasSavedDistricts })) return null;
+  if (!alertBannerHasContent({ status, alerts, locationPrompt })) return null;
 
-  // Before any district has been saved. Rendered outside `AsyncStateView` on
-  // purpose: it describes the reader's own settings, not the state of the
-  // alerts query, so it should not wait on a fetch to say something already
-  // known.
-  if (alerts.length === 0) return <SaveDistrictsPrompt />;
+  // Alerts are not localised yet and detection has finished trying. Rendered
+  // outside `AsyncStateView` on purpose: it describes the reader's own settings,
+  // not the state of the alerts query, so it should not wait on a fetch to say
+  // something already known.
+  if (alerts.length === 0) return <LocationPrompt permission={locationPermission} />;
 
   return <AlertBannerCard alert={highestSeverityAlert(alerts)} usingCachedFallback={usingCachedFallback} cachedAt={cachedAt} />;
 }
 
-/** The one empty state left: the call to action, with no null result above it. */
-function SaveDistrictsPrompt() {
+/**
+ * The one empty state left: alerts are not tied to anywhere yet.
+ *
+ * The app tries to place the farmer from their location on its own; this shows
+ * when that could not happen — permission refused, or no fix. It leads with
+ * turning location on (the path that needs no typing) and keeps the manual
+ * district picker as the second option.
+ */
+function LocationPrompt({ permission }: { permission?: LocationPermissionState }) {
   const theme = useTheme();
+  const denied = permission === 'denied';
 
   return (
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-        <Ionicons name="notifications-outline" size={20} color={theme.colors.accent} />
+        <Ionicons name="location-outline" size={20} color={theme.colors.accent} />
         <Text variant="bodyStrong" style={{ flex: 1 }}>
-          Get alerts for your districts
+          Alerts for where you are
         </Text>
       </View>
+      <Text variant="body" muted style={{ marginTop: theme.spacing.xs }}>
+        {denied
+          ? 'Turn on location and AgroMet will send alerts for your area.'
+          : 'AgroMet could not find your area. Turn on location, or choose your districts by hand.'}
+      </Text>
+      {denied ? (
+        <Pressable
+          onPress={openLocationSettings}
+          accessibilityRole="button"
+          style={{ marginTop: theme.spacing.sm, minHeight: theme.minTouchTarget, justifyContent: 'center' }}
+        >
+          <Text variant="body" color={theme.colors.accent}>
+            Open settings →
+          </Text>
+        </Pressable>
+      ) : null}
       <Pressable
         onPress={() => router.push('/saved-districts')}
         accessibilityRole="button"
-        style={{ marginTop: theme.spacing.sm, minHeight: theme.minTouchTarget, justifyContent: 'center' }}
+        style={{ marginTop: theme.spacing.xs, minHeight: theme.minTouchTarget, justifyContent: 'center' }}
       >
         <Text variant="body" color={theme.colors.accent}>
-          Save your districts to get alerts that matter to you →
+          Choose districts manually →
         </Text>
       </Pressable>
     </Card>
