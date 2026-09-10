@@ -1,7 +1,5 @@
 import { Platform } from 'react-native';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
-import * as Notifications from 'expo-notifications';
-
 import type { FarmReminder } from '../domain/farmReminder';
 import { repeatSuffix, scheduleTargetFor } from '../utils/reminderSchedule';
 
@@ -49,17 +47,47 @@ export function canScheduleNotifications(): boolean {
   return Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 }
 
+/** The shape of the `expo-notifications` module, without importing it at load time. */
+type NotificationsApi = typeof import('expo-notifications');
+
+let cachedNotifications: NotificationsApi | null | undefined;
+
+/**
+ * The `expo-notifications` module, or null when this runtime cannot use it.
+ *
+ * Loaded through `require()` rather than a top-level import because the package
+ * resolves native modules the moment it is evaluated, which throws in Expo Go
+ * (unsupported since SDK 53) and would take down every screen that transitively
+ * imports this file — via the root layout, all of them — before any guard here
+ * could run. The require is a string literal, so Metro still bundles the module;
+ * it is only executed on a runtime that can schedule. Cached after the first call.
+ */
+function getNotifications(): NotificationsApi | null {
+  if (cachedNotifications !== undefined) return cachedNotifications;
+  if (!canScheduleNotifications()) {
+    cachedNotifications = null;
+    return null;
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    cachedNotifications = require('expo-notifications') as NotificationsApi;
+  } catch {
+    cachedNotifications = null;
+  }
+  return cachedNotifications;
+}
+
 /**
  * Show reminders even while the app is in the foreground.
  *
  * Guarded and wrapped because this runs at import time, before any caller has
- * had the chance to check anything. In Expo Go the native module is absent, and
- * an exception here would take down every screen that transitively imports the
- * reminder store — which, via the root layout, is all of them.
+ * had the chance to check anything. In Expo Go `getNotifications()` returns null
+ * and this is skipped entirely.
  */
-if (canScheduleNotifications()) {
+const startupNotifications = getNotifications();
+if (startupNotifications) {
   try {
-    Notifications.setNotificationHandler({
+    startupNotifications.setNotificationHandler({
       handleNotification: async () => ({
         shouldShowBanner: true,
         shouldShowList: true,
@@ -83,6 +111,9 @@ if (canScheduleNotifications()) {
 async function ensureChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
 
+  const Notifications = getNotifications();
+  if (!Notifications) return;
+
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: 'Farm reminders',
     description: 'Reminders you set for farm tasks and calendar activities.',
@@ -100,7 +131,8 @@ async function ensureChannel(): Promise<void> {
  * often than one that ambushes you on the splash screen.
  */
 export async function ensurePermission(): Promise<PermissionState> {
-  if (!canScheduleNotifications()) return 'denied';
+  const Notifications = getNotifications();
+  if (!Notifications) return 'denied';
 
   try {
     const existing = await Notifications.getPermissionsAsync();
@@ -125,7 +157,8 @@ export async function ensurePermission(): Promise<PermissionState> {
 
 /** The current permission state without prompting. Used to render the banner. */
 export async function getPermissionState(): Promise<PermissionState> {
-  if (!canScheduleNotifications()) return 'denied';
+  const Notifications = getNotifications();
+  if (!Notifications) return 'denied';
 
   try {
     const existing = await Notifications.getPermissionsAsync();
@@ -161,7 +194,8 @@ export async function scheduleReminder(
   reminder: FarmReminder,
   now: Date = new Date(),
 ): Promise<string | null> {
-  if (!canScheduleNotifications()) return null;
+  const Notifications = getNotifications();
+  if (!Notifications) return null;
 
   const target = scheduleTargetFor(reminder, now);
   if (!target) return null;
@@ -192,7 +226,10 @@ export async function scheduleReminder(
 
 /** Cancel one scheduled notification. Safe to call with a stale or null handle. */
 export async function cancelReminder(notificationId: string | null | undefined): Promise<void> {
-  if (!notificationId || !canScheduleNotifications()) return;
+  if (!notificationId) return;
+
+  const Notifications = getNotifications();
+  if (!Notifications) return;
 
   try {
     await Notifications.cancelScheduledNotificationAsync(notificationId);
@@ -203,7 +240,8 @@ export async function cancelReminder(notificationId: string | null | undefined):
 
 /** Cancel everything this app has scheduled. Used when reminders are switched off. */
 export async function cancelAllReminders(): Promise<void> {
-  if (!canScheduleNotifications()) return;
+  const Notifications = getNotifications();
+  if (!Notifications) return;
 
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
@@ -222,9 +260,10 @@ export async function cancelAllReminders(): Promise<void> {
  * which is exactly when a reminder matters most.
  */
 export function attachResponseListener(onOpenReminder: (reminderId: string) => void): () => void {
-  if (!canScheduleNotifications()) return () => {};
+  const Notifications = getNotifications();
+  if (!Notifications) return () => {};
 
-  const handle = (response: Notifications.NotificationResponse | null) => {
+  const handle = (response: import('expo-notifications').NotificationResponse | null) => {
     const reminderId = response?.notification.request.content.data?.reminderId;
     if (typeof reminderId === 'string') onOpenReminder(reminderId);
   };
