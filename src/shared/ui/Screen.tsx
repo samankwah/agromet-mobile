@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { HeaderShownContext } from '@react-navigation/elements';
+import { HeaderShownContext } from 'expo-router/react-navigation';
 
 import { useTheme } from '../theme/ThemeProvider';
 import { DoodleWallpaper } from './DoodleWallpaper';
@@ -59,13 +59,7 @@ type Props = {
  * navigator in the tree and fights the expo-router mocks; this reads a
  * defaulted context and touches no router.
  */
-export function Screen({
-  children,
-  scroll = true,
-  padded = true,
-  fullBleed = false,
-  wallpaper = false,
-}: Props) {
+export function Screen({ children, scroll = true, padded = true, fullBleed = false, wallpaper = false }: Props) {
   const theme = useTheme();
   // Room for the floating tab bar, which no longer reserves its own space.
   // Zero on pushed screens and in tests.

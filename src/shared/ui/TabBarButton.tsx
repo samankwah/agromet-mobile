@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
-import { PlatformPressable } from '@react-navigation/elements';
+import type { BottomTabBarButtonProps } from 'expo-router/js-tabs';
+import { PlatformPressable } from 'expo-router/react-navigation';
 import Svg, { Path } from 'react-native-svg';
 
 import { useTheme } from '../theme/ThemeProvider';

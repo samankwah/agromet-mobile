@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router';
+import { Tabs } from 'expo-router/js-tabs';
 // Two icon families, uniquely in this file: Ionicons dresses the four content
 // tabs, and MaterialCommunityIcons is imported for one glyph Ionicons does not
 // have — a robot, for the assistant.

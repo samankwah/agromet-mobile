@@ -1,11 +1,10 @@
 import { useCallback, useEffect } from 'react';
-import { LogBox, Pressable, View } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Pressable, View } from 'react-native';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavigationThemeProvider, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import { SpaceGrotesk_500Medium, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
@@ -18,19 +17,6 @@ import { WelcomeScreen } from '../src/features/onboarding/WelcomeScreen';
 import { ThemeProvider, useTheme } from '../src/shared/theme/ThemeProvider';
 import { OfflineBanner } from '../src/shared/ui/OfflineBanner';
 import { useReminderNotifications } from '../src/features/farm-tools/reminders/useReminderNotifications';
-
-/*
- * expo-notifications logs a red LogBox error on every launch in Expo Go,
- * about *remote push* being unavailable there since SDK 53. Farm reminders
- * use local scheduled notifications only and never touch push, so the message
- * is inapplicable — and it renders over the tab bar, making the app harder to
- * use than it would be without it.
- *
- * Suppressed by exact text rather than broadly: the genuine limitation is
- * surfaced in the app itself, on the reminders screen, where a farmer can
- * actually read it.
- */
-LogBox.ignoreLogs(['expo-notifications: Android Push notifications (remote notifications)']);
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   // No-op: if the splash screen is already hidden (e.g. fast refresh),

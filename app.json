@@ -84,7 +84,10 @@
           "microphonePermission": "AgroMet Ghana uses the microphone so you can ask a question by speaking instead of typing."
         }
       ],
-      "react-native-fast-tflite"
+      "react-native-fast-tflite",
+      "expo-sharing",
+      "expo-status-bar",
+      "expo-asset"
     ],
     "extra": {
       "router": {},
