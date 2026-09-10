@@ -6,6 +6,10 @@ farmers. Part of the AgroMet monorepo, alongside `frontend/` (the web app /
 admin surface) and `backend/` (FastAPI). This is a native app, not a
 WebView wrapper.
 
+Built on Expo SDK 57 (React Native 0.86, React 19.2), New Architecture,
+expo-router. Styling is inline style objects over a design-token module
+(`src/shared/theme`); there is no NativeWind or Tailwind.
+
 ## Navigation
 
 Five bottom tabs, each covering a distinct area of the product:
@@ -65,30 +69,36 @@ npx expo start --dev-client
 `eas.json`'s `development` profile already sets `developmentClient: true`, so no
 build configuration changes are needed.
 
-### Physical iPhone testing needs an iOS development build too
+### What Expo Go can and cannot run
 
-Expo Go on iOS is a dead end for this app. Two reasons stack up:
+This project tracks the current Expo SDK (57), so Expo Go on a physical
+iPhone or Android device opens it directly — Apple only ships the newest
+Expo Go, and "Project is incompatible with this version of Expo Go" means
+the project has fallen behind that, not the other way round.
 
-- **SDK mismatch.** Apple only ships the newest Expo Go and an older one cannot
-  be sideloaded, so an iPhone whose Expo Go has updated past this project's SDK
-  shows "Project is incompatible with this version of Expo Go" and never loads.
-- **Native modules.** `react-native-fast-tflite` (crop diagnosis) and
-  `expo-notifications` local alerts are not in Expo Go regardless of SDK.
+Two features still need a development build, on either platform:
 
-So a physical iPhone needs the same development build the Android side does. The
-`development` profile in `eas.json` now carries an `ios` block:
+- **Crop diagnosis.** `react-native-fast-tflite` is a native module Expo Go
+  does not contain. The Diagnose screen loads but the on-device model does
+  not run.
+- **Real notification delivery.** `expo-notifications` dropped local
+  notification support from Expo Go in SDK 53. The reminders list works
+  fully in Expo Go and says plainly that alerts will not fire; it is loaded
+  lazily so its absence never white-screens the app.
+
+Everything else — forecasts, advisories, the hazard maps, market, the
+Consult assistant, reminders as a list — runs in Expo Go.
+
+For the two native features, build a development client. `eas.json`'s
+`development` profile is configured for both platforms (the `ios` block
+does an ad-hoc device build, which needs an Apple Developer Program
+membership to register the device):
 
 ```bash
 npx eas-cli@latest login
-npx eas-cli@latest device:create        # register the iPhone's UDID
-npx eas-cli@latest build --profile development --platform ios
-npx expo start --dev-client             # scan the QR with the Camera app, not Expo Go
+npx eas-cli@latest build --profile development --platform android   # or ios
+npx expo start --dev-client
 ```
-
-An EAS iOS device build signs against a registered device, which requires an
-active **Apple Developer Program** membership (a free Apple ID only allows 7-day
-local Xcode builds on a Mac). Without one, test on Android, which runs the full
-feature set today.
 
 ### Known limitation, stated rather than papered over
 
@@ -106,11 +116,13 @@ never had one.
 
 ## Prerequisites
 
-- Node.js (matching the repo root — v24.x)
+- Node.js (matching the repo root — v24.x; Expo SDK 57 wants `^20.19.4`,
+  `^22.13.0`, `^24.3.0`, or `^25`)
 - npm
 - The [Expo Go](https://expo.dev/go) app on a physical device (iOS or
   Android — Android is the primary release target, but the app runs on
-  both), or a simulator/emulator
+  both), or a simulator/emulator. See "What Expo Go can and cannot run"
+  above for the two features that need a development build.
 
 ## Install
 
