@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Text } from '../../../shared/ui/Text';
@@ -13,20 +14,32 @@ type Props = {
 /**
  * The empty state's tappable questions.
  *
- * Shaped like outgoing bubbles and aligned right, because that is exactly what
- * tapping one produces — the chip becomes the message, so it should already look
- * like the message. It also teaches which side of the transcript the farmer owns
- * before a word has been sent.
+ * These used to be shaped exactly like outgoing bubbles: right-aligned, filled
+ * with `bubbleOut`, squared at the top-right corner. The reasoning was that a
+ * chip becomes the message when tapped, so it should already look like one. On
+ * screen it read the other way round. Under an incoming greeting, four green
+ * right-hand bubbles are indistinguishable from four questions the farmer has
+ * already asked and is waiting on, and an offer to help reads as a queue.
  *
- * Full-width-ish rows rather than a wrapped grid of short pills: these are whole
- * sentences, and at the extra-large text size a grid either truncates them or
- * reflows into ragged one-word lines.
+ * So they are pills now, not bubbles. Left-aligned, outlined rather than
+ * filled, fully rounded (the radius this design system reserves for a label
+ * floating on wallpaper), each with an arrow saying it goes somewhere, under a
+ * caption that names them as suggestions. Nothing here can be mistaken for a
+ * turn in the transcript, because nothing here is shaped like one.
+ *
+ * Still full-width rows rather than a wrapped grid of short pills: these are
+ * whole sentences, and at the extra-large text size a grid either truncates
+ * them or reflows into ragged one-word lines.
  */
 export function SuggestionChips({ onSelect, disabled }: Props) {
   const theme = useTheme();
 
   return (
     <View style={{ gap: theme.spacing.sm }}>
+      <Text variant="caption" muted style={{ paddingHorizontal: theme.spacing.xs }}>
+        Try asking
+      </Text>
+
       {STARTER_PROMPTS.map((prompt) => (
         <Pressable
           key={prompt}
@@ -42,19 +55,34 @@ export function SuggestionChips({ onSelect, disabled }: Props) {
             // children still draw. Same reason Button and FaqItem do this.
             <View
               style={{
-                alignSelf: 'flex-end',
-                maxWidth: '92%',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.sm,
+                alignSelf: 'flex-start',
+                maxWidth: '100%',
                 minHeight: theme.minTouchTarget,
-                justifyContent: 'center',
-                paddingHorizontal: theme.spacing.md,
+                paddingLeft: theme.spacing.lg,
+                paddingRight: theme.spacing.md,
                 paddingVertical: theme.spacing.sm,
-                borderRadius: 10,
-                borderTopRightRadius: 0,
-                backgroundColor: theme.colors.bubbleOut,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surface,
                 opacity: disabled ? 0.6 : pressed ? 0.85 : 1,
               }}
             >
-              <Text variant="body">{prompt}</Text>
+              <Text variant="body" style={{ flexShrink: 1 }}>
+                {prompt}
+              </Text>
+              {/* Decorative: the label already says "Ask", and a screen reader
+                  announcing an arrow after it adds nothing. */}
+              <Ionicons
+                name="arrow-forward"
+                size={15}
+                color={theme.colors.muted}
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+              />
             </View>
           )}
         </Pressable>

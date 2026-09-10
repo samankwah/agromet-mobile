@@ -1,9 +1,11 @@
 import React from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
+import { useMenu } from '../../menu/MenuProvider';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { MenuButton } from '../../../shared/ui/MenuButton';
 import { Text } from '../../../shared/ui/Text';
 
 type Props = {
@@ -11,6 +13,11 @@ type Props = {
    * messaging app reports the other side rather than showing a spinner. */
   isSending: boolean;
   isOnline: boolean;
+  /** Whether the assistant answered the last time it was asked. Null before
+   * there is any evidence either way. */
+  serverReachable?: boolean | null;
+  /** Throws the conversation away. Absent while there is nothing to throw. */
+  onClear?: () => void;
 };
 
 /**
@@ -26,14 +33,18 @@ type Props = {
  * is worse than a plainer bar. The avatar is the same robot glyph as the tab
  * icon, so the tab and the thing it opens are visibly the same object.
  */
-export function ChatHeader({ isSending, isOnline }: Props) {
+export function ChatHeader({ isSending, isOnline, serverReachable, onClear }: Props) {
   const theme = useTheme();
+  const menu = useMenu();
   // Claimed here rather than by `Screen`, which this screen runs `fullBleed` so
   // that the bar's fill reaches the top of the display instead of stopping
   // below the status bar and leaving a band of page colour above it.
   const insets = useSafeAreaInsets();
 
-  const status = isSending ? 'typing…' : isOnline ? 'online' : 'offline';
+  // "online" used to mean the handset had a signal, which it reported happily
+  // with the server flat on its back. It now means what a person reading it
+  // would assume: the last thing we asked, we got an answer to.
+  const status = isSending ? 'typing…' : !isOnline ? 'offline' : serverReachable === false ? 'not responding' : 'online';
 
   return (
     <View
@@ -72,6 +83,24 @@ export function ChatHeader({ isSending, isOnline }: Props) {
           {status}
         </Text>
       </View>
+
+      {/* Only once there is something to clear. A control that wipes an empty
+          conversation is a button that does nothing, and the bar is narrow. */}
+      {onClear ? (
+        <Pressable onPress={onClear} accessibilityRole="button" accessibilityLabel="Start a new conversation" hitSlop={theme.spacing.sm}>
+          {({ pressed }) => (
+            // Chrome on the nested View: Android drops a Pressable's own.
+            <View style={{ padding: theme.spacing.xs, opacity: pressed ? 0.6 : 1 }}>
+              <Ionicons name="create-outline" size={22} color={theme.colors.text} />
+            </View>
+          )}
+        </Pressable>
+      ) : null}
+
+      {/* The button only, not the whole AppHeader: this bar names who you are
+          talking to rather than what the screen is, and folding it into the
+          shared header would lose the avatar and the status line. */}
+      <MenuButton onPress={menu.open} />
     </View>
   );
 }

@@ -166,9 +166,7 @@ describe('ChatScreen', () => {
   });
 
   it('marks a failed question and retries it without replaying the failure', async () => {
-    mockFetch
-      .mockRejectedValueOnce(new Error('transport down'))
-      .mockResolvedValueOnce(replyResponse('Plant in April.'));
+    mockFetch.mockRejectedValueOnce(new Error('transport down')).mockResolvedValueOnce(replyResponse('Plant in April.'));
     renderScreen();
 
     ask('When should I plant?');
@@ -214,14 +212,46 @@ describe('ChatScreen', () => {
     expect(screen.queryByLabelText('Record a voice question')).toBeNull();
   });
 
-  it('says plainly that voice is not available rather than doing nothing', () => {
+  /* The mic used to print "not available yet" and do nothing. It records now,
+     and the recording turns into text the farmer can edit. */
+  it('starts recording, and offers a way out that does not send', async () => {
     renderScreen();
 
     fireEvent.press(screen.getByLabelText('Record a voice question'));
 
-    expect(
-      screen.getByText('Voice questions are not available yet. Type your question for now.'),
-    ).toBeTruthy();
+    // The field is replaced while listening: a text box that cannot be typed
+    // into would be a control lying about what it does.
+    expect(await screen.findByText('Listening…')).toBeTruthy();
+    expect(screen.getByLabelText('Cancel recording')).toBeTruthy();
+    expect(screen.getByLabelText('Stop recording and use it')).toBeTruthy();
+  });
+
+  it('cancelling throws the recording away and asks for nothing', async () => {
+    renderScreen();
+    fireEvent.press(screen.getByLabelText('Record a voice question'));
+    fireEvent.press(await screen.findByLabelText('Cancel recording'));
+
+    await waitFor(() => expect(screen.queryByText('Listening…')).toBeNull());
+    // No transcription was requested, so nothing reached the draft.
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('puts the transcript in the draft rather than sending it', async () => {
+    // Speech recognition of accented English over a rural connection is not
+    // reliable enough to send unread.
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, text: 'When should I plant maize' }),
+    });
+
+    renderScreen();
+    fireEvent.press(screen.getByLabelText('Record a voice question'));
+    fireEvent.press(await screen.findByLabelText('Stop recording and use it'));
+
+    await waitFor(() => expect(screen.getByLabelText('Ask AgroMet AI a question').props.value).toBe('When should I plant maize'));
+    // Still the farmer's to send: a send control, not a sent message.
+    expect(screen.getByLabelText('Send')).toBeTruthy();
   });
 
   it('swaps the plus for a keyboard control while the grid is open', () => {
@@ -244,7 +274,7 @@ describe('ChatScreen', () => {
     fireEvent.changeText(screen.getByLabelText('Ask AgroMet AI a question'), 'When');
 
     // The grid would otherwise sit open underneath the keyboard it displaced.
-    expect(screen.queryByLabelText('Photos. Choose a crop photo for diagnosis')).toBeNull();
+    expect(screen.queryByLabelText('Photos. Ask about a crop photo')).toBeNull();
   });
 
   it('opens the attachment grid on the plus and lists the four options', () => {
@@ -252,29 +282,32 @@ describe('ChatScreen', () => {
 
     fireEvent.press(screen.getByLabelText('Attach'));
 
-    expect(screen.getByLabelText('Camera. Photograph a crop for diagnosis')).toBeTruthy();
-    expect(screen.getByLabelText('Photos. Choose a crop photo for diagnosis')).toBeTruthy();
-    expect(screen.getByLabelText('Location. Add your district to the question')).toBeTruthy();
-    // Present but marked, because /api/chat takes text only.
-    expect(screen.getByLabelText('Document. Not supported yet')).toBeTruthy();
+    expect(screen.getByLabelText('Camera. Photograph a crop and ask about it')).toBeTruthy();
+    expect(screen.getByLabelText('Photos. Ask about a crop photo')).toBeTruthy();
+    expect(screen.getByLabelText('Location. Add your area to the question')).toBeTruthy();
+    // The fourth slot used to be a Document tile that said "Not supported yet"
+    // and did nothing but print that sentence. It leads to the full crop check
+    // now, which is somewhere the row's camera deliberately does not go.
+    expect(screen.getByLabelText('Diagnose. Open the full crop check')).toBeTruthy();
   });
 
-  it('puts the farmer region into the draft from the Location option', () => {
+  it('puts the farmer area into the draft from the Location option', () => {
     useLocationStore.setState({ selectedLocationId: 'tamale', hasHydrated: true });
     renderScreen();
 
     fireEvent.press(screen.getByLabelText('Attach'));
-    fireEvent.press(screen.getByLabelText('Location. Add your district to the question'));
+    fireEvent.press(screen.getByLabelText('Location. Add your area to the question'));
 
-    expect(screen.getByLabelText('Ask AgroMet AI a question').props.value).toBe(
-      'I am farming in the Northern region.',
-    );
+    // The town as well as the region: "near Tamale" narrows an answer that
+    // "the Northern region" alone leaves the size of a quarter of Ghana.
+    expect(screen.getByLabelText('Ask AgroMet AI a question').props.value).toBe('I am farming near Tamale in the Northern region.');
   });
 
-  it('sends the camera shortcut to Crop Diagnose, where photos are actually read', () => {
+  it('sends the Diagnose tile to Crop Diagnose, where photos are kept and filed', () => {
     renderScreen();
 
-    fireEvent.press(screen.getByLabelText('Photograph a crop'));
+    fireEvent.press(screen.getByLabelText('Attach'));
+    fireEvent.press(screen.getByLabelText('Diagnose. Open the full crop check'));
 
     expect(router.push).toHaveBeenCalledWith('/diagnose');
   });
@@ -294,5 +327,92 @@ describe('ChatScreen', () => {
 
     expect(announce).toHaveBeenCalledTimes(1);
     expect(announce).toHaveBeenCalledWith('Plant in April.');
+  });
+
+  it('identifies the device, so the server can meter a route with no login', async () => {
+    mockFetch.mockResolvedValue(replyResponse('Plant in April.'));
+    renderScreen();
+
+    ask('When should I plant?');
+    await screen.findByText('Plant in April.');
+
+    const headers = (mockFetch.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers['X-Device-Id']).toBeTruthy();
+  });
+
+  it('passes on what the server says when the quota refuses a question', async () => {
+    /* The one refusal where trying again straight away is the wrong move, so
+       the server's own words are shown rather than a generic failure. */
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({ detail: 'You are asking faster than AgroMet AI can keep up. Please try again in about 5 minutes.' }),
+    } as Response);
+    renderScreen();
+
+    ask('When should I plant?');
+
+    expect(await screen.findByText('You are asking faster than AgroMet AI can keep up. Please try again in about 5 minutes.')).toBeTruthy();
+  });
+
+  it('renders the steps in an answer as steps', async () => {
+    mockFetch.mockResolvedValue(replyResponse('Do this:\n1. Clear the drains\n2. Move the seedlings'));
+    renderScreen();
+
+    ask('What should I do before the rain?');
+
+    // Each step is its own line with its own number, rather than one run-on
+    // paragraph with the digits buried in it.
+    expect(await screen.findByText('Clear the drains')).toBeTruthy();
+    expect(screen.getByText('Move the seedlings')).toBeTruthy();
+    expect(screen.getByText('1.')).toBeTruthy();
+  });
+
+  it('gives back this morning’s conversation, and offers a way to be rid of it', async () => {
+    const earlier = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+    await AsyncStorage.setItem(
+      'agromet:cache:chat-transcript',
+      JSON.stringify({
+        cachedAt: earlier,
+        value: [
+          { id: 'q1', role: 'user', text: 'When should I plant?', at: earlier },
+          { id: 'a1', role: 'assistant', text: 'Wait for the rains to settle.', at: earlier },
+        ],
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByText('Wait for the rains to settle.')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('Start a new conversation'));
+
+    await waitFor(() => expect(screen.queryByText('Wait for the rains to settle.')).toBeNull());
+    // Back to the opening turn, which is what an empty conversation looks like.
+    expect(screen.getByLabelText('Ask: Is the rain coming this week?')).toBeTruthy();
+  });
+
+  it('does not offer to clear a conversation that has not started', () => {
+    renderScreen();
+
+    expect(screen.queryByLabelText('Start a new conversation')).toBeNull();
+  });
+
+  it('leaves yesterday’s conversation where it is', async () => {
+    /* The window is a day because a chat answer is about *now*. Restoring
+       "rain on Thursday" cold, two days later, would read as a forecast. */
+    const yesterday = new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString();
+    await AsyncStorage.setItem(
+      'agromet:cache:chat-transcript',
+      JSON.stringify({
+        cachedAt: yesterday,
+        value: [{ id: 'a1', role: 'assistant', text: 'Wait for the rains to settle.', at: yesterday }],
+      }),
+    );
+
+    renderScreen();
+
+    await waitFor(() => expect(screen.getByLabelText('Ask: Is the rain coming this week?')).toBeTruthy());
+    expect(screen.queryByText('Wait for the rains to settle.')).toBeNull();
   });
 });

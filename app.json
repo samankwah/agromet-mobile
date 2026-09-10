@@ -14,7 +14,7 @@
     "android": {
       "package": "com.agromet.ghana",
       "adaptiveIcon": {
-        "backgroundColor": "#145e49",
+        "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -37,7 +37,19 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#ffffff"
+          }
+        }
+      ],
       [
         "expo-camera",
         {
@@ -65,7 +77,14 @@
           "defaultChannel": "reminders",
           "enableBackgroundRemoteNotifications": false
         }
-      ]
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "AgroMet Ghana uses the microphone so you can ask a question by speaking instead of typing."
+        }
+      ],
+      "react-native-fast-tflite"
     ],
     "extra": {
       "router": {},

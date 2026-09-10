@@ -9,6 +9,26 @@ export type ChatRole = 'user' | 'assistant';
  * off, and it is why a turn can exist in the transcript without a partner.
  */
 export type ChatMessage = {
+  /** Set on a question asked about a photo, so the bubble can show what was
+   * being asked about. The history sent upstream stays text only.
+   *
+   * It is also what tells a retry which endpoint to use: a photo question was
+   * answered by `/api/image-analysis`, and resending it as text would ask
+   * `/api/chat` about a picture it never saw. */
+  imageUri?: string;
+  /** Why this turn failed, in the farmer's words.
+   *
+   * On the message rather than on the screen because there is more than one
+   * thing that can fail here, and they fail separately: a photo question runs
+   * through a different endpoint from a typed one. A single screen-level error
+   * meant a failed photo showed a dimmed bubble with no explanation at all,
+   * while a stale error from an earlier typed question could attach itself to
+   * a bubble it had nothing to do with. */
+  errorText?: string;
+  /** True when the server served its built-in fallback instead of a model
+   * answer. Shown, because a farmer acting on generic advice while believing an
+   * assistant read their question is the failure worth preventing. */
+  degraded?: boolean;
   id: string;
   role: ChatRole;
   text: string;
@@ -29,13 +49,18 @@ export type ChatTurn = { role: ChatRole; content: string };
 /**
  * What the assistant is told about who is asking.
  *
- * The backend reads only `region` today (it interpolates it into the reply it
- * serves when no provider key is configured), but the field is a free-form dict
- * and the web client sends a similar shape, so `crops` costs nothing now and is
- * already there when the system prompt starts using it.
+ * All of it is now used. The backend puts the area and the crops into the DATA
+ * block it builds for each question, and uses the region to look up that
+ * area's forecast, its flood and drought bands, and its market prices. Before
+ * that, `region` reached the model only by accident, inside the canned reply
+ * served when no provider key was configured.
  */
 export type ChatUserContext = {
   region?: string;
+  /** The town selected on Home. Sent as the farmer's locality rather than as a
+   * district, because it is a town, and the answer should not put them in a
+   * district they did not choose. */
+  town?: string;
   crops?: string[];
 };
 

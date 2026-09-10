@@ -4,6 +4,9 @@ import {
   interpolateViridis,
   valueToClassColor,
   valueToViridis,
+  RAINFALL_STOPS,
+  TEMPERATURE_STOPS,
+  VIRIDIS_STOPS,
 } from '../../shared/utils/colorScale';
 
 describe('interpolateViridis', () => {
@@ -80,5 +83,37 @@ describe('valueToClassColor', () => {
   it('includes the maximum in the final class rather than falling off the end', () => {
     const classes = buildColorClasses(0, 60, 6);
     expect(valueToClassColor(60, 0, 60, 6)).toBe(classes[5].color);
+  });
+});
+
+/* Rainfall and temperature must not look like the same map. The ramp is passed
+   to the legend and both renderers from one place, so a colour on the map
+   always means what the key says -- the drift this component has hit before. */
+describe('per-variable sequential ramps', () => {
+  it('gives rainfall and temperature different colours at the same level', () => {
+    const wet = buildColorClasses(0, 100, 6, RAINFALL_STOPS);
+    const hot = buildColorClasses(0, 100, 6, TEMPERATURE_STOPS);
+
+    expect(wet.map((entry) => entry.color)).not.toEqual(hot.map((entry) => entry.color));
+    expect(wet[wet.length - 1].color).not.toBe(hot[hot.length - 1].color);
+  });
+
+  it('runs water pale to blue and heat pale to red', () => {
+    // Published convention: the top of the rainfall ramp is the bluest point,
+    // the top of the temperature ramp the reddest.
+    expect(interpolateViridis(1, RAINFALL_STOPS)).toBe('rgb(37, 52, 148)');
+    expect(interpolateViridis(1, TEMPERATURE_STOPS)).toBe('rgb(189, 0, 38)');
+  });
+
+  it('still defaults to viridis for callers that name no ramp', () => {
+    expect(buildColorClasses(0, 100, 6)).toEqual(buildColorClasses(0, 100, 6, VIRIDIS_STOPS));
+  });
+
+  it('keeps the legend and the fill on one scale', () => {
+    // valueToClassColor is what the SVG map fills with; buildColorClasses is
+    // what the legend keys. Same ramp in, same colour out.
+    const classes = buildColorClasses(0, 100, 6, TEMPERATURE_STOPS);
+    expect(valueToClassColor(5, 0, 100, 6, TEMPERATURE_STOPS)).toBe(classes[0].color);
+    expect(valueToClassColor(95, 0, 100, 6, TEMPERATURE_STOPS)).toBe(classes[5].color);
   });
 });

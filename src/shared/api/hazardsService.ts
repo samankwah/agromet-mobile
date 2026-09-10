@@ -12,7 +12,7 @@ import { ServiceError } from './mockDelay';
  */
 
 export const HAZARDS_UNAVAILABLE_MESSAGE =
-  'Flood and drought readings are not available right now. The weather and river services could not be reached — nothing is shown here rather than a guess.';
+  'Flood and drought readings are not available right now. The weather and river services could not be reached, so nothing is shown here rather than a guess.';
 
 /**
  * The national summary.

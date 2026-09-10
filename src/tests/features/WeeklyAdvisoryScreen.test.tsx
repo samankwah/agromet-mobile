@@ -165,18 +165,160 @@ describe('WeeklyAdvisoryScreen — a crop advisory', () => {
 });
 
 describe('WeeklyAdvisoryScreen — a poultry advisory', () => {
-  /* Poultry bulletins carry no forecast at all. Rendering an empty table would
-     imply data that failed to load rather than data never collected. */
-  it('shows management targets and actions, and no forecast table', async () => {
+  /* Poultry bulletins are authored on the same district template as crop ones —
+     one worksheet per activity, each with the nine-parameter forecast band. The
+     screen used to branch on `kind` and send every poultry bulletin to the
+     guidance card; it now branches on what the bulletin actually contains. The
+     sample is four worksheets of a real Jasikan broiler bulletin. */
+  it('gives a parsed poultry bulletin the same table a crop one gets', async () => {
     renderScreen('poultry');
     choose('Region', 'All regions', 'Ashanti Region');
     choose('District', 'Select district', 'Adansi Akrofuom');
     choose('Bird', 'All birds', 'Broiler');
 
+    expect(await screen.findByText('DETAILED FORECAST')).toBeTruthy();
+    // The activity chips, and the summary panel below the table.
+    expect(screen.getByText('Activity')).toBeTruthy();
+    // Twice over: the chip and the panel heading, as on the crop side. The
+    // screen opens on the first stage of the programme.
+    expect(screen.getAllByText('Site and housing').length).toBeGreaterThan(1);
+    // And every other stage is reachable as a chip.
+    expect(screen.getByText('Brooder management')).toBeTruthy();
+    expect(screen.getByText('FORECAST AND ADVISORY')).toBeTruthy();
+  });
+
+  it('carries the bird bulletin own advice, not a crop one', async () => {
+    renderScreen('poultry');
+
+    await screen.findByText('DETAILED FORECAST');
+    // Poultry advice, not crop advice — the opening stage of the bird programme.
+    expect(
+      screen.getByText(/Choose ground that drains, away from other poultry/),
+    ).toBeTruthy();
+  });
+
+  /* Layer bulletins label their weeks in prose — "1 - End", "From point of lay
+     to end of production" — and broiler sheets use ragged spacing. Anything
+     that tries to make a number of those loses the only week information the
+     sheet carries, so the label is passed through exactly as written. */
+  it('shows a week label exactly as the sheet wrote it', async () => {
+    renderScreen('poultry');
+
+    await screen.findByText('DETAILED FORECAST');
+    // The opening stage is labelled "Before Week 1" — prose, not a number, and
+    // it has to survive to the panel exactly as the sheet wrote it.
+    expect(screen.getByLabelText(/^Weeks: Before Week 1\./)).toBeTruthy();
+  });
+
+  /* The older generated template produces no worksheets, only a target table
+     and a list of actions. That path is still supported, and is the one thing
+     the guidance card now exists for. Driven through real responses rather than
+     the seed, because the seed is deliberately a parsed bulletin. */
+  it('falls back to management targets when the upload had no worksheets', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: [
+          {
+            id: 1,
+            advisory_id: 7,
+            activity: 'Brooding',
+            week_label: '1-2',
+            region: 'REG01/Oti',
+            district: 'DS001/Jasikan',
+            crop: 'Broiler',
+            year: 2026,
+          },
+        ],
+      }),
+    } as never);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          id: 7,
+          advisoryType: 'poultry-advisory',
+          title: 'Broiler Advisory',
+          region: 'REG01/Oti',
+          district: 'DS001/Jasikan',
+          crop: 'Broiler',
+          // Plain strings, so they partition as recommendations and leave no
+          // activities behind.
+          advisories: ['Check the brooder guard twice daily.'],
+          weatherForecast: { 'Brooding temperature': '32C' },
+          created_at: '2026-01-26T06:00:00.000Z',
+        },
+      }),
+    } as never);
+
+    renderScreen('poultry');
+
     expect(await screen.findByText('TARGETS THIS WEEK')).toBeTruthy();
-    expect(screen.getByText('ADVISORY')).toBeTruthy();
+    expect(screen.getByText('Check the brooder guard twice daily.')).toBeTruthy();
     expect(screen.queryByText('DETAILED FORECAST')).toBeNull();
-    expect(screen.queryByText('Activity')).toBeNull();
+    // `source` and `parameters` are reserved in that column; neither should
+    // ever surface as a management target.
+    expect(screen.queryByText('spreadsheet')).toBeNull();
+  });
+
+  /* The stand-in bulletin is a real Jasikan one. Its worksheets are headed
+     "...FOR BROILER FARMERS IN THE OTI REGION", which is true of the file and
+     false on screen the moment it stands in for a district that has published
+     nothing — a farmer who picked Ashanti got a card titled after Oti. Where
+     the sample came from is the fallback notice's job to say, not the card's. */
+  it('never titles the summary card after the sample own region', async () => {
+    renderScreen('poultry');
+    choose('Region', 'All regions', 'Ashanti Region');
+    choose('District', 'Select district', 'Adansi Akrofuom');
+    choose('Bird', 'All birds', 'Broiler');
+
+    await screen.findByText('DETAILED FORECAST');
+    expect(screen.getByText('FORECAST AND ADVISORY')).toBeTruthy();
+    expect(screen.queryByText(/OTI REGION/i)).toBeNull();
+  });
+
+  /* A layer runs to point of lay and beyond: sixteen stages against the
+     broiler's four, a year against eight weeks. One poultry stand-in cannot
+     represent both, so the seed follows the chosen bird. */
+  it('shows the layer programme, not the broiler one, when Layer is chosen', async () => {
+    renderScreen('poultry');
+    choose('Bird', 'All birds', 'Layer');
+
+    await screen.findByText('DETAILED FORECAST');
+    expect(screen.getAllByText('Debeaking').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Egg harvest and market').length).toBeGreaterThan(0);
+    // Broiler-only stages must not leak into a layer bulletin.
+    expect(screen.queryByText('Finisher feed')).toBeNull();
+  });
+
+  /* The district template is one sheet layout for both kinds, so a poultry
+     workbook carries the soil columns and fills every cell with "-". Housed
+     birds stand on litter: there is no reading to give, and two dead columns
+     cost two sideways swipes in a table that already scrolls. Crop keeps its
+     empty columns — see the crop suite above, where that is pinned. */
+  it('leaves the soil columns out of a poultry table', async () => {
+    renderScreen('poultry');
+
+    await screen.findByText('DETAILED FORECAST');
+    expect(screen.getByText('RAINFALL')).toBeTruthy();
+    expect(screen.getByText('HUMIDITY')).toBeTruthy();
+    expect(screen.queryByText('SOIL MOISTURE')).toBeNull();
+    expect(screen.queryByText('SOIL TEMP')).toBeNull();
+  });
+
+  it('offers only the birds anyone publishes for', async () => {
+    renderScreen('poultry');
+    fireEvent.press(screen.getByLabelText('Bird: All birds. Change it.'));
+
+    expect(screen.getAllByText('Broiler').length).toBeGreaterThan(0);
+    expect(screen.getByText('Layer')).toBeTruthy();
+    // Present in the backend catalogue, deliberately not offered here.
+    expect(screen.queryByText('Guinea Fowl')).toBeNull();
+    expect(screen.queryByText('Turkey')).toBeNull();
   });
 });
 

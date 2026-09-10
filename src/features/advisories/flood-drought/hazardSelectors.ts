@@ -1,4 +1,5 @@
 import { getDistrictById } from '../../../shared/data/districts';
+import { formatDriverMeasurement } from '../../../shared/domain/hazard';
 import type { HazardBlock, HazardKind, HazardRegion } from '../../../shared/domain/hazard';
 import { compareBandDesc, isElevatedBand } from '../../../shared/domain/hazardBand';
 
@@ -54,9 +55,9 @@ export function driverSummary(block: HazardBlock): string | null {
   const driver = dominantDriver(block);
   if (!driver || driver.value === null) return null;
 
-  const value =
-    Math.abs(driver.value) >= 10 ? Math.round(driver.value) : Math.round(driver.value * 100) / 100;
-  return `${driver.label} ${value} ${driver.unit}`;
+  // Rounding and units both live in `formatDriverMeasurement` now, so this row
+  // cannot drift from the alert evidence or the drivers list.
+  return `${driver.label} ${formatDriverMeasurement(driver.value, driver.unit).text}`;
 }
 
 /** The regions covered by the reader's saved districts, worst first. */

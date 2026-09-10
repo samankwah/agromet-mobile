@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
+import { Image, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import type { DiagnosisConfidenceBand, DiagnosisResult } from '../../../../shared/domain/diagnosis';
@@ -36,11 +36,32 @@ export function DiagnosisResultCard({ result }: Props) {
   return (
     <View style={{ gap: theme.spacing.md }}>
       <Card raised style={{ gap: theme.spacing.md, borderLeftWidth: 4, borderLeftColor: tone }}>
+        {/* The evidence the answer was drawn from. Without it the result reads
+            as disconnected from the photo that produced it, and a farmer has no
+            way to notice they photographed the wrong leaf. */}
+        {result.imageUri ? (
+          <Image
+            source={{ uri: result.imageUri }}
+            style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: theme.radii.md }}
+            resizeMode="cover"
+            accessibilityIgnoresInvertColors
+            accessible
+            accessibilityLabel="The photo this diagnosis was made from"
+          />
+        ) : null}
+
         <View style={{ gap: theme.spacing.xs }}>
           <Text variant="caption" muted>
             Most likely
           </Text>
           <Text variant="h2">{result.likelyIssue}</Text>
+
+          {/* The plant the provider decided it was looking at. A maize answer
+              on a cassava photo is the clearest signal available that this
+              result should be distrusted, and only this line reveals it. */}
+          <Text variant="caption" muted>
+            Identified as {result.plant}
+          </Text>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
             <Ionicons
@@ -53,6 +74,22 @@ export function DiagnosisResultCard({ result }: Props) {
             </Text>
           </View>
         </View>
+
+        {/* Which engine answered.
+            The offline model and the online provider produce the same shape and
+            render through this same card, which is convenient for the code and
+            misleading for the farmer: one covers two dozen crops with treatment
+            advice from a maintained database, the other is five cassava classes
+            running on the handset. Saying so is what stops the weaker answer
+            from borrowing the stronger one's authority. */}
+        {result.source === 'offline-model' ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+            <Ionicons name="phone-portrait-outline" size={15} color={theme.colors.teal} />
+            <Text variant="caption" color={theme.colors.teal}>
+              Checked on your phone, without internet. Cassava diseases only.
+            </Text>
+          </View>
+        ) : null}
 
         {/* Said out loud rather than left for the farmer to infer from a
             number — a weak match means "look again", not "act on this". */}
@@ -91,6 +128,35 @@ export function DiagnosisResultCard({ result }: Props) {
               </Text>
             </View>
           ))}
+        </Card>
+      ) : null}
+
+      {/* Providers sometimes return their advice as one block of prose rather
+          than as separated parts. Showing it whole beats splitting it on full
+          stops and pretending it was a list. */}
+      {result.immediateActions.length === 0 && result.preventionGuidance.length === 0 && result.remedy ? (
+        <Card raised style={{ gap: theme.spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+            <Ionicons name="leaf-outline" size={18} color={theme.colors.accent} />
+            <Text variant="h3">What to do</Text>
+          </View>
+          <Text variant="body">{result.remedy}</Text>
+        </Card>
+      ) : null}
+
+      {result.symptoms ? (
+        <Card style={{ gap: theme.spacing.xs }}>
+          <Text variant="caption" muted>
+            Your note
+          </Text>
+          <Text variant="body" muted>
+            {result.symptoms}
+          </Text>
+          {/* Stated plainly: the provider reads the photo. Leaving this out
+              would let the farmer believe their description was analysed. */}
+          <Text variant="caption" muted>
+            Saved with this record. The check itself is made from the photo.
+          </Text>
         </Card>
       ) : null}
 

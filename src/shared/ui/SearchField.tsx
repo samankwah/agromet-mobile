@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useTheme } from '../../../../shared/theme/ThemeProvider';
+import { useTheme } from '../theme/ThemeProvider';
 
 type Props = {
   value: string;
@@ -16,15 +16,16 @@ type Props = {
  *
  * `shared/ui/TextField` cannot be used: it has no slot for a leading icon, and
  * a magnifier is what tells a reader this box filters rather than records. The
- * chrome here is the row MarketScreen hand-rolled for the same reason —
- * extracted now that there is a second consumer, which is the point at which
- * this codebase promotes a pattern to a component.
+ * chrome here is the row MarketScreen hand-rolled for the same reason. It lived
+ * under the advisory archive until the subseasonal map needed to search
+ * districts, which is the third consumer and well past the point where this
+ * codebase moves a pattern into the shared kit.
  *
  * No debounce. Filtering is a synchronous `useMemo` over an already-fetched
  * list, so there is no request to delay; adding one would introduce the app's
  * first debounce for no gain and would make typing feel laggy.
  */
-export function ArchiveSearchField({ value, onChange, placeholder, accessibilityLabel }: Props) {
+export function SearchField({ value, onChange, placeholder, accessibilityLabel }: Props) {
   const theme = useTheme();
 
   return (

@@ -9,10 +9,29 @@ jest.mock('@react-native-async-storage/async-storage', () => require('@react-nat
 // MapLibre map) still mount and can be smoke-tested. The map's own
 // behaviour lives in the injected HTML, which Jest can't execute anyway —
 // so this mock loses no meaningful coverage.
-jest.mock('react-native-webview', () => {
+//
+// `injectJavaScript` has to exist on the instance: the map pushes its selected
+// outline into the running document that way rather than rebuilding the HTML,
+// and a bare View ref has no such method, so every screen embedding a map threw
+// on selection. The stub records nothing because there is no JS engine behind
+// it to run the script against.
+// Built out here rather than inside the factory: nativewind's babel transform
+// rewrites any component defined in there and jest then rejects the factory for
+// referencing its injected helper. A `mock`-prefixed name is the escape hatch
+// jest documents for exactly this.
+const mockWebView = (() => {
+  const React = require('react');
   const { View } = require('react-native');
-  return { WebView: View, default: View };
-});
+
+  const Mock = React.forwardRef((props, ref) => {
+    React.useImperativeHandle(ref, () => ({ injectJavaScript: () => {}, postMessage: () => {}, reload: () => {} }));
+    return React.createElement(View, props);
+  });
+  Mock.displayName = 'WebView';
+  return Mock;
+})();
+
+jest.mock('react-native-webview', () => ({ WebView: mockWebView, default: mockWebView }));
 
 // NetInfo is native too. Its own official mock reports a connected state,
 // which is what we want by default — components that branch on
@@ -53,3 +72,113 @@ jest.mock('expo-constants', () => ({
   default: { executionEnvironment: 'standalone', expoConfig: {} },
   ExecutionEnvironment: { Bare: 'bare', Standalone: 'standalone', StoreClient: 'storeClient' },
 }));
+
+// expo-audio is native. The recorder is stubbed rather than simulated: what is
+// worth testing is the state machine around it (permission refused, empty
+// transcript, cancel discards) and none of that needs real audio.
+//
+// `mock`-prefixed and built outside the factory for the same reason the WebView
+// mock is: nativewind's babel transform otherwise injects a helper the factory
+// is not allowed to reference.
+const mockAudioRecorder = {
+  prepareToRecordAsync: jest.fn(async () => {}),
+  record: jest.fn(),
+  stop: jest.fn(async () => {}),
+  uri: 'file:///question.m4a',
+};
+
+jest.mock('expo-audio', () => ({
+  useAudioRecorder: () => mockAudioRecorder,
+  useAudioRecorderState: () => ({ isRecording: false, durationMillis: 0, canRecord: true }),
+  RecordingPresets: { LOW_QUALITY: {}, HIGH_QUALITY: {} },
+  setAudioModeAsync: jest.fn(async () => {}),
+  getRecordingPermissionsAsync: jest.fn(async () => ({ granted: true, canAskAgain: true, status: 'granted' })),
+  requestRecordingPermissionsAsync: jest.fn(async () => ({ granted: true, canAskAgain: true, status: 'granted' })),
+}));
+
+// expo-speech reads replies aloud. Mocked as a recorder of calls so a test can
+// assert what would have been spoken without a TTS engine.
+jest.mock('expo-speech', () => ({
+  speak: jest.fn(),
+  stop: jest.fn(async () => {}),
+  isSpeakingAsync: jest.fn(async () => false),
+}));
+
+jest.mock('expo-sharing', () => ({
+  isAvailableAsync: jest.fn(async () => true),
+  shareAsync: jest.fn(async () => {}),
+}));
+
+// react-native-fast-tflite is a Nitro module with a C++ implementation, so
+// there is nothing for jest to load. The stub reports the tensor shapes the
+// real bundled model has, which matters: classifier.ts validates them at load
+// and would otherwise be untestable. `run` echoes whatever scores a test set,
+// so the interesting behaviour (argmax, the confidence floor, the shape guard)
+// is exercised without a device.
+//
+// Defined outside the factory under a `mock`-prefixed name for the same reason
+// as the WebView stub above.
+const mockTflite = (() => {
+  const CLASS_COUNT = 5;
+  const INPUT_SIZE = 224;
+
+  // Uniform scores, i.e. 0.2 each, which is below the reportable floor. A test
+  // that wants an answer has to ask for one; a test that forgets gets the
+  // honest "not confident enough" path rather than an accidental diagnosis.
+  let scores = new Float32Array(CLASS_COUNT).fill(1 / CLASS_COUNT);
+  let inputs = [{ name: 'image', dataType: 'float32', shape: [1, INPUT_SIZE, INPUT_SIZE, 3] }];
+  let outputs = [{ name: 'probabilities', dataType: 'float32', shape: [1, CLASS_COUNT] }];
+  let loadError = null;
+  let lastInput = null;
+
+  const model = {
+    get inputs() {
+      return inputs;
+    },
+    get outputs() {
+      return outputs;
+    },
+    delegates: [],
+    run: jest.fn(async (input) => {
+      lastInput = input;
+      return [scores.buffer.slice(0)];
+    }),
+    runSync: jest.fn(() => [scores.buffer.slice(0)]),
+  };
+
+  const loadTensorflowModel = jest.fn(async () => {
+    if (loadError) throw loadError;
+    return model;
+  });
+
+  return {
+    loadTensorflowModel,
+    __model: model,
+    /** Set the softmax output the next run should return. */
+    __setScores: (next) => {
+      scores = Float32Array.from(next);
+    },
+    /** Override the reported tensor shapes to test the contract guard. */
+    __setTensors: (nextInputs, nextOutputs) => {
+      if (nextInputs) inputs = nextInputs;
+      if (nextOutputs) outputs = nextOutputs;
+    },
+    __failLoad: (error) => {
+      loadError = error;
+    },
+    __lastInput: () => lastInput,
+    __reset: () => {
+      scores = new Float32Array(CLASS_COUNT).fill(1 / CLASS_COUNT);
+      inputs = [{ name: 'image', dataType: 'float32', shape: [1, INPUT_SIZE, INPUT_SIZE, 3] }];
+      outputs = [{ name: 'probabilities', dataType: 'float32', shape: [1, CLASS_COUNT] }];
+      loadError = null;
+      lastInput = null;
+      model.run.mockClear();
+      // Cleared too, so a test asserting on load count is not reading calls
+      // made by whichever test happened to run before it.
+      loadTensorflowModel.mockClear();
+    },
+  };
+})();
+
+jest.mock('react-native-fast-tflite', () => mockTflite);

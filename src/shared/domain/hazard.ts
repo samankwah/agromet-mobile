@@ -31,6 +31,64 @@ export type HazardDriver = {
   gloss: string;
 };
 
+/**
+ * A driver's unit, written the way it is read.
+ *
+ * The backend sends ASCII (`m3/s`, `m3/m3`) because it serves two clients and
+ * one of them is a spreadsheet export; on a phone that renders as "6667.07
+ * m3/s", which looks like a typo. `fraction` is worse — it names the quantity's
+ * form rather than a unit, and 0.96 of a thing is a percentage everywhere except
+ * in the payload. `sigma` gets no unit at all: SPI is conventionally unitless
+ * and the label already says which index it is.
+ *
+ * Unknown units pass through unchanged. A backend that adds one should show it
+ * verbatim rather than have it silently disappear.
+ */
+export function formatDriverUnit(unit: string): string {
+  switch (unit) {
+    case 'm3/s':
+      return 'm³/s';
+    case 'm3/m3':
+      return 'm³/m³';
+    case 'fraction':
+      return '%';
+    case 'sigma':
+      return '';
+    default:
+      return unit;
+  }
+}
+
+/**
+ * A driver's measurement, formatted once for every surface that shows one.
+ *
+ * `value` and `unit` come back separately because the monitoring screen renders
+ * them at different weights; `text` is the same thing joined, for the places
+ * that need a sentence.
+ *
+ * The rounding rule — whole numbers from ten up, two decimals below — is what
+ * makes the figures agree with the backend's own glosses. They disagreed before:
+ * the payload's 26.9 mm sat beside a gloss reading "27 mm in a day", and 74.3 mm
+ * beside "74 mm forecast", which reads as two different measurements of the same
+ * thing. A tenth of a millimetre of rain is noise; the mismatch was not.
+ */
+export function formatDriverMeasurement(
+  value: number,
+  unit: string,
+): { value: string; unit: string; text: string } {
+  // A fraction is a percentage that has not been multiplied yet. Doing it here
+  // rather than at each call site keeps 0.96 from ever reaching a screen.
+  const scaled = unit === 'fraction' ? value * 100 : value;
+  const rounded = Math.abs(scaled) >= 10 ? Math.round(scaled) : Math.round(scaled * 100) / 100;
+
+  const displayUnit = formatDriverUnit(unit);
+  const shown = String(rounded);
+  // No space before a percent sign; a space before every real unit.
+  const text = displayUnit === '%' ? `${shown}%` : displayUnit ? `${shown} ${displayUnit}` : shown;
+
+  return { value: shown, unit: displayUnit, text };
+}
+
 export type HazardBlock = {
   score: number;
   band: HazardBand;

@@ -28,6 +28,15 @@ export type CachedQueryResult<T> = {
   /** True when what's on screen came from disk, not the network. */
   usingCachedFallback: boolean;
   cachedAt: string | undefined;
+  /**
+   * When what is on screen was obtained, in milliseconds.
+   *
+   * A number rather than a date so it can be a `useMemo` dependency — which is
+   * what it exists for: anything derived from this data *and* the clock (an
+   * alert lapsing, a "3 hours ago" caption) needs a value that changes on each
+   * refetch, or it never recomputes.
+   */
+  dataUpdatedAt: number;
   isFetching: boolean;
   refetch: () => void;
 };
@@ -96,6 +105,10 @@ export function useCachedQuery<T>(params: {
     data: query.status === 'success' ? query.data : fallback?.value,
     usingCachedFallback,
     cachedAt: fallback?.cachedAt,
+    // The disk snapshot's own age when that is what is showing; TanStack's
+    // `dataUpdatedAt` describes the failed network attempt, not the value.
+    dataUpdatedAt:
+      usingCachedFallback && fallback ? new Date(fallback.cachedAt).getTime() : query.dataUpdatedAt,
     isFetching: query.isFetching,
     refetch,
   };

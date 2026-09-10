@@ -1,18 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, View } from 'react-native';
-import { useQueries } from '@tanstack/react-query';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
+import Svg, { Path } from 'react-native-svg';
 
 import { useReduceMotion } from '../../../shared/a11y/useReduceMotion';
-import { getCurrentConditions } from '../../../shared/api/weatherService';
+import { getCarouselConditions } from '../../../shared/api/weatherService';
 import { HOME_LOCATIONS } from '../../../shared/data/mockWeather';
 import { useLocationStore } from '../../../shared/state/locationStore';
 import { useSettingsStore } from '../../../shared/state/settingsStore';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { chamferedRectPath } from '../../../shared/ui/cardShape';
 import { Text } from '../../../shared/ui/Text';
 import { formatTemperature } from '../../../shared/utils/formatTemperature';
 import {
   MARQUEE_SPEED_PPS,
+  cityCardHeight,
   cityCardWidth,
   citySnapOffsets,
   marqueeCycleWidth,
@@ -78,19 +81,46 @@ export function CityCarousel() {
   const hasHydrated = useLocationStore((state) => state.hasHydrated);
   const dataSaverEnabled = useSettingsStore((state) => state.dataSaverEnabled);
 
-  const results = useQueries({
-    queries: HOME_LOCATIONS.map((location) => ({
-      queryKey: ['currentConditions', location.id],
-      queryFn: () => getCurrentConditions(location.id),
-      // `hasHydrated` matches every other Home consumer (useHomeData.ts). Without
-      // it a cold start with data-saver on fetches the default town first and the
-      // restored one second.
-      enabled: hasHydrated && (!dataSaverEnabled || location.id === selectedLocationId),
-    })),
+  // One request for the whole strip, not one per town.
+  //
+  // This was `useQueries` over `HOME_LOCATIONS` — fine at ten towns, indefensible
+  // at thirty-two: thirty-two requests, each returning a full bundle of 7 daily
+  // and 168 hourly readings, to render one number per card. Open-Meteo takes a
+  // comma-separated coordinate list, so `getCarouselConditions` asks once and
+  // gets roughly 2 KB back. See its docblock for why it goes direct.
+  //
+  // `hasHydrated` matches every other Home consumer (useHomeData.ts). Data saver
+  // now skips the strip entirely rather than fetching one town of it: the
+  // selected town's reading already arrives through `useHomeData`, and the
+  // conditions card below shows it in full.
+  const strip = useQuery({
+    queryKey: ['carouselConditions'],
+    queryFn: getCarouselConditions,
+    enabled: hasHydrated && !dataSaverEnabled,
   });
 
   const gap = theme.spacing.sm;
   const cardWidth = cityCardWidth(theme.typeScale.bodyStrong.fontSize);
+  const cardHeight = cityCardHeight(
+    theme.typeScale.body.lineHeight,
+    theme.spacing.sm,
+    theme.spacing.xs,
+    theme.minTouchTarget + 16,
+  );
+  /* One path for all sixty-four cards. Every card is the same size, so the
+     silhouette is identical — building it once here rather than per card keeps
+     the flowing row cheap to mount, and keeps these chips on exactly the same
+     chamfered edge as every Card in the app. */
+  const cardPath = useMemo(
+    () =>
+      chamferedRectPath({
+        width: cardWidth,
+        height: cardHeight,
+        chamfer: theme.cardShape.chamfer,
+        minorChamfer: theme.cardShape.minorChamfer,
+      }),
+    [cardWidth, cardHeight, theme.cardShape.chamfer, theme.cardShape.minorChamfer],
+  );
   const cycleWidth = marqueeCycleWidth(HOME_LOCATIONS.length, cardWidth, gap);
   const snapOffsets = useMemo(
     () => citySnapOffsets(HOME_LOCATIONS.length, cardWidth, gap),
@@ -152,9 +182,9 @@ export function CityCarousel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFlowing, hasHydrated, selectedIndex, cardWidth]);
 
-  const renderCard = (location: (typeof HOME_LOCATIONS)[number], index: number, copy = 0) => {
+  const renderCard = (location: (typeof HOME_LOCATIONS)[number], copy = 0) => {
     const isSelected = location.id === selectedLocationId;
-    const conditions = results[index]?.data;
+    const conditions = strip.data?.[location.id];
     const fg = isSelected ? theme.colors.onAccent : theme.colors.text;
 
     return (
@@ -178,18 +208,32 @@ export function CityCarousel() {
           <View
             style={{
               width: cardWidth,
-              minHeight: theme.minTouchTarget + 16,
-              borderRadius: theme.radii.md,
-              borderWidth: 1,
-              borderColor: isSelected ? theme.colors.accent : theme.colors.border,
-              backgroundColor: isSelected ? theme.colors.accent : theme.colors.surface,
-              paddingVertical: theme.spacing.sm,
+              // An exact height, not a minimum: the painted path below is drawn
+              // to this size, and a card that grew past it would show its fill
+              // stopping short of its own text.
+              height: cardHeight,
               paddingHorizontal: theme.spacing.md,
               justifyContent: 'center',
               gap: theme.spacing.xs,
               opacity: pressed ? 0.7 : 1,
             }}
           >
+            {/* The chamfered silhouette, as on every card in the app. Painted
+                rather than set with borderRadius, because no radius cuts a
+                corner straight — see ui/cardShape.ts. */}
+            <Svg
+              pointerEvents="none"
+              style={StyleSheet.absoluteFill}
+              width={cardWidth}
+              height={cardHeight}
+            >
+              <Path
+                d={cardPath}
+                fill={isSelected ? theme.colors.accent : theme.colors.surface}
+                stroke={isSelected ? theme.colors.accent : theme.colors.border}
+                strokeWidth={1}
+              />
+            </Svg>
             <Text variant="bodyStrong" color={fg} numberOfLines={1}>
               {location.name}
             </Text>
@@ -224,7 +268,7 @@ export function CityCarousel() {
             transform: [{ translateX }],
           }}
         >
-          {HOME_LOCATIONS.map((location, index) => renderCard(location, index, 0))}
+          {HOME_LOCATIONS.map((location) => renderCard(location, 0))}
           {/* The second pass exists only so the loop can restart without a
               visible rewind, so it is hidden from assistive tech — a screen
               reader should hear ten towns, not twenty. */}
@@ -233,7 +277,7 @@ export function CityCarousel() {
             importantForAccessibility="no-hide-descendants"
             style={{ flexDirection: 'row', gap }}
           >
-            {HOME_LOCATIONS.map((location, index) => renderCard(location, index, 1))}
+            {HOME_LOCATIONS.map((location) => renderCard(location, 1))}
           </View>
         </Animated.View>
       </View>
@@ -253,7 +297,7 @@ export function CityCarousel() {
       style={{ marginHorizontal: bleed }}
       contentContainerStyle={{ paddingHorizontal: theme.spacing.lg, gap }}
     >
-      {HOME_LOCATIONS.map((location, index) => renderCard(location, index, 0))}
+      {HOME_LOCATIONS.map((location) => renderCard(location, 0))}
     </ScrollView>
   );
 }

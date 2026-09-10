@@ -12,7 +12,7 @@ import { Text } from '../../../shared/ui/Text';
 import { formatRelativeTime } from '../../../shared/utils/formatRelativeTime';
 import { ArchiveFilters } from './components/ArchiveFilters';
 import { ArchiveRow } from './components/ArchiveRow';
-import { ArchiveSearchField } from './components/ArchiveSearchField';
+import { SearchField } from '../../../shared/ui/SearchField';
 import { ArchiveSkeleton } from './components/ArchiveSkeletons';
 import {
   activeFilterCount,
@@ -107,7 +107,7 @@ export function AdvisoryArchiveScreen() {
 
   return (
     <Screen>
-      <ArchiveSearchField
+      <SearchField
         value={filter.query}
         onChange={(query) => update({ query })}
         placeholder="Search titles and activities"

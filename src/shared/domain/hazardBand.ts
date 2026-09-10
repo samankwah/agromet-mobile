@@ -31,14 +31,30 @@ export type HazardBand = 'unavailable' | 'normal' | 'watch' | 'moderate' | 'seve
 
 /** Least to most severe. `unavailable` sorts below everything: it is an absence
  * of information, not a reassurance. */
-export const HAZARD_BAND_ORDER: HazardBand[] = [
-  'unavailable',
-  'normal',
-  'watch',
-  'moderate',
-  'severe',
-  'extreme',
-];
+export const HAZARD_BAND_ORDER: HazardBand[] = ['unavailable', 'normal', 'watch', 'moderate', 'severe', 'extreme'];
+
+/**
+ * The inclusive score each band starts at, mirroring `SEVERITY_BANDS` in
+ * `backend/app/hazards.py`. A band runs up to the next band's minimum, so every
+ * real band is twenty points wide.
+ *
+ * `unavailable` is 0 rather than absent so callers can index without a guard —
+ * a region with no reading has no score to compare anyway.
+ *
+ * Restated here rather than read from `/api/hazards/methodology` because
+ * `hazardAlerts.ts` derives CAP certainty from how deep a score sits in its
+ * band, and that derivation must work from a cached snapshot with no
+ * methodology call behind it. If the backend ever moves a threshold, this is
+ * the second place to change.
+ */
+export const HAZARD_BAND_MIN_SCORE: Record<HazardBand, number> = {
+  unavailable: 0,
+  normal: 0,
+  watch: 25,
+  moderate: 45,
+  severe: 65,
+  extreme: 85,
+};
 
 export type HazardBandMeta = {
   band: HazardBand;
@@ -75,7 +91,7 @@ const BAND_META: Record<HazardBand, HazardBandMeta> = {
   watch: {
     band: 'watch',
     label: 'Watch',
-    description: 'Slightly outside the usual range — worth keeping an eye on',
+    description: 'Slightly outside the usual range, worth keeping an eye on',
     icon: 'eye',
     steps: 2,
     fillRatio: 0.3,
@@ -84,7 +100,7 @@ const BAND_META: Record<HazardBand, HazardBandMeta> = {
   moderate: {
     band: 'moderate',
     label: 'Moderate',
-    description: 'Clearly outside the usual range — start preparing',
+    description: 'Clearly outside the usual range, so start preparing',
     icon: 'alert',
     steps: 3,
     fillRatio: 0.42,
@@ -93,7 +109,7 @@ const BAND_META: Record<HazardBand, HazardBandMeta> = {
   severe: {
     band: 'severe',
     label: 'Severe',
-    description: 'Well outside the usual range — act now',
+    description: 'Well outside the usual range, act now',
     icon: 'warning',
     steps: 4,
     fillRatio: 0.55,

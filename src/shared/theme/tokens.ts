@@ -81,9 +81,9 @@ export type ColorTokens = {
    * no `onBubble` token is needed. `bubbleIn` is the neutral partner, one step
    * forward of `bg` in each scheme.
    *
-   * `wallpaperInk` is the doodle pattern behind the transcript; it is drawn at
-   * low opacity, so this is deliberately a colour that stays a whisper rather
-   * than one that reads on its own.
+   * `wallpaperInk` is the doodle pattern behind a page — the chat transcript and
+   * Home both use it. It is drawn at low opacity, so this is deliberately a
+   * colour that stays a whisper rather than one that reads on its own.
    */
   bubbleIn: string;
   bubbleOut: string;
@@ -227,6 +227,22 @@ export const cardShape = {
 } as const;
 
 /**
+ * The menu drawer panel, measured off the reference (see ui/cardShape.ts's
+ * `drawerPanelPath`). Ratios, not fixed dp: the reference's panel is 70.7% of a
+ * 408dp-wide screen with its corner cuts running ~0.7 of the panel width, which
+ * is a ~35 degree diagonal. Pinning the cuts in dp instead would flatten that
+ * angle on a wide screen and steepen it on a narrow one.
+ *
+ * `maxWidth` stops the panel swallowing most of a tablet, where 71% of the
+ * screen is far more than a menu needs.
+ */
+export const drawerShape = {
+  widthRatio: 0.71,
+  maxWidth: 340,
+  cutRatio: 0.7,
+} as const;
+
+/**
  * No elevation. Surfaces are outline-first: a 1px `border` plus the
  * `surface`/`bg` fill difference does all the separating, at two radii
  * (see `radii`). Emphasis and state are carried by colour — a stronger
@@ -264,6 +280,10 @@ export const fontFamily = {
 /** Type scale sized for readability on small Android screens — 14sp is the
  * accessibility floor for body text, 12sp for captions only. */
 export const typeScale = {
+  /** Hero type, for a screen whose whole job is one line — the welcome
+   * wordmark. Deliberately far above `h1`: a display size that only just
+   * outranks a heading reads as a mistake rather than as a decision. */
+  display: { fontSize: 40, lineHeight: 44, fontFamily: fontFamily.headingBold },
   h1: { fontSize: 24, lineHeight: 30, fontFamily: fontFamily.headingBold },
   h2: { fontSize: 19, lineHeight: 25, fontFamily: fontFamily.headingBold },
   h3: { fontSize: 16, lineHeight: 22, fontFamily: fontFamily.headingMedium },

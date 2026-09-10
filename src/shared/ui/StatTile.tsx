@@ -1,12 +1,13 @@
 import React from 'react';
 import { View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import type { Icon } from 'phosphor-react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
+import { DuotoneIcon } from './DuotoneIcon';
 import { Text } from './Text';
 
 type Props = {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: Icon;
   label: string;
   value: string;
 };
@@ -22,7 +23,7 @@ export function StatTile({ icon, label, value }: Props) {
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, minWidth: '42%' }}>
-      <Ionicons name={icon} size={18} color={theme.colors.muted} />
+      <DuotoneIcon icon={icon} size={18} color={theme.colors.muted} />
       <View>
         <Text variant="caption" muted>
           {label}

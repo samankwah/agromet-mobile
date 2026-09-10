@@ -1,0 +1,16 @@
+{
+  "classIds": [
+    "cbb",
+    "cbsd",
+    "cgm",
+    "cmd",
+    "healthy"
+  ],
+  "inputSize": 224,
+  "inputRange": [
+    0,
+    255
+  ],
+  "quantization": "none",
+  "note": "Pixels are fed at 0-255; MobileNetV3 rescales internally."
+}

@@ -2,30 +2,17 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { useTheme } from '../../../../shared/theme/ThemeProvider';
-import { Skeleton, SkeletonCard, SkeletonScreen, SkeletonText } from '../../../../shared/ui/Skeleton';
+import { Skeleton, SkeletonScreen, SkeletonText } from '../../../../shared/ui/Skeleton';
 
 /** Loading placeholders for the weather-alert surfaces. */
 
-/**
- * The Home/Advisories alert banner.
- *
- * One compact card either way: the loaded state is either an "all clear" row
- * or a severity banner, and both occupy about the same height, so the
- * placeholder does not have to guess which is coming.
+/*
+ * `AlertBannerSkeleton` used to live here. It is gone with the banner's empty
+ * state: the banner now renders nothing when there is no alert, so a
+ * placeholder would promise a card that almost never arrives and then collapse.
+ * The details screen below still has one, because opening `/alert/[id]` is a
+ * deliberate act with a result guaranteed to follow.
  */
-export function AlertBannerSkeleton() {
-  const theme = useTheme();
-
-  return (
-    <SkeletonCard gap={theme.spacing.sm}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-        <Skeleton width={20} height={20} radius={10} />
-        <Skeleton width="70%" height={14} />
-      </View>
-      <Skeleton width="45%" height={10} />
-    </SkeletonCard>
-  );
-}
 
 /** A full alert: severity, headline, body, and the advice list. */
 export function AlertDetailsSkeleton() {

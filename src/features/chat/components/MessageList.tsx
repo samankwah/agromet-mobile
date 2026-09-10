@@ -1,9 +1,11 @@
-import React, { useMemo } from 'react';
-import { FlatList, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { FlatList, Share, View } from 'react-native';
 
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { OptionSheet, type SheetOption } from '../../../shared/ui/OptionSheet';
 import type { ChatMessage } from '../../../shared/domain/chat';
 import { dayLabel, startsNewDay } from '../dayLabel';
+import { toPlainText } from '../richText';
 import { DateSeparator } from './DateSeparator';
 import { MessageBubble, type BubbleState } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
@@ -16,8 +18,11 @@ type Row =
 type Props = {
   messages: ChatMessage[];
   isSending: boolean;
-  errorMessage?: string;
   onRetry: (id: string) => void;
+  /** Reads one reply aloud. Absent when the device already has a screen reader
+   * speaking the transcript. */
+  onToggleSpeech?: (id: string, text: string) => void;
+  speakingId?: string | null;
 };
 
 /**
@@ -44,8 +49,47 @@ type Props = {
  * uniform gap throws it away. (Inside a cell the list's flip is applied twice
  * and cancels, so `marginTop` here is the visual top.)
  */
-export function MessageList({ messages, isSending, errorMessage, onRetry }: Props) {
+export function MessageList({ messages, isSending, onRetry, onToggleSpeech, speakingId }: Props) {
   const theme = useTheme();
+
+  // One sheet for the whole list, not one per bubble: a modal mounted inside
+  // every cell of a recycling list is a modal per turn, and this transcript can
+  // run to a couple of hundred.
+  const [actionsFor, setActionsFor] = useState<ChatMessage | null>(null);
+
+  const actions = useMemo<SheetOption[]>(() => {
+    if (!actionsFor) return [];
+    const options: SheetOption[] = [{ id: 'share', label: 'Share this answer' }];
+    if (onToggleSpeech && actionsFor.role === 'assistant' && !actionsFor.failed) {
+      options.unshift({
+        id: 'speak',
+        label: speakingId === actionsFor.id ? 'Stop reading aloud' : 'Read aloud',
+      });
+    }
+    return options;
+  }, [actionsFor, onToggleSpeech, speakingId]);
+
+  const runAction = useCallback(
+    (id: string) => {
+      const message = actionsFor;
+      setActionsFor(null);
+      if (!message) return;
+
+      if (id === 'speak') {
+        onToggleSpeech?.(message.id, toPlainText(message.text));
+        return;
+      }
+
+      // React Native's own share sheet, so this needs no native module and no
+      // new build. Sharing the words is the point: an answer about a spray
+      // window is worth forwarding to whoever else is farming that plot.
+      void Share.share({ message: toPlainText(message.text) }).catch(() => {
+        // A dismissed or unavailable share sheet is not an error worth a
+        // banner. The farmer still has the answer on screen.
+      });
+    },
+    [actionsFor, onToggleSpeech],
+  );
 
   const rows = useMemo<Row[]>(() => {
     const chronological: Row[] = [];
@@ -80,54 +124,83 @@ export function MessageList({ messages, isSending, errorMessage, onRetry }: Prop
   }, [messages, isSending]);
 
   return (
-    <FlatList
-      inverted
-      data={rows}
-      keyExtractor={(row) => row.key}
-      // No tab-bar clearance: the composer is a real flex sibling below this
-      // list and reserves its own room. Adding it in both places floats the
-      // newest message a bar's height off the bottom.
-      contentContainerStyle={{
-        paddingHorizontal: theme.spacing.md,
-        paddingVertical: theme.spacing.sm,
-      }}
-      // So Try again, or a suggestion, lands on the first press with the
-      // keyboard up — matching Screen's own scroll container.
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag"
-      // TalkBack reads new replies as they arrive on Android; iOS gets the
-      // explicit announcement from useChat.
-      accessibilityLiveRegion="polite"
-      renderItem={({ item }) => {
-        if (item.kind === 'typing') {
+    <>
+      <FlatList
+        inverted
+        data={rows}
+        keyExtractor={(row) => row.key}
+        // No tab-bar clearance: the composer is a real flex sibling below this
+        // list and reserves its own room. Adding it in both places floats the
+        // newest message a bar's height off the bottom.
+        contentContainerStyle={{
+          paddingHorizontal: theme.spacing.md,
+          paddingVertical: theme.spacing.sm,
+        }}
+        // So Try again, or a suggestion, lands on the first press with the
+        // keyboard up — matching Screen's own scroll container.
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        // TalkBack reads new replies as they arrive on Android; iOS gets the
+        // explicit announcement from useChat.
+        accessibilityLiveRegion="polite"
+        // A day's conversation can run to a couple of hundred rows, and the
+        // phone this is built for is not fast. Rendering a screenful at a time
+        // keeps the first paint cheap; the window either side of it is what
+        // stops a fast scroll showing blank cells. No `getItemLayout`: bubbles
+        // are variable height and guessing one would be worse than measuring.
+        initialNumToRender={12}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews
+        renderItem={({ item }) => {
+          if (item.kind === 'typing') {
+            return (
+              <View style={{ marginTop: theme.spacing.xs }}>
+                <TypingIndicator />
+              </View>
+            );
+          }
+
+          if (item.kind === 'date') {
+            return (
+              <View style={{ marginTop: theme.spacing.lg, marginBottom: theme.spacing.xs }}>
+                <DateSeparator label={item.label} />
+              </View>
+            );
+          }
+
           return (
-            <View style={{ marginTop: theme.spacing.xs }}>
-              <TypingIndicator />
+            <View style={{ marginTop: item.isFirstInGroup ? theme.spacing.md : theme.spacing.xs }}>
+              <MessageBubble
+                message={item.message}
+                state={item.state}
+                isFirstInGroup={item.isFirstInGroup}
+                errorMessage={item.message.errorText}
+                onRetry={() => onRetry(item.message.id)}
+                retryDisabled={isSending}
+                // Only finished answers: reading the farmer's own words back, or
+                // speaking a reply that failed to arrive, would be noise.
+                onToggleSpeech={
+                  onToggleSpeech && item.message.role === 'assistant' && item.state !== 'failed'
+                    ? () => onToggleSpeech(item.message.id, item.message.text)
+                    : undefined
+                }
+                isSpeaking={speakingId === item.message.id}
+                onLongPress={() => setActionsFor(item.message)}
+              />
             </View>
           );
-        }
+        }}
+      />
 
-        if (item.kind === 'date') {
-          return (
-            <View style={{ marginTop: theme.spacing.lg, marginBottom: theme.spacing.xs }}>
-              <DateSeparator label={item.label} />
-            </View>
-          );
-        }
-
-        return (
-          <View style={{ marginTop: item.isFirstInGroup ? theme.spacing.md : theme.spacing.xs }}>
-            <MessageBubble
-              message={item.message}
-              state={item.state}
-              isFirstInGroup={item.isFirstInGroup}
-              errorMessage={errorMessage}
-              onRetry={() => onRetry(item.message.id)}
-              retryDisabled={isSending}
-            />
-          </View>
-        );
-      }}
-    />
+      <OptionSheet
+        visible={actionsFor !== null}
+        options={actions}
+        selectedId=""
+        onSelect={runAction}
+        onClose={() => setActionsFor(null)}
+        title="This message"
+      />
+    </>
   );
 }

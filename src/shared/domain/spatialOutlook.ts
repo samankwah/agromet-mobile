@@ -13,7 +13,7 @@ export type SpatialGeography = 'region' | 'district';
 /** How a variable's raw numeric value should be rendered to a reader.
  * Carried on the variable itself so the legend, map popups and any future
  * consumer format consistently, instead of each branching on variable id. */
-export type SpatialValueFormat = 'number' | 'day-of-year';
+export type SpatialValueFormat = 'number' | 'day-of-year' | 'temperature';
 
 /**
  * Which period vocabulary a variable is scoped by.

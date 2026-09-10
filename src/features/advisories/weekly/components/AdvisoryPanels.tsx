@@ -102,12 +102,16 @@ export function AdvisorySummary({ activity }: { activity: AdvisoryActivity }) {
 }
 
 /**
- * A poultry bulletin's body.
+ * The fallback body, for a bulletin with no per-activity worksheets.
  *
- * Poultry advisories carry no forecast and no per-parameter advice — the
- * spreadsheet holds a flat table of target values and a list of recommended
- * actions, and that is all. Rendering an empty forecast table here would
- * suggest the data exists and simply failed to load.
+ * Named for poultry because that is where it is met in practice: the older
+ * generated template holds a flat table of target values and a list of
+ * recommended actions, and nothing else. Rendering an empty forecast table for
+ * one of those would suggest the data exists and simply failed to load.
+ *
+ * It is no longer *the* poultry layout. Bulletins on the current district
+ * template — crop and poultry alike — carry per-worksheet forecasts and get the
+ * table; see WeeklyAdvisoryScreen, which chooses on content rather than kind.
  */
 export function PoultryGuidance({ advisory }: { advisory: WeeklyAdvisory }) {
   const theme = useTheme();

@@ -2,8 +2,12 @@ import React from 'react';
 import { Text as RNText, type TextProps as RNTextProps } from 'react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
+import type { TypeScale } from '../theme/tokens';
 
-type Variant = 'h1' | 'h2' | 'h3' | 'body' | 'bodyStrong' | 'caption';
+/** Derived from the scale, not restated. As a hand-written union this drifted:
+ * a variant could be added to `typeScale` and remain unrenderable here, with
+ * nothing to say so. */
+type Variant = keyof TypeScale;
 
 type Props = RNTextProps & {
   variant?: Variant;

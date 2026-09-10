@@ -7,7 +7,8 @@ import type { DailyForecast, HourlyForecast, WeeklyForecast } from '../../../sha
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { BulletList } from '../../../shared/ui/BulletList';
 import { Card } from '../../../shared/ui/Card';
-import { MockDataTag } from '../../../shared/ui/MockDataTag';
+import { CloudRain, Drop, NavigationArrow, Thermometer } from 'phosphor-react-native';
+
 import { StatTile } from '../../../shared/ui/StatTile';
 import { Text } from '../../../shared/ui/Text';
 import { ON_BACKDROP_COLOR, ON_BACKDROP_MUTED } from '../../../shared/ui/WeatherBackdrop';
@@ -15,6 +16,7 @@ import { formatTemperature } from '../../../shared/utils/formatTemperature';
 import { formatWind } from '../../../shared/utils/formatWind';
 import { getConditionIcon } from '../../../shared/utils/getConditionIcon';
 import { HourlyStripItem } from './HourlyStripItem';
+import { MapPreviewCard } from './MapPreviewCard';
 
 type Props = {
   conditions: CurrentWeather;
@@ -70,13 +72,21 @@ export function TodaySection({ conditions, today, hourly, actionCard }: Props) {
           Today&apos;s conditions
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: theme.spacing.md, columnGap: theme.spacing.lg }}>
-          <StatTile icon="thermometer-outline" label="Feels like" value={formatTemperature(conditions.feelsLikeC)} />
-          <StatTile icon="water-outline" label="Humidity" value={`${conditions.humidityPct}%`} />
-          <StatTile icon="navigate-outline" label="Wind" value={formatWind(conditions.windKph)} />
-          <StatTile icon="rainy-outline" label="Rain chance" value={`${today.rainfallProbabilityPct}%`} />
+          <StatTile icon={Thermometer} label="Feels like" value={formatTemperature(conditions.feelsLikeC)} />
+          <StatTile icon={Drop} label="Humidity" value={`${conditions.humidityPct}%`} />
+          <StatTile icon={NavigationArrow} label="Wind" value={formatWind(conditions.windKph)} />
+          <StatTile icon={CloudRain} label="Rain chance" value={`${today.rainfallProbabilityPct}%`} />
         </View>
-        <MockDataTag />
       </Card>
+
+      {/* Directly under the rain-chance tile it expands on. The map runs three
+          hours back to twelve ahead, which is this section's timescale and not
+          the week's, so this is where it belongs. */}
+      <MapPreviewCard
+        center={{ lat: conditions.lat, lng: conditions.lng }}
+        locationName={conditions.locationName}
+        temperatureC={conditions.temperatureC}
+      />
 
       <Card translucent raised style={{ gap: theme.spacing.sm }}>
         <Text variant="h3">{actionCard.headline}</Text>

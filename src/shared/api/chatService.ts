@@ -1,11 +1,12 @@
 import type { ChatTurn, ChatUserContext } from '../domain/chat';
+import { useAuthStore } from '../state/authStore';
 import { postJson } from './http';
 import { ServiceError } from './mockDelay';
 
 /**
  * The AgroMet AI assistant.
  *
- * Two things about this endpoint are worth knowing before changing anything
+ * Three things about this endpoint are worth knowing before changing anything
  * here.
  *
  * First, the envelope. `/api/chat` answers `{ success, message }` with **no
@@ -15,28 +16,47 @@ import { ServiceError } from './mockDelay';
  * unique any more, it is these two. If a third appears, the envelope handling
  * belongs in `http.ts`.
  *
- * Second, the budget. The backend allows its OpenAI upstream 30 seconds and,
- * on any failure, answers with a canned regional fallback instead of an error.
- * So a slow request is nearly always about to succeed with *something* useful,
- * and the client must not abort first — hence 35s rather than the shared
- * 10s default.
+ * Second, the budget. The server allows its model upstream 20 seconds and, on
+ * any failure, answers with a plainly worded fallback instead of an error. So a
+ * slow request is nearly always about to succeed with *something* useful, and
+ * the client must not abort first — hence 25s rather than the shared 10s
+ * default. It sits just outside the server's own budget, so the fallback beats
+ * us to it and the farmer gets words rather than a timeout.
+ *
+ * Third, the device header. This endpoint has no login and spends money on
+ * every call, so the server meters it per device. The id is the app's existing
+ * persisted guest id, which is not an account and identifies nobody: it is
+ * there so that one phone in a loop cannot spend the quota of a whole district
+ * sharing its mobile address.
  */
-type ChatReplyDto = { success?: boolean; message?: string };
+type ChatReplyDto = {
+  success?: boolean;
+  message?: string;
+  degraded?: boolean;
+  degradedReason?: string;
+};
 
-const CHAT_TIMEOUT_MS = 35_000;
+/** The reply, and whether it actually came from the assistant.
+ *
+ * The server serves its built-in fallback with `success: true`, so on the wire
+ * canned advice is indistinguishable from an answer that considered the
+ * question. `degraded` is how the difference reaches the screen; `reason` is
+ * for the logs and for anyone debugging why, and is never shown. */
+export type ChatReply = { text: string; degraded: boolean; reason?: string };
 
-export async function sendChatMessage(input: {
-  message: string;
-  history: ChatTurn[];
-  userContext: ChatUserContext;
-}): Promise<string> {
+const CHAT_TIMEOUT_MS = 25_000;
+
+export async function sendChatMessage(input: { message: string; history: ChatTurn[]; userContext: ChatUserContext }): Promise<ChatReply> {
   const body = {
     message: input.message,
     conversationHistory: input.history,
     userContext: input.userContext,
   };
 
-  const dto = await postJson<ChatReplyDto>('/api/chat', body, { timeoutMs: CHAT_TIMEOUT_MS });
+  const dto = await postJson<ChatReplyDto>('/api/chat', body, {
+    timeoutMs: CHAT_TIMEOUT_MS,
+    headers: { 'X-Device-Id': useAuthStore.getState().guestId },
+  });
 
   const reply = dto?.message?.trim();
 
@@ -48,5 +68,5 @@ export async function sendChatMessage(input: {
     throw new ServiceError('AgroMet AI did not send a reply. Try again.');
   }
 
-  return reply;
+  return { text: reply, degraded: dto?.degraded === true, reason: dto?.degradedReason };
 }

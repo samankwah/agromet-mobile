@@ -108,11 +108,28 @@ describe('driverSummary', () => {
     expect(summary).toBe('Heaviest forecast day 28 mm');
   });
 
-  it('keeps precision on small fractional values', () => {
+  /* "0.98 fraction" was the payload leaking onto the screen: `fraction` names
+     the quantity's form, not a unit, and 0.98 of a thing is a percentage
+     everywhere outside the JSON. */
+  it('reads a fraction as the percentage it is', () => {
     const summary = driverSummary(
       block('watch', 30, [driver('saturation', 'Soil saturation', 0.98, 'fraction', 90, 0.4)]),
     );
-    expect(summary).toBe('Soil saturation 0.98 fraction');
+    expect(summary).toBe('Soil saturation 98%');
+  });
+
+  it('writes cubic metres per second the way it is read', () => {
+    const summary = driverSummary(
+      block('severe', 70, [driver('discharge', 'River discharge', 6667.07, 'm3/s', 94, 0.4)]),
+    );
+    expect(summary).toBe('River discharge 6667 m³/s');
+  });
+
+  it('drops sigma, which is not a unit anyone reads', () => {
+    const summary = driverSummary(
+      block('watch', 30, [driver('spi90', 'Rainfall anomaly (SPI-90)', 1.32, 'sigma', 80, 0.4)]),
+    );
+    expect(summary).toBe('Rainfall anomaly (SPI-90) 1.32');
   });
 });
 

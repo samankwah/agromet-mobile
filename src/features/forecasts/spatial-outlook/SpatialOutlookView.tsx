@@ -42,7 +42,10 @@ type Props = {
 export function SpatialOutlookView({ seasonal }: Props) {
   const theme = useTheme();
   const { isOnline } = useNetworkStatus();
-  const [drawerExpanded, setDrawerExpanded] = useState(true);
+  // Starts collapsed: on arrival the map is the thing to see, with just the
+  // legend showing beneath it. The reader taps the handle to bring the
+  // selectors up when they want to change what the map shows.
+  const [drawerExpanded, setDrawerExpanded] = useState(false);
 
   const {
     forecastView,

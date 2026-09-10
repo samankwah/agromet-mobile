@@ -8,6 +8,7 @@ import { DayDetailScreen } from '../../features/forecasts/day-detail/DayDetailSc
 import { getWeeklyForecast } from '../../shared/api/forecastService';
 import { queryClient } from '../../shared/api/queryClient';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
+import { stubWeatherFetch } from '../fixtures/openMeteo';
 
 // DayDetailScreen imports `router` at module scope for its close button.
 // Mocked here rather than in jest.setup.js, whose stated scope is native
@@ -35,11 +36,16 @@ function renderScreen(date: string) {
 describe('DayDetailScreen', () => {
   let date: string;
 
+  // The forecast now comes from Open-Meteo, so this suite has to stub the
+  // network or it makes a live request per test — including in beforeAll,
+  // where a failure takes every test with it.
   beforeAll(async () => {
+    stubWeatherFetch();
     date = (await getWeeklyForecast('accra')).days[0].date;
   });
 
   beforeEach(() => {
+    stubWeatherFetch();
     queryClient.clear();
     jest.clearAllMocks();
   });

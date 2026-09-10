@@ -5,7 +5,7 @@ import Svg, { Path, Rect } from 'react-native-svg';
 import { GHANA_BOUNDARIES } from '../data/ghanaBoundaries';
 import type { SpatialGeography, SpatialGridCell } from '../domain/spatialOutlook';
 import { useTheme } from '../theme/ThemeProvider';
-import { TERCILE_CATEGORIES, valueToClassColor } from '../utils/colorScale';
+import { TERCILE_CATEGORIES, valueToClassColor, type ColorStops } from '../utils/colorScale';
 import { createProjector, polygonToSvgPath } from '../utils/geoProjection';
 
 type Props = {
@@ -14,10 +14,18 @@ type Props = {
   max: number;
   geography: SpatialGeography;
   height: number;
-  /** Probability view: values are tercile indices, coloured by category —
-   * must match the MapLibre renderer so switching online/offline never
-   * changes what a colour means. */
+  /** Probability view: values are indices into a categorical palette, not
+   * points on a numeric ramp — must match the MapLibre renderer so switching
+   * online/offline never changes what a colour means. */
   isTercile?: boolean;
+  /** Overrides `TERCILE_CATEGORIES` when the variable has a published colour
+   * convention of its own. The Subseasonal map passes rainfall and temperature
+   * ramps; Seasonal omits it and keeps the neutral default, because "above" has
+   * no agreed colour for a variable like dry-spell length. */
+  palette?: { label: string; color: string; sublabel?: string }[];
+  /** The continuous ramp, so the offline renderer follows the same per-variable
+   * convention the online one does. */
+  stops?: ColorStops;
 };
 
 /**
@@ -28,13 +36,18 @@ type Props = {
  * so a full map library would be unjustified weight for what's actually
  * needed here.
  */
-export function ChoroplethMap({ cells, min, max, geography, height, isTercile = false }: Props) {
+export function ChoroplethMap({ cells, min, max, geography, height, isTercile = false, palette, stops }: Props) {
   const theme = useTheme();
   const { width } = useWindowDimensions();
 
   const project = useMemo(() => createProjector(GHANA_BOUNDARIES.bounds, { width, height, padding: 12 }), [width, height]);
 
   const countryPath = useMemo(() => polygonToSvgPath(GHANA_BOUNDARIES.country.geometry, project), [project]);
+
+  const categories = palette ?? TERCILE_CATEGORIES;
+  // The middle of whatever palette is in use, which is the honest fallback for a
+  // value that does not resolve.
+  const neutralIndex = Math.floor(categories.length / 2);
 
   const boundaryFeatures = geography === 'region' ? GHANA_BOUNDARIES.regions : GHANA_BOUNDARIES.districts;
   const internalBoundaryPath = useMemo(
@@ -64,7 +77,9 @@ export function ChoroplethMap({ cells, min, max, geography, height, isTercile = 
               width={cellSizePx}
               height={cellSizePx}
               fill={
-                isTercile ? (TERCILE_CATEGORIES[cell.value]?.color ?? TERCILE_CATEGORIES[1].color) : valueToClassColor(cell.value, min, max)
+                isTercile
+                  ? (categories[cell.value]?.color ?? categories[neutralIndex].color)
+                  : valueToClassColor(cell.value, min, max, undefined, stops)
               }
             />
           );

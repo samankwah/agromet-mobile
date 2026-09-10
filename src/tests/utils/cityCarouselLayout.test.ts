@@ -1,9 +1,10 @@
 import {
   BASE_BODY_FONT_SIZE,
   CARD_BASE_WIDTH,
+  MARQUEE_SPEED_PPS,
+  cityCardHeight,
   cityCardWidth,
   citySnapOffsets,
-  MARQUEE_SPEED_PPS,
   marqueeCycleWidth,
   marqueeOffsetAt,
 } from '../../features/home/cityCarouselLayout';
@@ -108,5 +109,36 @@ describe('marqueeOffsetAt', () => {
 
   it('is zero when there is no cycle to travel', () => {
     expect(marqueeOffsetAt(9999, 0)).toBe(0);
+  });
+});
+
+describe('cityCardHeight', () => {
+  // The values the component passes at the standard type scale: body lineHeight
+  // 21, spacing.sm 8, spacing.xs 4, and a 44 touch target plus 16.
+  const STANDARD = [21, 8, 4, 60] as const;
+
+  it('fits two lines of text, the gap between them and the padding', () => {
+    // 21 + 21 + 4 + 8 + 8
+    expect(cityCardHeight(...STANDARD)).toBe(62);
+  });
+
+  it('never returns less than a comfortable touch target', () => {
+    // Small type would otherwise produce a card too short to tap reliably.
+    expect(cityCardHeight(10, 2, 2, 60)).toBe(60);
+  });
+
+  it('grows with the farmer’s text-size preference', () => {
+    const standard = cityCardHeight(...STANDARD);
+    const large = cityCardHeight(24, 8, 4, 60);
+    const extraLarge = cityCardHeight(27, 8, 4, 60);
+
+    expect(large).toBeGreaterThan(standard);
+    expect(extraLarge).toBeGreaterThan(large);
+  });
+
+  it('returns a whole number, because a fractional height blurs the painted edge', () => {
+    const height = cityCardHeight(21.5, 8, 4, 60);
+
+    expect(Number.isInteger(height)).toBe(true);
   });
 });

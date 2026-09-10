@@ -1,6 +1,7 @@
 import {
   MOCK_ADVISORY_ARCHIVE,
   MOCK_CROP_ADVISORY,
+  MOCK_LAYER_ADVISORY,
   MOCK_POULTRY_ADVISORY,
 } from '../data/mockWeeklyAdvisory';
 import type {
@@ -12,6 +13,7 @@ import type {
   ForecastRow,
   WeeklyAdvisory,
 } from '../domain/weeklyAdvisory';
+import { POULTRY_OMITTED_PARAMETERS } from '../domain/weeklyAdvisory';
 import { getJson, NetworkError } from './http';
 
 /**
@@ -165,12 +167,31 @@ function toWeeklyAdvisory(dto: AdvisoryDto): WeeklyAdvisory {
   const { activities, recommendations } = partitionAdvisories(dto.advisories ?? []);
   const kind: AdvisoryKind = dto.advisoryType === 'poultry-advisory' ? 'poultry' : 'crop';
 
+  // The soil columns come through on a poultry sheet because the template is
+  // shared, not because anyone measured them. Dropped here rather than in the
+  // table, so the rest of the app sees the same rows the table draws.
+  const shaped =
+    kind === 'poultry'
+      ? activities.map((activity) => ({
+          ...activity,
+          rows: activity.rows.filter((row) => !POULTRY_OMITTED_PARAMETERS.includes(row.parameter)),
+        }))
+      : activities;
+
   // For poultry the backend reroutes management metrics through the weather
-  // forecast column. It is not a forecast, and is only read as metrics here.
+  // forecast column, because weekly_advisories has nowhere else to put them. It
+  // is not a forecast, and is only read as metrics here.
+  //
+  // `source` and `parameters` are reserved: a bulletin whose worksheets parsed
+  // carries the real forecast in this column instead, and `source` is a string,
+  // so without excluding it every parsed poultry bulletin would show
+  // "source: spreadsheet" as a management target.
   const metrics =
     kind === 'poultry' && dto.weatherForecast
       ? Object.fromEntries(
-          Object.entries(dto.weatherForecast).filter(([, value]) => typeof value === 'string'),
+          Object.entries(dto.weatherForecast).filter(
+            ([key, value]) => typeof value === 'string' && key !== 'source' && key !== 'parameters',
+          ),
         )
       : {};
 
@@ -183,7 +204,7 @@ function toWeeklyAdvisory(dto: AdvisoryDto): WeeklyAdvisory {
     crop: readableName(dto.crop),
     year: dto.year ?? null,
     season: dto.season ?? '',
-    activities,
+    activities: shaped,
     recommendations,
     managementMetrics: metrics as Record<string, string>,
     summary: dto.summary ?? '',
@@ -241,8 +262,13 @@ function toActivityRef(dto: ActivityRefDto): AdvisoryActivityRef {
 }
 
 /** The seeded bulletin for a kind, used when the server has nothing. */
-export function seededAdvisory(kind: AdvisoryKind): WeeklyAdvisory {
-  return kind === 'poultry' ? MOCK_POULTRY_ADVISORY : MOCK_CROP_ADVISORY;
+export function seededAdvisory(kind: AdvisoryKind, subject?: string): WeeklyAdvisory {
+  if (kind !== 'poultry') return MOCK_CROP_ADVISORY;
+  // Broiler and layer are genuinely different programmes — 4 stages against 16,
+  // eight weeks against a year — so one poultry stand-in cannot represent both.
+  // A farmer who picked Layer and was shown a broiler cycle would reasonably
+  // conclude the app does not know the difference.
+  return subject?.trim().toLowerCase() === 'layer' ? MOCK_LAYER_ADVISORY : MOCK_POULTRY_ADVISORY;
 }
 
 /**
@@ -305,13 +331,15 @@ export async function listArchivedAdvisories(): Promise<AdvisoryResult<ArchivedA
 export async function getWeeklyAdvisory(
   advisoryId: number,
   kind: AdvisoryKind,
+  /** The chosen bird or commodity, so a stand-in matches what was asked for. */
+  subject?: string,
 ): Promise<AdvisoryResult<WeeklyAdvisory>> {
   try {
     const data = await getJson<AdvisoryDto>(`/api/weekly-advisories/${advisoryId}`);
-    if (!data) return { data: seededAdvisory(kind), fallback: 'empty' };
+    if (!data) return { data: seededAdvisory(kind, subject), fallback: 'empty' };
     return { data: toWeeklyAdvisory(data), fallback: null };
   } catch (error) {
-    if (error instanceof NetworkError) return { data: seededAdvisory(kind), fallback: 'offline' };
+    if (error instanceof NetworkError) return { data: seededAdvisory(kind, subject), fallback: 'offline' };
     throw error;
   }
 }

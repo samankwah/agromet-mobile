@@ -65,6 +65,11 @@ export function WeeklyAdvisoryScreen({ kind, advisoryId }: Props) {
   useEffect(() => setActivityIndex(0), [filter.region, filter.district, filter.subject]);
 
   const copy = COPY[kind];
+  // The fallback path has content only if the older template produced some.
+  const hasGuidance =
+    (advisory?.recommendations.length ?? 0) > 0 ||
+    Object.keys(advisory?.managementMetrics ?? {}).length > 0;
+
   const activity = activities[Math.min(activityIndex, Math.max(activities.length - 1, 0))] ?? null;
 
   return (
@@ -113,18 +118,14 @@ export function WeeklyAdvisoryScreen({ kind, advisoryId }: Props) {
               sampleFrom={advisory.district}
             />
 
-            {kind === 'poultry' ? (
-              <PoultryGuidance advisory={advisory} />
-            ) : activities.length === 0 ? (
-              /* A crop bulletin with no parsed worksheets. Rare, but it means
-                 the upload failed to parse rather than that the week was
-                 quiet, and saying so is more use than an empty table. */
-              <EmptyState
-                icon="document-outline"
-                title="This bulletin has no activity detail"
-                message="The published file could not be read into weekly activities. Ask your district office to re-upload it."
-              />
-            ) : (
+            {/* What was uploaded decides the layout, not which kind of bulletin
+                this is. Crop and poultry advisories are authored on the same
+                district template — one worksheet per activity, each with the
+                nine-parameter forecast band — so a poultry bulletin that parsed
+                gets the same table a crop one does. This used to branch on
+                `kind`, which sent every poultry bulletin to the guidance card
+                even when it had a full set of worksheets behind it. */}
+            {activities.length > 0 ? (
               <>
                 <ActivityPicker
                   activities={activities}
@@ -138,6 +139,19 @@ export function WeeklyAdvisoryScreen({ kind, advisoryId }: Props) {
                   </>
                 ) : null}
               </>
+            ) : hasGuidance ? (
+              /* The older generated poultry template: management targets and a
+                 list of recommended actions, with no forecast band to table. */
+              <PoultryGuidance advisory={advisory} />
+            ) : (
+              /* Nothing parsed either way. That means the upload could not be
+                 read, not that the week was quiet, and saying so is more use
+                 than an empty table. */
+              <EmptyState
+                icon="document-outline"
+                title="This bulletin has no activity detail"
+                message="The published file could not be read into weekly activities. Ask your district office to re-upload it."
+              />
             )}
           </View>
         ) : null}

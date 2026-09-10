@@ -40,6 +40,24 @@ export function cityCardWidth(bodyFontSize: number): number {
 }
 
 /**
+ * How tall each card is, for the given resolved body line height.
+ *
+ * Computed rather than left to the content, because the cards are painted as an
+ * SVG path (the app's chamfered silhouette, see `ui/cardShape.ts`) and a path
+ * needs a size before it can be drawn. Measuring instead would mean an
+ * `onLayout` and a state update on each of the sixty-four cards the flowing row
+ * renders — on the low-end Android this carousel is written for, that is the
+ * kind of cost this file exists to avoid.
+ *
+ * Two lines of text — the town and its temperature — plus the gap between them
+ * and the padding above and below. Floored at the minimum touch target so a
+ * card is always comfortably tappable, whatever the type scale.
+ */
+export function cityCardHeight(bodyLineHeight: number, verticalPadding: number, gap: number, minimum: number): number {
+  return Math.max(minimum, Math.round(bodyLineHeight * 2 + gap + verticalPadding * 2));
+}
+
+/**
  * The `contentOffset.x` at which each card sits flush against the page gutter.
  *
  * These are scroll offsets, not positions within the content: the carousel's

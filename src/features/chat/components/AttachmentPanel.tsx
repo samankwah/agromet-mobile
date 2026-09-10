@@ -6,7 +6,7 @@ import { tint } from '../../../shared/theme/blend';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Text } from '../../../shared/ui/Text';
 
-export type AttachmentAction = 'photos' | 'camera' | 'location' | 'document';
+export type AttachmentAction = 'photos' | 'camera' | 'location' | 'diagnose';
 
 type Tile = {
   action: AttachmentAction;
@@ -29,32 +29,35 @@ const TILES: Tile[] = [
     icon: 'images',
     label: 'Photos',
     tone: 'photos',
-    hint: 'Choose a crop photo for diagnosis',
+    hint: 'Ask about a crop photo',
   },
   {
     action: 'camera',
     icon: 'camera',
     label: 'Camera',
     tone: 'camera',
-    hint: 'Photograph a crop for diagnosis',
+    hint: 'Photograph a crop and ask about it',
   },
   {
     action: 'location',
     icon: 'location',
     label: 'Location',
     tone: 'location',
-    hint: 'Add your district to the question',
+    // Says "area" because that is what it adds: the town selected on Home and
+    // its region. It never knew the farmer's district, and claiming to was a
+    // promise the sentence it writes could not keep.
+    hint: 'Add your area to the question',
   },
   {
-    action: 'document',
-    icon: 'document-text',
-    label: 'Document',
+    action: 'diagnose',
+    icon: 'leaf',
+    label: 'Diagnose',
     tone: 'document',
-    // Shown but marked. `/api/chat` takes text only and no document picker is
-    // installed, so a working tile would need both a dependency and a backend
-    // change. A tile that says so beats one that looks live and does nothing.
-    hint: 'Not supported yet',
-    disabled: true,
+    // Was a Document tile that said "Not supported yet" and did nothing but
+    // print that sentence. This slot now leads to Crop Diagnose, which is where
+    // a photo gets kept, numbered and filed -- the thing the camera in the row
+    // above deliberately does not do.
+    hint: 'Open the full crop check',
   },
 ];
 

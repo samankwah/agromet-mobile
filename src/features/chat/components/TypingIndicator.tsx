@@ -28,9 +28,7 @@ export function TypingIndicator() {
   useEffect(() => {
     if (reduceMotion) return;
 
-    const loop = Animated.loop(
-      Animated.timing(progress, { toValue: 3, duration: 1200, useNativeDriver: true }),
-    );
+    const loop = Animated.loop(Animated.timing(progress, { toValue: 3, duration: 1200, useNativeDriver: true }));
     loop.start();
     return () => loop.stop();
   }, [progress, reduceMotion]);

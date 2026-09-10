@@ -16,19 +16,21 @@ Five bottom tabs, each covering a distinct area of the product:
 | **Forecasts**  | Real — Today (hourly strip + stats + a farm-actionable card), 7-Day (expandable list with a min–max range bar), and Outlook (subseasonal + seasonal, marked as probabilistic), plus a lightweight, honest map preview card |
 | **Advisories** | Real — weather alerts derived from the hazard index, crop and poultry advisories, flood/drought monitoring, and a searchable advisory archive        |
 | **Farm Tools** | Crop Diagnose, crop/poultry calendars, market prices and farm reminders — every tool on this tab is built and routes out from here                                                                                        |
-| **AgroMet AI** | Real — a conversational assistant over the backend's `/api/chat`, in a messaging layout: multi-turn context, day-grouped tailed bubbles, starter questions, inline retry |
+| **Consult**    | Real — a conversational assistant over the backend's `/api/chat`, in a messaging layout: multi-turn context, day-grouped tailed bubbles, starter questions, inline retry, voice input, photo questions, read-aloud. Answers are grounded server-side in the farmer's own forecast, hazard bands and prices. The transcript survives a restart for 24 hours (`storage/chatHistory`) and clears itself after. The tab is named for the action; the assistant itself is still AgroMet AI wherever it speaks |
 
-Settings live at `app/settings.tsx`, reached from the gear in the Home
-header. It is deliberately not a sixth tab: the five tabs run with
-`headerShown: false` and Home is the screen every session starts from, so that
-is the one place an app-level utility belongs.
+Settings live at `app/settings.tsx`, reached from the app menu — the button at
+the right of every tab's header, which opens `shared/ui/MenuDrawer`. Settings is
+deliberately not a sixth tab: the five tabs run with `headerShown: false`, and
+app-level utilities (About, Settings, Share, Contact, Terms, Privacy) belong
+together behind one menu rather than competing with the five things a farmer
+actually opens the app to do.
 
 The fifth tab used to be **Library**, a single card of four FAQ answers. The
 assistant replaced it: the backend had been serving `/api/chat` all along with
 nothing in this app calling it, and a conversation is a better use of the slot
-than a static list. The FAQ *data layer* is deliberately retained, unused, for
-the planned Mobile Menu — see `src/features/library/useFaqs.ts`, which explains
-which five files that covers and why none of them is dead code.
+than a static list. The FAQ *data layer* is deliberately retained, currently
+unplaced — see `src/features/library/useFaqs.ts`, which explains which five
+files that covers and why none of them is dead code.
 
 Several areas still run on mock data, clearly tagged in development (see
 "Mock data" below). See "Mock services" for which are real and which are
@@ -62,6 +64,31 @@ npx expo start --dev-client
 
 `eas.json`'s `development` profile already sets `developmentClient: true`, so no
 build configuration changes are needed.
+
+### Physical iPhone testing needs an iOS development build too
+
+Expo Go on iOS is a dead end for this app. Two reasons stack up:
+
+- **SDK mismatch.** Apple only ships the newest Expo Go and an older one cannot
+  be sideloaded, so an iPhone whose Expo Go has updated past this project's SDK
+  shows "Project is incompatible with this version of Expo Go" and never loads.
+- **Native modules.** `react-native-fast-tflite` (crop diagnosis) and
+  `expo-notifications` local alerts are not in Expo Go regardless of SDK.
+
+So a physical iPhone needs the same development build the Android side does. The
+`development` profile in `eas.json` now carries an `ios` block:
+
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest device:create        # register the iPhone's UDID
+npx eas-cli@latest build --profile development --platform ios
+npx expo start --dev-client             # scan the QR with the Camera app, not Expo Go
+```
+
+An EAS iOS device build signs against a registered device, which requires an
+active **Apple Developer Program** membership (a free Apple ID only allows 7-day
+local Xcode builds on a Mac). Without one, test on Android, which runs the full
+feature set today.
 
 ### Known limitation, stated rather than papered over
 
@@ -132,11 +159,14 @@ npx tsc --noEmit       # type-check
 
 ```
 app/                          Expo Router routes — thin, just render a screen
-  (tabs)/                      Home, Forecasts, Advisories, Farm Tools, AgroMet AI tabs
+  (tabs)/                      Home, Forecasts, Advisories, Farm Tools, Consult tabs
   alert/[id].tsx                Alert details
   saved-districts.tsx           Manage which districts you get alerts for
   diagnose.tsx                  Crop Diagnose (reached from a Farm Tools card, not a tab itself)
-  settings.tsx                  App settings (reached from the gear in the Home header, not a tab)
+  settings.tsx                  App settings (reached from the app menu, not a tab)
+  about.tsx                     What the app is, its sources and its version
+  contact.tsx                   Write to the AgroMet team (POSTs to /api/contact)
+  legal/[slug].tsx              Terms and Privacy, fetched from /api/legal/{slug}
   spatial-outlook.tsx           Seasonal Outlook's gridded map (reached from SeasonalOutlookCard, not a tab)
 src/
   features/
@@ -148,10 +178,10 @@ src/
       diagnose/                   Diagnose form, photo capture, result card, WhatsApp share
       FarmToolsScreen.tsx          Composed screen: live diagnose entry + stub sections
     forecasts/                   Today / 7-Day / Outlook segmented screen, useForecastsData, components/
-    chat/                        AgroMet AI: transcript reducer (useChat), tailed bubbles, doodle wallpaper,
-                                 contact header, pill composer + attachment grid, starter prompts
-    library/                     Retained FAQ layer (useFaqs, FaqItem, LibrarySkeleton) — no screen renders it
-                                 today; held for the planned Mobile Menu, not dead code
+    chat/                        AgroMet AI: transcript reducer (useChat), tailed bubbles, contact header,
+                                 pill composer + attachment grid, starter prompts
+    library/                     Retained FAQ layer (useFaqs, FaqItem, LibrarySkeleton) — no screen
+                                 renders it today; retained deliberately, not dead code
     settings/                    App settings: appearance, text size, data saver, reminder alerts
   shared/
     domain/                      TypeScript types for every feature area (see "Domain models" below)
@@ -162,6 +192,9 @@ src/
     net/                         Connectivity hook (NetInfo)
     theme/                       Design tokens (ported from the web app's palette) + ThemeProvider
     ui/                          Shared primitives — Screen, Card, Button, Text, AsyncStateView, EmptyState,
+                                  DoodleWallpaper (the page pattern behind Home, Advisories, Farm Tools and
+                                  the chat — opt-in via Screen's `wallpaper` prop; Forecasts skips it because
+                                  it paints its own photographic ground),
                                   Skeleton, OfflineBanner, SeverityBadge, MockDataTag, StatTile, BulletList,
                                   DetailRow, Divider, FieldLabel, TextField, DateTimeField, OptionSheet,
                                   SegmentedControl, TemperatureRangeBar, ConfidenceBadge, ChoroplethMap,

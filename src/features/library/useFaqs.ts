@@ -6,11 +6,18 @@ const HOUR = 60 * 60 * 1000;
 /**
  * The common questions and their answers.
  *
- * NOT DEAD CODE, though nothing imports it right now. The Library screen this
- * hook fed has been replaced by the AgroMet AI chat tab, and these answers are
- * deliberately held back for the planned Mobile Menu rather than folded into
- * the assistant's starter prompts — the chat teaches what *can* be asked, while
- * these are the four things the backend has actually published.
+ * NOT DEAD CODE, though nothing imports it right now.
+ *
+ * The Library screen this hook fed was replaced by the AgroMet AI chat tab.
+ * These answers have since been tried in two other homes — a screen of their own
+ * behind an FAQ row in the app menu, and a block above the contact form — and
+ * both were removed on request. The layer is kept because the answers are still
+ * published by the backend and still worth surfacing; only the placement is
+ * unsettled.
+ *
+ * They are deliberately not folded into the assistant's starter prompts: the
+ * chat teaches what *can* be asked, while these are the things the backend has
+ * actually published.
  *
  * The retained set is this hook, `components/FaqItem.tsx`,
  * `components/LibrarySkeleton.tsx`, `shared/api/faqService.ts` and

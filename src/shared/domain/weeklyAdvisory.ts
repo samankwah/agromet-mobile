@@ -13,13 +13,35 @@
  *   - The forecast does NOT come from `weather_forecast_json`. That column
  *     holds only the parameter names. The values live inside each element of
  *     `advisories_json`.
- *   - Crop and poultry bulletins are different shapes, not one shape with a
- *     flag. A crop advisory carries per-worksheet objects; a poultry advisory
- *     carries a list of plain strings and a flat metrics map, with no forecast
- *     table anywhere in the data.
+ *   - Crop and poultry bulletins are the SAME shape. Both are authored on the
+ *     district template above, one worksheet per activity, so both carry
+ *     per-worksheet objects. (This comment used to say the opposite, and the
+ *     screen branched on `kind` because of it. What was actually true was that
+ *     poultry uploads were being run through a parser written for a different,
+ *     older template, so they arrived with no worksheets and nothing to table.)
+ *   - The older template is still accepted, and it produces a list of plain
+ *     strings plus a flat metrics map instead of worksheets. So the two shapes
+ *     below are a function of which template was uploaded, not of which kind of
+ *     bird or crop the bulletin is about.
  */
 
 export type AdvisoryKind = 'crop' | 'poultry';
+
+/**
+ * Weather parameters a poultry bulletin has nothing to say about.
+ *
+ * The district template is one sheet layout for both kinds, so a poultry
+ * workbook carries the soil columns and fills every cell with "-". Housed birds
+ * stand on litter, not soil: there is no reading to give and none is wanted.
+ * Two dead columns in a nine-column table that already scrolls sideways cost
+ * two swipes to get past, on the screen size this app is built for.
+ *
+ * Dropped for poultry only. A crop bulletin keeps every column its sheet
+ * carries, empty or not — see the forecast-table test, which pins that
+ * deliberately: on a crop sheet an empty soil column means the district did not
+ * measure it, which is itself worth seeing.
+ */
+export const POULTRY_OMITTED_PARAMETERS = ['SOIL MOISTURE', 'SOIL TEMP'];
 
 /**
  * One weather parameter for one activity, with all three of its readings.
@@ -72,11 +94,12 @@ export type WeeklyAdvisory = {
   crop: string;
   year: number | null;
   season: string;
-  /** Crop bulletins only. Empty for poultry, which has no per-activity sheets. */
+  /** One per worksheet, for either kind. Empty when the upload used the older
+   * template, which has no per-activity sheets. */
   activities: AdvisoryActivity[];
-  /** Poultry bulletins only: the recommended-actions list. */
+  /** The recommended-actions list. Older template only, in practice poultry. */
   recommendations: string[];
-  /** Poultry bulletins only: a flat parameter to recommended-value map. */
+  /** A flat parameter to recommended-value map. Older template only. */
   managementMetrics: Record<string, string>;
   summary: string;
   createdAt: string;

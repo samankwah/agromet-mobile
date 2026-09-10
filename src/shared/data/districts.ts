@@ -55,6 +55,29 @@ export const DISTRICTS: District[] = [
   { id: 'krachi-east', name: 'Krachi East (Dambai)', region: 'Oti' },
   { id: 'east-mamprusi', name: 'East Mamprusi (Nalerigu)', region: 'North East' },
   { id: 'wa-municipal', name: 'Wa Municipal', region: 'Upper West' },
+
+  /* The MMDAs of the towns added when the carousel grew from ten to
+     thirty-two. Every Home town has to resolve to a district — advisories and
+     alerts are district-scoped, and `getDistrictNameForLocation` returning
+     undefined means a farmer who picks that town silently gets nothing.
+     Named by the district, with the town in brackets where the two differ, so
+     the row is recognisable to someone who knows the town but not the MMDA. */
+  { id: 'ketu-south', name: 'Ketu South Municipal (Aflao)', region: 'Volta' },
+  { id: 'anloga-district', name: 'Anloga District', region: 'Volta' },
+  { id: 'awutu-senya-east', name: 'Awutu Senya East Municipal (Kasoa)', region: 'Central' },
+  { id: 'effutu-municipal', name: 'Effutu Municipal (Winneba)', region: 'Central' },
+  { id: 'nzema-east', name: 'Nzema East Municipal (Axim)', region: 'Western' },
+  { id: 'tarkwa-nsuaem', name: 'Tarkwa-Nsuaem Municipal', region: 'Western' },
+  { id: 'birim-central', name: 'Birim Central Municipal (Akim Oda)', region: 'Eastern' },
+  { id: 'kwahu-east', name: 'Kwahu East (Kwahu Tafo)', region: 'Eastern' },
+  { id: 'ejura-sekyedumase', name: 'Ejura-Sekyedumase Municipal', region: 'Ashanti' },
+  { id: 'bibiani-anhwiaso-bekwai', name: 'Bibiani-Anhwiaso-Bekwai Municipal (Sefwi Bekwai)', region: 'Western North' },
+  { id: 'krachi-west', name: 'Krachi West (Kete Krachi)', region: 'Oti' },
+  { id: 'atebubu-amantin', name: 'Atebubu-Amantin Municipal', region: 'Bono East' },
+  { id: 'kintampo-north', name: 'Kintampo North Municipal', region: 'Bono East' },
+  { id: 'jaman-north', name: 'Jaman North (Sampa)', region: 'Bono' },
+  { id: 'bole-district', name: 'Bole District', region: 'Savannah' },
+  { id: 'jirapa-municipal', name: 'Jirapa Municipal', region: 'Upper West' },
 ];
 
 export function getDistrictById(id: string): District | undefined {
@@ -66,19 +89,38 @@ export function getDistrictById(id: string): District | undefined {
  * be shown for whichever town the farmer currently has selected, without
  * requiring them to separately pick a district. */
 const LOCATION_TO_DISTRICT_ID: Record<string, string> = {
+  aflao: 'ketu-south',
+  anloga: 'anloga-district',
   accra: 'accra-metropolitan',
-  kumasi: 'kumasi-metropolitan',
-  tamale: 'tamale-metropolitan',
-  bolgatanga: 'bolgatanga-municipal',
-  // The one required fix this round — makes the existing Savannah-drought
-  // mock alert (district: "West Gonja (Damongo)") reachable from a Home
-  // town selection for the first time.
-  damongo: 'west-gonja',
+  kasoa: 'awutu-senya-east',
+  winneba: 'effutu-municipal',
   'cape-coast': 'cape-coast-metropolitan',
-  koforidua: 'new-juaben-south',
-  tema: 'tema-metropolitan',
+  takoradi: 'sekondi-takoradi-metropolitan',
+  axim: 'nzema-east',
   ho: 'ho-municipal',
+  koforidua: 'new-juaben-south',
+  'akim-oda': 'birim-central',
+  'kwahu-tafo': 'kwahu-east',
+  kumasi: 'kumasi-metropolitan',
+  obuasi: 'obuasi-municipal',
+  tarkwa: 'tarkwa-nsuaem',
+  'sefwi-bekwai': 'bibiani-anhwiaso-bekwai',
+  'kete-krachi': 'krachi-west',
+  atebubu: 'atebubu-amantin',
+  ejura: 'ejura-sekyedumase',
+  kintampo: 'kintampo-north',
+  goaso: 'asunafo-north',
+  sunyani: 'sunyani-municipal',
+  techiman: 'techiman-municipal',
+  sampa: 'jaman-north',
   yendi: 'yendi-municipal',
+  tamale: 'tamale-metropolitan',
+  bole: 'bole-district',
+  damongo: 'west-gonja',
+  bolgatanga: 'bolgatanga-municipal',
+  nalerigu: 'east-mamprusi',
+  wa: 'wa-municipal',
+  jirapa: 'jirapa-municipal',
 };
 
 export function getDistrictNameForLocation(locationId: string): string | undefined {

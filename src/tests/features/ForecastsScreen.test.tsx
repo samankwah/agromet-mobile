@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -35,5 +35,80 @@ describe('ForecastsScreen', () => {
     // ...then the probabilistic ones.
     expect(getByText('Subseasonal')).toBeTruthy();
     expect(getByText('Seasonal')).toBeTruthy();
+  });
+
+  /**
+   * The deep-link contract Home's tiles depend on.
+   *
+   * This screen is a tab, so it stays mounted after its first visit. Reading the
+   * requested segment once at mount is what left the Forecast tile showing
+   * whatever the Outlook tile had last opened, which is the bug these cover.
+   */
+  describe('requested segment', () => {
+    function renderScreen(requestedSegment?: string) {
+      return render(
+        <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
+          <ThemeProvider>
+            <QueryClientProvider client={queryClient}>
+              <ForecastsScreen requestedSegment={requestedSegment} />
+            </QueryClientProvider>
+          </ThemeProvider>
+        </SafeAreaProvider>,
+      );
+    }
+
+    function selected(): string | undefined {
+      return screen.getAllByRole('tab').find((tab) => tab.props.accessibilityState?.selected)?.props.accessibilityLabel;
+    }
+
+    it('opens on the timescale it was asked for', () => {
+      renderScreen('weekly');
+
+      expect(selected()).toBe('Weekly');
+    });
+
+    it('opens on Daily when asked for nothing', () => {
+      renderScreen();
+
+      expect(selected()).toBe('Daily');
+    });
+
+    it('follows a later request on a screen that is already mounted', () => {
+      const { rerender } = renderScreen('weekly');
+
+      rerender(
+        <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
+          <ThemeProvider>
+            <QueryClientProvider client={queryClient}>
+              <ForecastsScreen requestedSegment="daily" />
+            </QueryClientProvider>
+          </ThemeProvider>
+        </SafeAreaProvider>,
+      );
+
+      expect(selected()).toBe('Daily');
+    });
+
+    it('leaves the reader where they are when the request is cleared', () => {
+      // What a tab-bar press looks like from here: the route file has already
+      // cleared the param, so nothing is being asked for and the segment the
+      // reader chose by hand must survive.
+      const { rerender } = renderScreen('daily');
+
+      fireEvent.press(screen.getByRole('tab', { name: 'Weekly' }));
+      expect(selected()).toBe('Weekly');
+
+      rerender(
+        <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
+          <ThemeProvider>
+            <QueryClientProvider client={queryClient}>
+              <ForecastsScreen requestedSegment="" />
+            </QueryClientProvider>
+          </ThemeProvider>
+        </SafeAreaProvider>,
+      );
+
+      expect(selected()).toBe('Weekly');
+    });
   });
 });

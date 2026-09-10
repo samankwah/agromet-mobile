@@ -15,9 +15,7 @@ function xLabelsFor(dates: string[]) {
     const date = new Date(dates[index]);
     return {
       at: index,
-      label: Number.isNaN(date.getTime())
-        ? ''
-        : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+      label: Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
     };
   });
 }
@@ -50,13 +48,7 @@ function ChartCard({ title, caption, children }: { title: string; caption: strin
  * a labelled gridline at exactly the right value without touching the shared
  * component or implying a second measure.
  */
-export function RainfallAccumulationChart({
-  series,
-  normalMm,
-}: {
-  series: HazardSeries | undefined;
-  normalMm: number | null | undefined;
-}) {
+export function RainfallAccumulationChart({ series, normalMm }: { series: HazardSeries | undefined; normalMm: number | null | undefined }) {
   const theme = useTheme();
   const { width } = useWindowDimensions();
   const chartWidth = width - theme.spacing.lg * 4;
@@ -85,7 +77,7 @@ export function RainfallAccumulationChart({
 
   const caption =
     normalMm != null
-      ? `${Math.round(total)} mm so far against a normal of ${Math.round(normalMm)} mm — ${
+      ? `${Math.round(total)} mm so far against a normal of ${Math.round(normalMm)} mm, ${
           total >= normalMm ? 'ahead of' : 'behind'
         } the seasonal average.`
       : `${Math.round(total)} mm over the last 90 days.`;
@@ -116,13 +108,7 @@ export function RainfallAccumulationChart({
  * raw figure in cubic metres per second means nothing without knowing what is
  * normal for that stretch of river.
  */
-export function DischargeChart({
-  discharge,
-  riverine,
-}: {
-  discharge: HazardDischarge | undefined;
-  riverine: boolean;
-}) {
+export function DischargeChart({ discharge, riverine }: { discharge: HazardDischarge | undefined; riverine: boolean }) {
   const theme = useTheme();
   const { width } = useWindowDimensions();
   const chartWidth = width - theme.spacing.lg * 4;

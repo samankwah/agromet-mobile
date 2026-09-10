@@ -20,7 +20,19 @@ export const SEASONS = ['Major Season', 'Minor Season'];
 /** The birds the backend's poultry catalogue recognises. Unlike crops,
  * this is a closed list — a calendar cannot be filed under a bird that
  * does not exist. */
-export const POULTRY_TYPES = ['Broiler', 'Layer', 'Cockerel', 'Duck', 'Turkey', 'Guinea Fowl', 'Goose'];
+/**
+ * The birds this app covers.
+ *
+ * Two, not the seven in the backend catalogue (`frontend/src/data/ghanaCodes.js`
+ * `POULTRY_TYPES`, which also lists Cockerel, Duck, Turkey, Guinea Fowl and
+ * Goose). That is a deliberate narrowing rather than a sync error: broiler and
+ * layer are the only birds anyone publishes calendars or advisories for, and
+ * offering five more that can only ever come back empty teaches farmers that
+ * the filter is broken.
+ *
+ * Also imported by the weekly advisory's Bird selector, so both narrow together.
+ */
+export const POULTRY_TYPES = ['Broiler', 'Layer'];
 
 export type FilterState = { season: string; commodity: string; region: string; district: string; year: string };
 

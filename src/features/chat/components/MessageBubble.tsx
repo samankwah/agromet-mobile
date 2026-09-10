@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -7,6 +7,8 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Text } from '../../../shared/ui/Text';
 import { formatTime } from '../../../shared/utils/dates';
 import type { ChatMessage } from '../../../shared/domain/chat';
+import { toPlainText } from '../richText';
+import { RichText } from './RichText';
 
 export type BubbleState = 'pending' | 'sent' | 'failed';
 
@@ -17,7 +19,15 @@ type Props = {
   isFirstInGroup: boolean;
   errorMessage?: string;
   onRetry?: () => void;
+  /** Reads this reply aloud. Omitted for the farmer's own messages, and while a
+   * screen reader is running, which already speaks the screen. */
+  onToggleSpeech?: () => void;
+  isSpeaking?: boolean;
   retryDisabled?: boolean;
+  /** Opens the actions for this turn. Held rather than tapped, because a tap
+   * inside a transcript should do nothing: there is no detail view to open, and
+   * a bubble that reacts to a stray touch feels broken. */
+  onLongPress?: () => void;
 };
 
 const RADIUS = 10;
@@ -53,19 +63,21 @@ export function MessageBubble({
   errorMessage,
   onRetry,
   retryDisabled,
+  onToggleSpeech,
+  isSpeaking,
+  onLongPress,
 }: Props) {
   const theme = useTheme();
   const isUser = message.role === 'user';
+  // The farmer's own words are exactly as typed; only a reply can carry the
+  // light structure the assistant is asked for.
+  const spoken = isUser ? message.text : toPlainText(message.text);
 
   const fill = isUser ? theme.colors.bubbleOut : theme.colors.bubbleIn;
 
   // The tailed corner is squared off so the tail grows out of a straight edge
   // rather than out of the middle of a curve.
-  const corners = isFirstInGroup
-    ? isUser
-      ? { borderTopRightRadius: 0 }
-      : { borderTopLeftRadius: 0 }
-    : null;
+  const corners = isFirstInGroup ? (isUser ? { borderTopRightRadius: 0 } : { borderTopLeftRadius: 0 }) : null;
 
   return (
     <View style={{ alignSelf: isUser ? 'flex-end' : 'flex-start', maxWidth: '84%' }}>
@@ -78,16 +90,17 @@ export function MessageBubble({
             style={{ position: 'absolute', top: 0, [isUser ? 'right' : 'left']: -TAIL + 1 }}
           >
             {/* A right triangle filling the corner the squared edge left open. */}
-            <Path
-              d={isUser ? `M0 0 H${TAIL} L0 ${TAIL} Z` : `M${TAIL} 0 H0 L${TAIL} ${TAIL} Z`}
-              fill={fill}
-            />
+            <Path d={isUser ? `M0 0 H${TAIL} L0 ${TAIL} Z` : `M${TAIL} 0 H0 L${TAIL} ${TAIL} Z`} fill={fill} />
           </Svg>
         ) : null}
 
-        <View
+        <Pressable
           accessible
-          accessibilityLabel={`${isUser ? 'You' : 'AgroMet AI'}: ${message.text}`}
+          accessibilityLabel={`${isUser ? 'You' : 'AgroMet AI'}: ${spoken}`}
+          accessibilityRole={onLongPress ? 'button' : undefined}
+          accessibilityHint={onLongPress ? 'Hold for options' : undefined}
+          onLongPress={onLongPress}
+          delayLongPress={350}
           style={{
             paddingHorizontal: theme.spacing.md,
             paddingVertical: theme.spacing.sm,
@@ -104,18 +117,64 @@ export function MessageBubble({
             columnGap: theme.spacing.sm,
           }}
         >
-          <Text variant="body" style={{ flexShrink: 1 }}>
-            {message.text}
-          </Text>
+          {/* Above the words, because the photo is what the question is
+              about. Full width of the bubble so a leaf is actually legible. */}
+          {message.imageUri ? (
+            <Image
+              source={{ uri: message.imageUri }}
+              style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: theme.radii.sm, marginBottom: theme.spacing.xs }}
+              resizeMode="cover"
+              accessibilityIgnoresInvertColors
+            />
+          ) : null}
+
+          {isUser ? (
+            <Text variant="body" style={{ flexShrink: 1 }}>
+              {message.text}
+            </Text>
+          ) : (
+            <RichText text={message.text} />
+          )}
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 'auto' }}>
+            {/* Inside the bubble, beside the timestamp, so it belongs to this
+                reply rather than floating between two of them. */}
+            {onToggleSpeech ? (
+              <Pressable
+                onPress={onToggleSpeech}
+                accessibilityRole="button"
+                accessibilityLabel={isSpeaking ? 'Stop reading this answer' : 'Read this answer aloud'}
+                hitSlop={12}
+              >
+                {/* Chrome on the nested View: Android drops a Pressable's own. */}
+                <View style={{ paddingRight: theme.spacing.xs }}>
+                  <Ionicons
+                    name={isSpeaking ? 'stop-circle' : 'volume-medium-outline'}
+                    size={16}
+                    color={isSpeaking ? theme.colors.accent : theme.colors.muted}
+                  />
+                </View>
+              </Pressable>
+            ) : null}
             <Text variant="caption" muted>
               {formatTime(new Date(message.at))}
             </Text>
             {isUser ? <DeliveryMark state={state} /> : null}
           </View>
-        </View>
+        </Pressable>
       </View>
+
+      {/* Quietly said, not alarming. The advice is still worth reading; what
+          the farmer must not do is act on it believing the assistant looked at
+          their question. */}
+      {message.degraded ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, marginTop: theme.spacing.xs }}>
+          <Ionicons name="information-circle-outline" size={13} color={theme.colors.muted} />
+          <Text variant="caption" muted style={{ flexShrink: 1 }}>
+            General guidance. AgroMet AI is not fully set up on this server.
+          </Text>
+        </View>
+      ) : null}
 
       {state === 'failed' && errorMessage ? (
         // Attached to the turn that failed rather than shown as a screen-level

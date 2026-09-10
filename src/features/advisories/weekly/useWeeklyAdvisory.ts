@@ -39,7 +39,7 @@ async function fetchSnapshot(
   // entirely. Without this the screen would search by filter and land on the
   // newest bulletin for the district rather than the one that was tapped.
   if (advisoryId !== undefined) {
-    const chosen = await getWeeklyAdvisory(advisoryId, kind);
+    const chosen = await getWeeklyAdvisory(advisoryId, kind, filter.subject);
     return { advisory: chosen.data, fallback: chosen.fallback };
   }
 
@@ -52,10 +52,10 @@ async function fetchSnapshot(
   // nothing here. Both fall back to the seeded bulletin, and the caller is told
   // which, because "no signal" and "not written yet" need different words.
   if (list.fallback !== null) {
-    return { advisory: seededAdvisory(kind), fallback: list.fallback };
+    return { advisory: seededAdvisory(kind, filter.subject), fallback: list.fallback };
   }
 
-  const detail = await getWeeklyAdvisory(list.data[0].advisoryId, kind);
+  const detail = await getWeeklyAdvisory(list.data[0].advisoryId, kind, filter.subject);
   return { advisory: detail.data, fallback: detail.fallback };
 }
 

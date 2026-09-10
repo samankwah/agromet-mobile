@@ -1,3 +1,4 @@
+import { POULTRY_OMITTED_PARAMETERS } from '../domain/weeklyAdvisory';
 import type { AdvisoryActivity, ArchivedAdvisory, WeeklyAdvisory } from '../domain/weeklyAdvisory';
 
 /**
@@ -443,20 +444,323 @@ export const MOCK_CROP_ADVISORY: WeeklyAdvisory = {
   ],
 };
 
+const POULTRY_PARAMETERS = CROP_PARAMETERS.filter(
+  (parameter) => !POULTRY_OMITTED_PARAMETERS.includes(parameter),
+);
+
+type Band = { forecast: Cells; implication: Cells; advisory: Cells };
+type Place = { region: string; district: string; crop: string };
+
+const JASIKAN: Place = { region: 'Oti Region', district: 'Jasikan', crop: 'Broiler' };
+const AHANTA_WEST: Place = { region: 'Western Region', district: 'Ahanta West', crop: 'Layer' };
+
+/**
+ * One worksheet of a poultry bulletin.
+ *
+ * Same builder as `stage` above with a place and a shared weather band —
+ * poultry bulletins are authored on the identical district template, which is
+ * exactly why the screen no longer branches on kind.
+ *
+ * Bands are shared by stage character rather than written out per stage: every
+ * vaccination week faces the same weather question, and repeating the answer
+ * twelve times would only invite the copies to drift.
+ *
+ * The soil columns are omitted entirely — see POULTRY_OMITTED_PARAMETERS in
+ * domain/weeklyAdvisory.ts for why, and for the matching filter applied to real
+ * uploads, which do carry those columns full of dashes.
+ */
+function poultryStage(
+  place: Place,
+  activity: string,
+  week: string,
+  band: Band,
+  summaryTitle: string,
+  summaryBody: string,
+): AdvisoryActivity {
+  return {
+    activity,
+    metadata: { zone: 'Forest', ...place, week, monthYear: 'Jan 2026', startDate: '', endDate: '' },
+    rows: POULTRY_PARAMETERS.map((parameter) => ({
+      parameter,
+      forecast: band.forecast[parameter] ?? '-',
+      implication: band.implication[parameter] ?? '-',
+      advisory: band.advisory[parameter] ?? '-',
+    })),
+    summaryTitle,
+    summaryBody,
+  };
+}
+
+/* ------------------------------------------------------------------ bands --
+ * Broiler figures are the Jasikan workbook's own. Layer figures are drafted:
+ * the Ahanta West workbook groups the same programme into seven sheets and
+ * carries weather for those, not for all sixteen stages below.
+ */
+
+const SUN_LONG: Cells = { 'SUNSHINE INTENSITY': '9 hours', SUNRISE: '5:50 AM', SUNSET: '6:10 PM' };
+const SUN_SHORT: Cells = { 'SUNSHINE INTENSITY': '8 hours', SUNRISE: '5:50 AM', SUNSET: '6:15 PM' };
+const IMPL_SUN: Cells = {
+  'SUNSHINE INTENSITY': 'High day light',
+  SUNRISE: 'Early sunrise',
+  SUNSET: 'Late sunset',
+  'EVAPO-TRANSP.': 'Moderate water loss',
+};
+
+/** Siting and building — dry, workable weather. */
+const BAND_BUILD: Band = {
+  forecast: { RAINFALL: '30% occurrence', TEMP: '26/34 °C', HUMIDITY: '60%', 'SUNSHINE INTENSITY': '8 hours', SUNRISE: '6:13 AM', SUNSET: '6:05 PM', 'EVAPO-TRANSP.': '3.5-4.0 mm/day' },
+  implication: {
+    RAINFALL: 'No rainfall to low rainfall expected',
+    TEMP: 'Suitable temperature',
+    HUMIDITY: 'Moderate effect',
+    'SUNSHINE INTENSITY': 'High day light',
+    SUNRISE: 'Late sunrise',
+    SUNSET: 'Early sunset',
+    'EVAPO-TRANSP.': 'Moderate water loss',
+  },
+  advisory: {
+    RAINFALL: 'Site selection can go ahead. Choose ground that drains, away from other poultry, and set the house long axis east to west.',
+    TEMP: 'Field investigation can begin, including access, water supply and market distance.',
+    HUMIDITY: 'Good conditions for construction. Build in ridge and eave openings now; a house that traps moist air costs birds every wet season it stands.',
+    'SUNSHINE INTENSITY': 'Adequate day length for construction work.',
+    SUNRISE: 'Field activities can begin early in the morning.',
+    SUNSET: 'Darkness sets in early, so plan to stop before dusk.',
+    'EVAPO-TRANSP.': 'Remain hydrated.',
+  },
+};
+
+/** The week before the chicks land. */
+const BAND_PREP: Band = {
+  forecast: { RAINFALL: '40% occurrence', TEMP: '26/34 °C', HUMIDITY: '65%', ...SUN_LONG, 'EVAPO-TRANSP.': '3.5-4.0 mm/day' },
+  implication: { RAINFALL: 'Low rainfall expected', TEMP: 'Suitable temperature', HUMIDITY: 'Moderate effect', ...IMPL_SUN },
+  advisory: {
+    RAINFALL: 'Clean, disinfect and rest the house. Bed dry litter and set up guards, feeders and drinkers before the chicks arrive.',
+    TEMP: 'Pre-heat the brooder well ahead so the litter itself is warm, not just the air.',
+    HUMIDITY: 'Make sure the house can be ventilated without draughting the brooding area.',
+    'SUNSHINE INTENSITY': 'Use the long day to finish preparation; nothing should be outstanding on arrival day.',
+    SUNRISE: 'Field activity should begin very early in the morning.',
+    SUNSET: 'Field activity can extend into the late evening.',
+    'EVAPO-TRANSP.': 'Fill and check drinkers so water is at house temperature when the chicks go in.',
+  },
+};
+
+/** Chick weeks — heat and water are the whole job. */
+const BAND_BROOD: Band = {
+  forecast: { RAINFALL: '60% occurrence', TEMP: '25/33 °C', HUMIDITY: '80%', ...SUN_LONG, 'EVAPO-TRANSP.': '3.5-4.0 mm/day' },
+  implication: {
+    RAINFALL: 'Low rainfall expected and chicks dehydrate faster in dry conditions, reducing feed intake.',
+    TEMP: 'Suitable temperature',
+    HUMIDITY: 'Moderate to high effects (dry air, dusty litter, and dehydration risks).',
+    ...IMPL_SUN,
+  },
+  advisory: {
+    RAINFALL: 'Ensure access to potable and cool water and feed ad lib; and add vitamins to water for the first 3 days to prevent dehydration.',
+    TEMP: 'Hold 33-35 °C at chick level for the first 3 days, then step down about 2 °C a week.',
+    HUMIDITY: 'Ensure minimum ventilation to exchange air without causing drafts on chicks.',
+    'SUNSHINE INTENSITY': 'There will be suitable sunlight and energy to support brooding and growth of birds',
+    SUNRISE: 'Farm activity should begin very early in the morning. Chicks bunched in a corner mean the heat is low.',
+    SUNSET: 'Check brooder heat again after dark. Night temperature falls faster than the house feels.',
+    'EVAPO-TRANSP.': 'Water in drinkers must be monitored regularly to ensure birds have access to clean and cool water.',
+  },
+};
+
+/** Any feed change, starter through finisher or layer mash. */
+const BAND_FEED: Band = {
+  forecast: { RAINFALL: '60% occurrence', TEMP: '25/33 °C', HUMIDITY: '70-80%', ...SUN_LONG, 'EVAPO-TRANSP.': '3.7-4.3 mm/day' },
+  implication: {
+    RAINFALL: 'Medium rainfall expected',
+    TEMP: 'Suitable temperature',
+    HUMIDITY: 'Moderate effects (high humidity increases heat stress and fungal/bacterial risks)',
+    ...IMPL_SUN,
+  },
+  advisory: {
+    RAINFALL: 'Change the diet gradually over about a week; an abrupt switch costs intake.',
+    TEMP: 'Feed during the cooler parts of the day. Intake drops once the house warms up.',
+    HUMIDITY: 'Store feed on pallets away from the walls and keep the store ventilated. At this humidity mash cakes and moulds within days.',
+    'SUNSHINE INTENSITY': 'Long daylight supports steady feeding. Keep troughs topped up through the day rather than filling once.',
+    SUNRISE: 'Provide potable and cool water ad-lib',
+    SUNSET: 'Delay evening feeding until temperatures drop (encourages activity during cooler hours).',
+    'EVAPO-TRANSP.': 'Water in drinkers must be monitored regularly to ensure birds have access to clean and cool water.',
+  },
+};
+
+/** Every water-route vaccination faces the same question: keep it alive. */
+const BAND_VACCINE: Band = {
+  forecast: { RAINFALL: '60% occurrence', TEMP: '26/33 °C', HUMIDITY: '67%', ...SUN_LONG, 'EVAPO-TRANSP.': '3.5-4.0 mm/day' },
+  implication: { RAINFALL: 'Low rainfall effect', TEMP: 'Suitable temperature', HUMIDITY: 'Moderate effect', ...IMPL_SUN },
+  advisory: {
+    RAINFALL: 'Use skim milk (1 g/L) to stabilise the vaccine in the drinking water, and use it within two hours.',
+    TEMP: 'Cooler morning temperature favours vaccination. Heat kills a live vaccine faster than anything else on the farm.',
+    HUMIDITY: 'Low humidity facilitates the evaporation that concentrates the dose; keep the birds drinking.',
+    'SUNSHINE INTENSITY': 'Dehydration risk from intense sunshine — keep vaccine and mixed water out of direct sun throughout.',
+    SUNRISE: 'Withhold water 1-2 hours pre-vaccination so every bird drinks its share.',
+    SUNSET: 'Do not carry a mixed vaccine over to the evening; discard and mix fresh.',
+    'EVAPO-TRANSP.': 'Restore full water immediately afterwards.',
+  },
+};
+
+/** Injected vaccination and other whole-flock handling. */
+const BAND_HANDLING: Band = {
+  forecast: { RAINFALL: '50% occurrence', TEMP: '24/30 °C', HUMIDITY: '72%', ...SUN_SHORT, 'EVAPO-TRANSP.': '3.5-4.0 mm/day' },
+  implication: {
+    RAINFALL: 'Low rainfall effect',
+    TEMP: 'Milder days, less handling stress',
+    HUMIDITY: 'Moderate effect',
+    'SUNSHINE INTENSITY': 'Moderate day light',
+    SUNRISE: 'Early sunrise',
+    SUNSET: 'Late sunset',
+    'EVAPO-TRANSP.': 'Moderate water loss',
+  },
+  advisory: {
+    RAINFALL: 'Handle birds on a dry day; wet litter and handling together spread infection.',
+    TEMP: 'Work in the cool of the morning. Handling in the heat costs weight and can cost birds.',
+    HUMIDITY: 'Keep the house well aired while birds are crowded for catching.',
+    'SUNSHINE INTENSITY': 'Dim the house to settle the flock before catching.',
+    SUNRISE: 'Start at first light and finish before the day warms.',
+    SUNSET: 'Give vitamins in the water and leave the flock undisturbed overnight afterwards.',
+    'EVAPO-TRANSP.': 'Make sure water is available the moment handling ends.',
+  },
+};
+
+/** Biosecurity, which runs the whole cycle rather than a stage of it. */
+const BAND_BIOSECURITY: Band = {
+  forecast: { RAINFALL: '60% occurrence', TEMP: '24/28 °C', HUMIDITY: '78%', ...SUN_SHORT, 'EVAPO-TRANSP.': '3.5-4.0 mm/day' },
+  implication: { RAINFALL: 'Medium rainfall expected', TEMP: 'Suitable temperature', HUMIDITY: 'High effect', ...IMPL_SUN },
+  advisory: {
+    RAINFALL: 'Keep the footbath under cover. Rain dilutes the disinfectant to nothing, and a diluted footbath is worse than none because it is still trusted.',
+    TEMP: 'Disinfectant loses strength in the heat. Mix a fresh solution each morning rather than topping up yesterday.',
+    HUMIDITY: 'Damp litter keeps organic matter alive and disinfectant cannot work through it. Scrape and re-bed wet patches before spraying.',
+    'SUNSHINE INTENSITY': 'Dry cleaned crates and equipment in full sun before they go back in the pen. Sunlight finishes what the disinfectant starts.',
+    SUNRISE: 'Change the footbath and walk the pen first thing, before any visitor or vehicle reaches the farm.',
+    SUNSET: 'Close and secure the house before dusk to keep rodents and wild birds out overnight.',
+    'EVAPO-TRANSP.': 'Check that footbaths and spray drums have not evaporated dry during the day.',
+  },
+};
+
+/** Broiler off-take: catching, processing, market. */
+const BAND_OFFTAKE: Band = {
+  forecast: { RAINFALL: '60% occurrence', TEMP: '24/28 °C', HUMIDITY: '78%', ...SUN_SHORT, 'EVAPO-TRANSP.': '3.5-4.0 mm/day' },
+  implication: { RAINFALL: 'Medium rainfall expected', TEMP: 'Suitable temperature', HUMIDITY: 'High effect', ...IMPL_SUN },
+  advisory: {
+    RAINFALL: 'Catch and load under cover. Wet birds chill in transit and lose condition before they reach the market.',
+    TEMP: 'Move birds in the cool of the early morning or evening, never in the middle of the day.',
+    HUMIDITY: 'Process promptly and keep meat cold. High humidity shortens the time you have before spoilage.',
+    'SUNSHINE INTENSITY': 'Keep crates shaded while birds wait; a crate in full sun becomes an oven.',
+    SUNRISE: 'Withdraw feed 8-12 hours before catching, but never water.',
+    SUNSET: 'Finish loading before dark so birds are not held overnight in crates.',
+    'EVAPO-TRANSP.': 'Give water right up to catching to limit weight loss in transit.',
+  },
+};
+
+/** Point of lay onward — egg hygiene and heat. */
+const BAND_LAY: Band = {
+  forecast: { RAINFALL: '55% occurrence', TEMP: '25/32 °C', HUMIDITY: '75%', ...SUN_LONG, 'EVAPO-TRANSP.': '3.7-4.3 mm/day' },
+  implication: {
+    RAINFALL: 'Medium rainfall expected',
+    TEMP: 'Warm days; heat depresses egg size and shell quality',
+    HUMIDITY: 'Moderate to high effect on egg hygiene',
+    ...IMPL_SUN,
+  },
+  advisory: {
+    RAINFALL: 'Keep nest boxes dry and bedded. A wet nest is the shortest route from a clean egg to a rejected one.',
+    TEMP: 'Collect eggs at least three times a day in this heat, and more in the afternoon. Store cool and out of the sun.',
+    HUMIDITY: 'Do not wash eggs; wipe soiling off dry. Washing drives bacteria through the shell.',
+    'SUNSHINE INTENSITY': 'Hold the lighting programme steady at 16 hours; changing it mid-lay costs production.',
+    SUNRISE: 'Take the first collection early, before the house warms.',
+    SUNSET: 'Take a final collection before dark so no egg sits out overnight.',
+    'EVAPO-TRANSP.': 'Water intake drives egg output. Never let the drinkers run dry.',
+  },
+};
+
+/* ------------------------------------------------------- the two bulletins --
+ * The ORDER of the stages is the district's own list. The names are shortened
+ * from it, because each one renders twice — as a chip in a horizontal strip and
+ * as the panel heading — and the district's own phrasing runs to fifteen words
+ * ("1st Gumboro vaccine intermediate administration if day-old chicks were not
+ * given Gumboro matelin at hatchery"), which wraps to three lines on a 360dp
+ * screen and makes the chip row unreadable.
+ *
+ * Nothing is lost: the detail a short name drops — the strain, the route, the
+ * hatchery condition — moves into that stage's summary body, which has room for
+ * a sentence. Keep it that way. If a name has to grow, put the words in the body
+ * instead. The week labels are drafted, and want an agronomist's eye.
+ */
+
 export const MOCK_POULTRY_ADVISORY: WeeklyAdvisory = {
   id: 'sample-poultry-advisory',
   kind: 'poultry',
   title: 'Broiler Advisory',
-  region: 'Ashanti Region',
-  district: 'Ejisu',
+  region: 'Oti Region',
+  district: 'Jasikan',
   crop: 'Broiler',
   year: 2026,
   season: '',
-  summary: 'Weekly management advisory for broilers.',
+  summary: 'Weekly management advisory for broilers, day-old to market.',
   createdAt: '2026-01-26T06:00:00.000Z',
-  activities: [],
+  /**
+   * The broiler programme: twelve stages over an eight-week cycle.
+   *
+   * This used to be `[]`, which was accurate while poultry uploads were parsed
+   * by a builder that could not read the district template and the screen sent
+   * every poultry bulletin to the guidance card regardless. Both are fixed, so
+   * the sample has to show what a parsed poultry bulletin looks like.
+   *
+   * The weather figures are the Jasikan workbook's own. Its sunrise/sunset
+   * cells arrive as Excel time serials (0.2430555...); they are written here as
+   * the times they mean.
+   *
+   * Summary titles are NOT the workbook's. Each sheet there is headed "OVERALL
+   * SUMMARY ... FOR BROILER FARMERS IN THE OTI REGION", which is correct on a
+   * Jasikan bulletin and wrong the moment this sample stands in for a district
+   * that has published nothing — a farmer who picked Ashanti saw a card titled
+   * after Oti. Where the stand-in came from is the FallbackNotice's job to say.
+   */
+  activities: [
+    poultryStage(JASIKAN, 'Site and housing', 'Before Week 1', BAND_BUILD,
+      'DRY SPELL, GOOD BUILDING WEATHER',
+      'Site selection and construction of appropriate housing, and sourcing a market. Choose free-draining ground away from other poultry, oriented east to west, and line up an outlet before the first bird arrives.'),
+    poultryStage(JASIKAN, 'Before chicks arrive', 'Before Week 1', BAND_PREP,
+      'WARM AND DRY, PRE-HEAT THE BROODER',
+      'Clean, disinfect and rest the house. Bed dry litter, set up guards, feeders and drinkers, and pre-heat the brooder well before the chicks land.'),
+    poultryStage(JASIKAN, 'Brooder management', '1-  2', BAND_BROOD,
+      'WARM DRY AIR, WATCH BROODER HEAT AND WATER',
+      'During brooding ensure optimal temperature, humidity and air quality; enough feed and water in the troughs; and proper lighting. For the first 3 days hold 33-35 °C. If birds crowd into one spot, especially the corners, the heat is too low.'),
+    poultryStage(JASIKAN, 'Starter feed and water', '1-4', BAND_FEED,
+      'HUMID WEEKS, KEEP STARTER FEED DRY',
+      'Provide recommended (good quality, quantity and nutrient levels) starter diet from day 1 to day 28, with potable cool water ad-lib. Store feed on pallets away from the side walls and practise first in, first out.'),
+    poultryStage(JASIKAN, '1st Gumboro vaccine', '1', BAND_VACCINE,
+      'COOL MORNINGS SUIT VACCINATION',
+      'Intermediate strain, given only if the day-old chicks were not vaccinated against Gumboro at the hatchery. Give plain or vitamin-stabilised water before and after, and use the mixed vaccine within two hours.'),
+    poultryStage(JASIKAN, '1st Newcastle (Hitchner)', '2', BAND_VACCINE,
+      'COOL MORNINGS SUIT VACCINATION',
+      'Withhold water 1-2 hours, then give the vaccine in cool stabilised water and make sure it is drunk within two hours.'),
+    poultryStage(JASIKAN, '2nd Gumboro vaccine', '3', BAND_VACCINE,
+      'COOL MORNINGS SUIT VACCINATION',
+      'Intermediate plus strain, through the drinking water. The booster matters more than the first dose: same two-hour window, same cool early start.'),
+    poultryStage(JASIKAN, '2nd Newcastle (Lasota)', '4', BAND_VACCINE,
+      'COOL MORNINGS SUIT VACCINATION',
+      'Give in stabilised drinking water early. Keep the flock off water beforehand so every bird takes a share.'),
+    poultryStage(JASIKAN, 'Grower feed', '5-  6', BAND_FEED,
+      'HEAT BUILDS, FEED EARLY AND LATE',
+      'Move onto the grower diet from day 29, changing over across about a week. Birds are heavier now and shed heat poorly, so shift the main feeds to early morning and evening.'),
+    poultryStage(JASIKAN, 'Finisher feed', '7-  8', BAND_FEED,
+      'LAST WEEKS, PROTECT THE FINISHER FEED',
+      'Broiler finisher diet to market weight. This is when the most feed goes through the house and spoils fastest, so keep the store dry and turn stock over quickly. Observe the withdrawal period for any medication.'),
+    poultryStage(JASIKAN, 'Biosecurity', 'Before, during and after production', BAND_BIOSECURITY,
+      'WET SPELLS RAISE DISEASE PRESSURE',
+      'Implement measures to prevent the introduction and spread of disease: a disinfectant footbath at the entrance to the pen and farm, separate clothing and footwear, few visitors and vehicles, and hygienic disposal of dead birds by incineration or deep burial.'),
+    poultryStage(JASIKAN, 'Harvest and market', '6 -8', BAND_OFFTAKE,
+      'MILD SPELL, GOOD FOR CATCHING AND SALE',
+      'Harvesting, processing and marketing. Withdraw feed 8-12 hours before catching but never water. Move birds in the cool of the day, process hygienically, and keep meat cold from the moment of slaughter.'),
+  ],
+  /**
+   * Retained even though the bulletin above now parses into activities, because
+   * they are what the *older* generated template produces — and that path is
+   * still supported. Keeping them means the fallback layout has something to
+   * render in a test without inventing a second fixture.
+   */
   managementMetrics: {
-    'Brooding temperature': '32-34 °C for the first week',
+    'Brooding temperature': '32–34 °C for the first week',
     'Stocking density': '10 birds per square metre',
     'Feed intake': '45 g per bird per day',
     'Water intake': '90 ml per bird per day',
@@ -469,6 +773,81 @@ export const MOCK_POULTRY_ADVISORY: WeeklyAdvisory = {
     'Provide clean water continuously and flush the lines each morning.',
     'Remove wet litter promptly to keep ammonia down.',
   ],
+};
+
+export const MOCK_LAYER_ADVISORY: WeeklyAdvisory = {
+  id: 'sample-layer-advisory',
+  kind: 'poultry',
+  title: 'Layer Advisory',
+  region: 'Western Region',
+  district: 'Ahanta West',
+  crop: 'Layer',
+  year: 2026,
+  season: '',
+  summary: 'Weekly management advisory for layers, brooding through lay.',
+  createdAt: '2026-01-26T06:00:00.000Z',
+  /**
+   * The layer programme: sixteen stages, not the broiler's twelve. A layer runs
+   * to point of lay and beyond, so it carries a longer vaccination programme,
+   * debeaking, fowl pox, and three feed changes a broiler never reaches.
+   *
+   * The Ahanta West workbook groups the same programme into seven sheets with
+   * prose week labels, and carries weather for those seven rather than for all
+   * sixteen — so the placings here are a reading of layer practice, not a
+   * transcription.
+   */
+  activities: [
+    poultryStage(AHANTA_WEST, 'Site and housing', 'Before Week 1', BAND_BUILD,
+      'DRY SPELL, GOOD BUILDING WEATHER',
+      'Site selection and construction of appropriate housing, and sourcing a market. Oriented east to west so the long walls avoid the low sun, on ground that drains.'),
+    poultryStage(AHANTA_WEST, 'Before chicks arrive', 'Before Week 1', BAND_PREP,
+      'WARM AND DRY, PRE-HEAT THE BROODER',
+      'Clean, disinfect and rest the house. Bed dry litter, set up guards, feeders and drinkers, and pre-heat the brooder well before the chicks land.'),
+    poultryStage(AHANTA_WEST, 'Brooder management', '1 - 4', BAND_BROOD,
+      'WARM DRY AIR, WATCH BROODER HEAT AND WATER',
+      'Hold 33-35 °C at chick level for the first 3 days and step down about 2 °C a week. Watch how the chicks spread: bunched means cold, panting at the edges means hot.'),
+    poultryStage(AHANTA_WEST, 'Starter feed and water', '1 - 8', BAND_FEED,
+      'HUMID WEEKS, KEEP STARTER FEED DRY',
+      'Provide a good quality starter to week 8, with cool potable water always available. Store feed on pallets and use it first in, first out.'),
+    poultryStage(AHANTA_WEST, '1st Gumboro vaccine', '1', BAND_VACCINE,
+      'COOL MORNINGS SUIT VACCINATION',
+      'Intermediate strain, given only if the day-old chicks were not vaccinated against Gumboro at the hatchery. Through the drinking water in the cool of the morning, using skim milk to stabilise it.'),
+    poultryStage(AHANTA_WEST, '1st Newcastle (Hitchner)', '2', BAND_VACCINE,
+      'COOL MORNINGS SUIT VACCINATION',
+      'Withhold water 1-2 hours, then give the vaccine in cool stabilised water and make sure it is drunk within two hours.'),
+    poultryStage(AHANTA_WEST, '2nd Gumboro vaccine', '3', BAND_VACCINE,
+      'COOL MORNINGS SUIT VACCINATION',
+      'Intermediate plus strain, through the drinking water. The booster matters more than the first dose: same two-hour window, same cool early start.'),
+    poultryStage(AHANTA_WEST, '2nd Newcastle (Lasota)', '4', BAND_VACCINE,
+      'COOL MORNINGS SUIT VACCINATION',
+      'Give in stabilised drinking water early. Keep the flock off water beforehand so every bird takes a share.'),
+    poultryStage(AHANTA_WEST, '1st Fowl pox vaccine', '6', BAND_HANDLING,
+      'MILD DAYS, GOOD FOR HANDLING',
+      'Wing web route, one bird at a time. Check for a scab at the site about a week later; no scab means no take, and the flock needs doing again.'),
+    poultryStage(AHANTA_WEST, 'Debeaking', '8', BAND_HANDLING,
+      'MILD DAYS, LEAST HANDLING STRESS',
+      'Debeak in the cool of the morning. Raise the feed level in the troughs for a few days afterwards and give vitamin K in the water.'),
+    poultryStage(AHANTA_WEST, '2nd Fowl pox vaccine', '10', BAND_HANDLING,
+      'MILD DAYS, GOOD FOR HANDLING',
+      'Second wing web dose. Check takes again a week later before moving on.'),
+    poultryStage(AHANTA_WEST, 'Grower feed and water', '9 - 18', BAND_FEED,
+      'STEADY WEEKS, GROW THE FRAME',
+      'Grower diet through to point of lay. This is where the frame is built, so do not let intake slip; underweight pullets never catch up in lay.'),
+    poultryStage(AHANTA_WEST, '3rd Newcastle (injected)', '16', BAND_HANDLING,
+      'MILD DAYS, GOOD FOR HANDLING',
+      'Intramuscular, so every bird is handled rather than dosed through the water. Work early, keep the vaccine in a cool box at the pen, and change needles regularly.'),
+    poultryStage(AHANTA_WEST, 'Biosecurity', 'Before, during and after production', BAND_BIOSECURITY,
+      'WET SPELLS RAISE DISEASE PRESSURE',
+      'Biosecurity measures and husbandry practices, observed throughout: footbath at every entrance, separate clothing and boots, few visitors, and hygienic disposal of dead birds. This one runs the whole cycle, not a stage of it.'),
+    poultryStage(AHANTA_WEST, 'Layer feed and water', '19 - End', BAND_FEED,
+      'HUMID WEEKS, PROTECT THE LAYER MASH',
+      'Move onto layer mash as the flock comes into lay, changing over about a week. Calcium and water drive shell quality; neither can be allowed to run short.'),
+    poultryStage(AHANTA_WEST, 'Egg harvest and market', 'From point of lay to end of production', BAND_LAY,
+      'HEAT AND DAMP, COLLECT OFTEN',
+      'Collect at least three times a day, more in the heat. Keep nests dry, wipe soiling off dry rather than washing, and store eggs cool, pointed end down.'),
+  ],
+  managementMetrics: {},
+  recommendations: [],
 };
 
 /**

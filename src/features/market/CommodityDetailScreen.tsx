@@ -15,6 +15,8 @@ import { Dropdown } from '../../shared/ui/Dropdown';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { LineAreaChart } from '../../shared/ui/LineAreaChart';
 import { Screen } from '../../shared/ui/Screen';
+import { ArrowDown, ArrowUp, Tag, TrendDown, TrendUp } from 'phosphor-react-native';
+
 import { StatTile } from '../../shared/ui/StatTile';
 import { Text } from '../../shared/ui/Text';
 import { buildMarketOrderUrl, canPlaceOrder } from '../../shared/utils/buildMarketOrderText';
@@ -261,14 +263,14 @@ function ChartAndDetail({
           />
           {change ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
-              <StatTile icon="pricetag-outline" label="Current" value={formatCedi(change.last)} />
+              <StatTile icon={Tag} label="Current" value={formatCedi(change.last)} />
               <StatTile
-                icon={change.direction === 'down' ? 'trending-down' : 'trending-up'}
+                icon={change.direction === 'down' ? TrendDown : TrendUp}
                 label="6-month change"
                 value={`${change.delta >= 0 ? '+' : '−'}${formatCedi(Math.abs(change.delta))}`}
               />
-              <StatTile icon="arrow-up-outline" label="Period high" value={formatCedi(change.high)} />
-              <StatTile icon="arrow-down-outline" label="Period low" value={formatCedi(change.low)} />
+              <StatTile icon={ArrowUp} label="Period high" value={formatCedi(change.high)} />
+              <StatTile icon={ArrowDown} label="Period low" value={formatCedi(change.low)} />
             </View>
           ) : null}
           <Text variant="caption" muted>

@@ -47,10 +47,7 @@ export function RegionHazardScreen({ region, initialHazard = 'flood' }: Props) {
   const summary = useHazardSummary();
   const detail = useHazardRegion(region);
 
-  const row = useMemo(
-    () => summary.regions.find((entry) => entry.region === region),
-    [summary.regions, region],
-  );
+  const row = useMemo(() => summary.regions.find((entry) => entry.region === region), [summary.regions, region]);
 
   const block = row?.[hazard];
   const meta = getHazardBandMeta(block?.band);
@@ -84,7 +81,13 @@ export function RegionHazardScreen({ region, initialHazard = 'flood' }: Props) {
             <Card style={{ gap: theme.spacing.md }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <HazardBandBadge band={block.band} />
-                <Text variant="h2">{Math.round(block.score)}<Text variant="caption" muted> of 100</Text></Text>
+                <Text variant="h2">
+                  {Math.round(block.score)}
+                  <Text variant="caption" muted>
+                    {' '}
+                    of 100
+                  </Text>
+                </Text>
               </View>
               <HazardBandMeter band={block.band} score={block.score} />
               <Text variant="caption" muted>
@@ -133,7 +136,7 @@ export function RegionHazardScreen({ region, initialHazard = 'flood' }: Props) {
                 hazard === 'flood' && !row.riverine
                   ? 'No major monitored river reach falls in this region, so flood risk here is scored from rainfall alone. Flooding is typically drainage-related rather than riverine.'
                   : hazard === 'drought' && drought?.spi === null
-                    ? 'The rainfall anomaly is outside its valid range this month — a 90-day dry season total is too close to zero for the index to be meaningful.'
+                    ? 'The rainfall anomaly is outside its valid range this month. A 90-day dry season total is too close to zero for the index to be meaningful.'
                     : null
               }
             />
@@ -155,19 +158,13 @@ export function RegionHazardScreen({ region, initialHazard = 'flood' }: Props) {
                 />
               ) : null}
               <Text variant="caption" muted>
-                Both hazards use the same 0-100 scale, so their severities can be compared directly.
-                Currently dominant: {row.dominant}.
+                Both hazards use the same 0-100 scale, so their severities can be compared directly. Currently dominant: {row.dominant}.
               </Text>
             </Card>
 
             {/* Only the charts depend on the per-region call, so a cold region
                 endpoint costs three charts rather than the whole screen. */}
-            <AsyncStateView
-              status={detail.status}
-              error={detail.error}
-              onRetry={detail.refetch}
-              skeleton={<RegionHazardSkeleton />}
-            >
+            <AsyncStateView status={detail.status} error={detail.error} onRetry={detail.refetch} skeleton={<RegionHazardSkeleton />}>
               <HazardCharts
                 series={detail.data?.series}
                 discharge={detail.data?.discharge}
@@ -177,8 +174,7 @@ export function RegionHazardScreen({ region, initialHazard = 'flood' }: Props) {
             </AsyncStateView>
 
             <Text variant="caption" muted>
-              A regional indicator, not a district forecast. In an emergency follow NADMO instructions
-              for your district.
+              A regional indicator, not a district forecast. In an emergency follow NADMO instructions for your district.
             </Text>
           </View>
         )}

@@ -49,3 +49,38 @@ export async function removeQueuedSubmission(localId: string): Promise<void> {
   const queue = await readQueue();
   await writeQueue(queue.filter((item) => item.localId !== localId));
 }
+
+/**
+ * How many times a submission is retried before it is given up on.
+ *
+ * `attempts` used to be incremented and never read, so a submission the server
+ * would never accept was retried on every reconnection for as long as the app
+ * stayed installed. A cap turns that into a state the farmer can be told
+ * about.
+ */
+export const MAX_QUEUE_ATTEMPTS = 5;
+
+/**
+ * Put back anything left mid-flight by a previous run.
+ *
+ * A submission is marked `syncing` before the request goes out, so an app
+ * killed mid-sweep leaves it there forever: `syncing` is excluded from the
+ * retry filter *and* from the pending count, which means the farmer's
+ * submission is neither sent nor visible. Called on mount, before the first
+ * sweep, because there cannot legitimately be a request in flight at that
+ * point.
+ */
+export async function reclaimOrphanedSubmissions(): Promise<void> {
+  const queue = await readQueue();
+  if (!queue.some((item) => item.status === 'syncing')) return;
+
+  await writeQueue(queue.map((item) => (item.status === 'syncing' ? { ...item, status: 'pending' } : item)));
+}
+
+/** Everything still owed an answer, oldest first. `abandoned` is excluded:
+ * it is terminal, and counting it would keep a badge lit over work that will
+ * never happen. */
+export async function listUnsentSubmissions(): Promise<QueuedDiagnosisSubmission[]> {
+  const queue = await readQueue();
+  return queue.filter((item) => item.status !== 'abandoned');
+}

@@ -1,39 +1,50 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, G, Path, Pattern, Rect } from 'react-native-svg';
 
-import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { useTheme } from '../theme/ThemeProvider';
 
 /**
- * The faint doodle pattern behind the transcript.
+ * The faint doodle pattern that backs a page.
  *
- * WhatsApp's wallpaper is the single most recognisable thing about its chat, and
- * it does real work: it marks the transcript as a different kind of surface from
- * the rest of the app, so bubbles read as objects sitting on a ground rather
- * than as cards in a list.
+ * Borrowed from the messaging idiom, where a patterned ground is the single most
+ * recognisable thing about a chat, and it does real work: it marks the page as a
+ * ground rather than a container, so cards and bubbles read as objects sitting
+ * *on* something instead of floating in nothing.
  *
  * Ours is drawn from this app's own subject — leaf, sun, cloud, raindrop,
- * seedling, grain — rather than WhatsApp's party of hearts and footballs.
+ * seedling, grain, watering can — rather than the hearts and footballs of the
+ * app the idea came from.
  *
  * Cost is one `<Svg>` with a single tiled `<Pattern>`: one draw call for the
- * whole screen, no images to decode, no per-bubble work. That matters on the
+ * whole screen, no image to decode, nothing per-card. That matters on the
  * low-end Android this app is built for, which is also why the whole thing is
- * static — nothing here animates.
+ * static — nothing here animates, so it costs nothing after the first paint.
  *
- * Opacity is low on purpose. The pattern must never compete with the text on
- * top of it: at this weight it reads as texture, and a farmer in bright sun
- * simply does not see it, which is the correct failure mode.
+ * Opacity is low on purpose. The pattern must never compete with the text over
+ * it: at this weight it reads as texture, and a farmer in bright sun simply does
+ * not see it, which is the correct failure mode.
+ *
+ * Lives in `shared/ui` rather than with the chat it started in, because `Screen`
+ * needs it (see its `wallpaper` prop) and a shared layout primitive must not
+ * reach into a feature.
  */
 const TILE = 84;
 
-export function ChatWallpaper() {
+export function DoodleWallpaper() {
   const theme = useTheme();
+  // Every instance gets its own pattern id. Two of these are on screen at once
+  // as soon as a second tab has been visited — expo-router keeps tab screens
+  // mounted — and sharing one id across two SVG documents has bitten this
+  // codebase before (see the same note in ui/Card.tsx). React's useId contains
+  // colons, which are not safe inside url(#...).
+  const patternId = `doodles${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Svg width="100%" height="100%">
         <Defs>
-          <Pattern id="agrometDoodles" width={TILE} height={TILE} patternUnits="userSpaceOnUse">
+          <Pattern id={patternId} width={TILE} height={TILE} patternUnits="userSpaceOnUse">
             <G
               stroke={theme.colors.wallpaperInk}
               strokeWidth={1.4}
@@ -75,7 +86,7 @@ export function ChatWallpaper() {
             </G>
           </Pattern>
         </Defs>
-        <Rect x={0} y={0} width="100%" height="100%" fill="url(#agrometDoodles)" />
+        <Rect x={0} y={0} width="100%" height="100%" fill={`url(#${patternId})`} />
       </Svg>
     </View>
   );

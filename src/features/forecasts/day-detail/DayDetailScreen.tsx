@@ -15,9 +15,11 @@ import { Card } from '../../../shared/ui/Card';
 import { DetailRow } from '../../../shared/ui/DetailRow';
 import { Divider } from '../../../shared/ui/Divider';
 import { LineAreaChart } from '../../../shared/ui/LineAreaChart';
-import { MockDataTag } from '../../../shared/ui/MockDataTag';
 import { Screen } from '../../../shared/ui/Screen';
+import { SectionHeading } from '../../../shared/ui/SectionHeading';
 import { SegmentedControl } from '../../../shared/ui/SegmentedControl';
+import { Drop, NavigationArrow } from 'phosphor-react-native';
+
 import { StatTile } from '../../../shared/ui/StatTile';
 import { Text } from '../../../shared/ui/Text';
 import { formatTemperature } from '../../../shared/utils/formatTemperature';
@@ -436,22 +438,6 @@ function buildChartConfig(metric: MetricId, mode: number, theme: ReturnType<type
   };
 }
 
-/** A section title sitting on the page background, with the card (if any)
- * below it — the reference's structure, and the reason the page reads as a
- * document rather than a stack of boxes. */
-function SectionHeading({ title, subtitle }: { title: string; subtitle?: string }) {
-  return (
-    <View>
-      <Text variant="h2">{title}</Text>
-      {subtitle ? (
-        <Text variant="caption" muted>
-          {subtitle}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
 function DayDetail({
   day,
   hours,
@@ -581,8 +567,8 @@ function DayDetail({
           to support, and neither appears anywhere else on it. */}
       <SectionHeading title="Wind & Humidity" />
       <Card style={{ flexDirection: 'row', gap: theme.spacing.md }}>
-        <StatTile icon="navigate-outline" label="Wind" value={formatWind(day.windKph)} />
-        <StatTile icon="water-outline" label="Humidity" value={`${day.humidityPct}%`} />
+        <StatTile icon={NavigationArrow} label="Wind" value={formatWind(day.windKph)} />
+        <StatTile icon={Drop} label="Humidity" value={`${day.humidityPct}%`} />
       </Card>
 
       <SectionHeading title="Daily Summary" />
@@ -599,8 +585,6 @@ function DayDetail({
         </Text>
         <BulletList items={week.farmerActionCard.actions} accent />
       </Card>
-
-      <MockDataTag />
     </View>
   );
 }

@@ -88,3 +88,55 @@ export function chamferedRectPath({
     'Z',
   ].join(' ');
 }
+
+export type DrawerPanelOptions = {
+  width: number;
+  height: number;
+  /** Vertical run of the diagonal cutting the top-left corner. */
+  topCut: number;
+  /** Vertical run of the diagonal cutting the bottom-left corner. */
+  bottomCut: number;
+  /** As `CardShapeOptions.inset` — keeps a centred stroke off the edge. */
+  inset?: number;
+};
+
+/**
+ * The menu drawer's silhouette: a right-anchored panel whose two **left**
+ * corners are cut away, leaving the right edge flush against the screen.
+ *
+ * Deliberately not a variant of `chamferedRectPath`. That one cuts *opposite*
+ * corners at 45 degrees, which is a card; this cuts *both left* corners at a
+ * much shallower angle and keeps the right ones square. Sharing one function
+ * would mean a corner-selection parameter that neither caller wants.
+ *
+ * The cuts are measured as a vertical run rather than an angle, because that is
+ * what the caller can clamp against the panel height. With the panel's own width
+ * as the horizontal run, `cut = width * 0.7` gives the reference's ~35 degrees.
+ */
+export function drawerPanelPath({ width, height, topCut, bottomCut, inset = 0.5 }: DrawerPanelOptions): string {
+  const x0 = inset;
+  const y0 = inset;
+  const x1 = width - inset;
+  const y1 = height - inset;
+
+  const h = Math.max(0, y1 - y0);
+
+  // Both cuts eat into the same left edge, so it is their sum that has to fit.
+  // Clamping them separately would let the top cut cross below the bottom one
+  // and render the panel inside out.
+  let top = Math.max(0, Math.min(topCut, h));
+  let bottom = Math.max(0, Math.min(bottomCut, h));
+  if (top + bottom > h && top + bottom > 0) {
+    const scale = h / (top + bottom);
+    top *= scale;
+    bottom *= scale;
+  }
+
+  return [
+    `M ${n(x1)} ${n(y0)}`,
+    `L ${n(x0)} ${n(y0 + top)}`,
+    `L ${n(x0)} ${n(y1 - bottom)}`,
+    `L ${n(x1)} ${n(y1)}`,
+    'Z',
+  ].join(' ');
+}

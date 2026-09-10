@@ -39,57 +39,81 @@ export function CurrentConditionsSkeleton() {
   );
 }
 
-/** Label row, a summary line, then three day columns. */
+/**
+ * The frame the three teaser skeletons share, matching `TeaserCard`.
+ *
+ * The cards were given one frame; if the skeletons kept three, they would each
+ * resolve into a card of a different height — the layout shift this file exists
+ * to avoid, reintroduced by the change that tidied the cards.
+ */
+function TeaserSkeletonFrame({
+  trailing,
+  hasNotice,
+  children,
+}: {
+  trailing?: number;
+  hasNotice?: boolean;
+  children: React.ReactNode;
+}) {
+  const theme = useTheme();
+
+  return (
+    <SkeletonCard gap={theme.spacing.sm}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Skeleton width={92} height={10} />
+        {trailing ? <Skeleton width={trailing} height={trailing === 72 ? 20 : 10} radius={theme.radii.sm} /> : null}
+      </View>
+      {children}
+      <View style={{ height: 1, backgroundColor: theme.colors.border, marginTop: theme.spacing.xs }} />
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        {hasNotice ? <Skeleton width={104} height={10} /> : <View />}
+        <Skeleton width={96} height={10} />
+      </View>
+    </SkeletonCard>
+  );
+}
+
+/** Summary line, then the seven day columns. */
 export function FeaturedForecastSkeleton() {
   const theme = useTheme();
 
   return (
-    <SkeletonCard gap={theme.spacing.sm}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Skeleton width={80} height={10} />
-        <Skeleton width={70} height={10} />
-      </View>
+    <TeaserSkeletonFrame>
       <SkeletonText lines={2} lastWidth="70%" />
-      <View style={{ flexDirection: 'row', gap: theme.spacing.lg }}>
-        {[0, 1, 2].map((day) => (
-          <View key={day} style={{ alignItems: 'center', gap: theme.spacing.xs }}>
-            <Skeleton width={32} height={10} />
-            <Skeleton width={40} height={16} />
-            <Skeleton width={32} height={10} />
+      <View style={{ flexDirection: 'row', marginTop: theme.spacing.xs }}>
+        {[0, 1, 2, 3, 4, 5, 6].map((day) => (
+          <View key={day} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
+            <Skeleton width={28} height={9} />
+            <Skeleton width={17} height={17} radius={9} />
+            <Skeleton width={26} height={13} />
+            <Skeleton width={22} height={9} />
           </View>
         ))}
       </View>
-    </SkeletonCard>
+    </TeaserSkeletonFrame>
   );
 }
 
-/** Label plus severity pill, a two-line title, a two-line summary, crops. */
+/** Severity pill, a two-line title, then the crop chips. */
 export function AdvisoryTeaserSkeleton() {
   const theme = useTheme();
 
   return (
-    <SkeletonCard gap={theme.spacing.sm}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <Skeleton width={90} height={10} />
-        <Skeleton width={72} height={20} radius={theme.radii.sm} />
+    <TeaserSkeletonFrame trailing={72} hasNotice>
+      <SkeletonText lines={2} lastWidth="55%" />
+      <View style={{ flexDirection: 'row', gap: theme.spacing.xs, marginTop: 2 }}>
+        <Skeleton width={86} height={22} radius={theme.radii.sm} />
+        <Skeleton width={70} height={22} radius={theme.radii.sm} />
       </View>
-      <Skeleton width="85%" height={18} />
-      <SkeletonText lines={2} lastWidth="60%" />
-      <Skeleton width={120} height={10} />
-    </SkeletonCard>
+    </TeaserSkeletonFrame>
   );
 }
 
-/** Label, two-line headline, two-line summary, timestamp. */
+/** Timestamp, then a two-line headline. */
 export function NewsTeaserSkeleton() {
-  const theme = useTheme();
-
   return (
-    <SkeletonCard gap={theme.spacing.sm}>
-      <Skeleton width={80} height={10} />
-      <Skeleton width="90%" height={18} />
-      <SkeletonText lines={2} lastWidth="50%" />
-      <Skeleton width={90} height={10} />
-    </SkeletonCard>
+    <TeaserSkeletonFrame trailing={64} hasNotice>
+      <SkeletonText lines={2} lastWidth="65%" />
+    </TeaserSkeletonFrame>
   );
 }

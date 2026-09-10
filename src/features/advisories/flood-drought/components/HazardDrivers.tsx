@@ -1,6 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 
+import { formatDriverMeasurement } from '../../../../shared/domain/hazard';
 import type { HazardDriver } from '../../../../shared/domain/hazard';
 import { useTheme } from '../../../../shared/theme/ThemeProvider';
 import { Card } from '../../../../shared/ui/Card';
@@ -43,13 +44,7 @@ export function HazardDrivers({ drivers, note }: { drivers: HazardDriver[]; note
               <Text variant="body" style={{ flexShrink: 1 }}>
                 {driver.label}
               </Text>
-              <Text variant="bodyStrong">
-                {driver.value === null ? '—' : driver.value}
-                <Text variant="caption" muted>
-                  {' '}
-                  {driver.unit}
-                </Text>
-              </Text>
+              <DriverMeasurement value={driver.value} unit={driver.unit} />
             </View>
 
             {driver.gloss ? (
@@ -87,5 +82,30 @@ export function HazardDrivers({ drivers, note }: { drivers: HazardDriver[]; note
         </Text>
       ) : null}
     </Card>
+  );
+}
+
+/**
+ * One measurement, at two weights: the figure prominent, its unit quiet beside
+ * it.
+ *
+ * Split out because the value and the unit are one formatting decision made in
+ * `formatDriverMeasurement` but two Text nodes on screen, and inlining that made
+ * the row unreadable.
+ */
+function DriverMeasurement({ value, unit }: { value: number | null; unit: string }) {
+  if (value === null) return <Text variant="bodyStrong">—</Text>;
+
+  const measurement = formatDriverMeasurement(value, unit);
+  return (
+    <Text variant="bodyStrong">
+      {measurement.value}
+      {measurement.unit ? (
+        <Text variant="caption" muted>
+          {measurement.unit === '%' ? '' : ' '}
+          {measurement.unit}
+        </Text>
+      ) : null}
+    </Text>
   );
 }

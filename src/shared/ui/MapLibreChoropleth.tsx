@@ -1,11 +1,11 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { View } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
 import { GHANA_BOUNDARIES } from '../data/ghanaBoundaries';
 import type { SpatialGeography, SpatialGridCell, SpatialValueFormat } from '../domain/spatialOutlook';
 import { useTheme } from '../theme/ThemeProvider';
-import { buildColorClasses, TERCILE_CATEGORIES } from '../utils/colorScale';
+import { buildColorClasses, TERCILE_CATEGORIES, type ColorStops } from '../utils/colorScale';
 import { formatSpatialValue } from '../utils/formatSpatialValue';
 
 type Props = {
@@ -22,6 +22,24 @@ type Props = {
   /** Probability view: cells carry tercile indices and render as the three
    * named categories rather than a numeric ramp. */
   isTercile: boolean;
+  /** Overrides `TERCILE_CATEGORIES`, so the online renderer bins identically to
+   * the offline SVG one. See `utils/tercilePalette.ts`. */
+  palette?: { label: string; color: string; sublabel?: string }[];
+  /** Called with the tapped cell's place and coordinate. Omit it and the map
+   * keeps its read-only popup, which is what the Seasonal view still wants. */
+  onSelect?: (selection: MapSelection) => void;
+  /** The continuous ramp for the fill. Must be the same one handed to the
+   * legend: a map keyed by a scale it does not use is the failure mode this
+   * component has already hit once. */
+  stops?: ColorStops;
+  /** Called when a tap lands on the map but not on any forecast cell. The
+   * host uses it to dismiss whatever is overlaying the map, which is the
+   * gesture people already expect from a bottom sheet. */
+  onDismiss?: () => void;
+  /** The place whose outline should read as selected. Pushed into the live map
+   * rather than rebuilt into the document, so selecting does not reload the
+   * basemap or throw away the reader's pan and zoom. */
+  selected?: { region: string | null; district: string | null } | null;
 };
 
 /**
@@ -42,10 +60,27 @@ type Props = {
 const MAPLIBRE_VERSION = '5.24.0';
 const CARTO_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 
+/** What a tap on the map resolves to. */
+export type MapSelection = {
+  lat: number;
+  lng: number;
+  region: string | null;
+  district: string | null;
+  /** The formatted value already shown in the popup, so a caller can label its
+   * own panel without re-deriving the formatting. */
+  label: string;
+};
+
 /** Grid cells -> GeoJSON squares. Building the polygons here (rather than
  * in the WebView) keeps the injected payload declarative and means the
  * same GeoJSON could be handed to a native map later untouched. */
-function buildGeoJson(cells: SpatialGridCell[], valueFormat: SpatialValueFormat, range: number, isTercile: boolean): string {
+function buildGeoJson(
+  cells: SpatialGridCell[],
+  valueFormat: SpatialValueFormat,
+  range: number,
+  isTercile: boolean,
+  categories: { label: string; color: string }[],
+): string {
   const half = GHANA_BOUNDARIES.gridResolutionDeg / 2;
   const features = cells.map((cell) => ({
     type: 'Feature',
@@ -54,7 +89,7 @@ function buildGeoJson(cells: SpatialGridCell[], valueFormat: SpatialValueFormat,
       // Pre-formatted here rather than in the WebView so the popup and the
       // legend share one formatter — duplicating that logic in injected JS
       // is exactly how the two would silently drift apart.
-      label: isTercile ? (TERCILE_CATEGORIES[cell.value]?.label ?? 'Normal') : formatSpatialValue(cell.value, valueFormat, range),
+      label: isTercile ? (categories[cell.value]?.label ?? 'No signal') : formatSpatialValue(cell.value, valueFormat, range),
       region: cell.regionName,
       district: cell.districtName,
     },
@@ -91,21 +126,30 @@ function buildBoundaryGeoJson(geography: SpatialGeography): string {
  * The first class's colour is the base; each subsequent entry supplies the
  * break value where the next colour takes over.
  */
-function buildColorRamp(min: number, max: number, isTercile: boolean): string {
+function buildColorRamp(
+  min: number,
+  max: number,
+  isTercile: boolean,
+  categories: { label: string; color: string }[],
+  stops?: ColorStops,
+): string {
   if (isTercile) {
-    // Values are tercile indices 0/1/2 — match on the index directly
-    // rather than deriving numeric breaks that would land between them.
-    const [below, normal, above] = TERCILE_CATEGORIES;
-    return JSON.stringify(['step', ['get', 'value'], below.color, 1, normal.color, 2, above.color]);
+    // Values are palette indices — match on the index directly rather than
+    // deriving numeric breaks that would land between them. Built from the
+    // palette's own length so a five-band ramp works as well as a three.
+    const [first, ...rest] = categories;
+    const steps = rest.flatMap((entry, index) => [index + 1, entry.color]);
+    return JSON.stringify(['step', ['get', 'value'], first.color, ...steps]);
   }
-  const classes = buildColorClasses(min, max);
+  const classes = buildColorClasses(min, max, undefined, stops);
   const [first, ...rest] = classes;
   const steps = rest.flatMap((entry) => [entry.from, entry.color]);
   return JSON.stringify(['step', ['get', 'value'], first.color, ...steps]);
 }
 
 function buildHtml(props: Props): string {
-  const { cells, min, max, geography, variableLabel, valueFormat, isTercile } = props;
+  const { cells, min, max, geography, variableLabel, valueFormat, isTercile, palette, stops } = props;
+  const categories = palette ?? TERCILE_CATEGORIES;
   const { minLng, minLat, maxLng, maxLat } = GHANA_BOUNDARIES.bounds;
 
   return `<!DOCTYPE html>
@@ -155,7 +199,7 @@ function buildHtml(props: Props): string {
       });
 
       map.on('load', function () {
-        map.addSource('forecast', { type: 'geojson', data: ${buildGeoJson(cells, valueFormat, max - min, isTercile)} });
+        map.addSource('forecast', { type: 'geojson', data: ${buildGeoJson(cells, valueFormat, max - min, isTercile, categories)} });
         map.addSource('boundaries', { type: 'geojson', data: ${buildBoundaryGeoJson(geography)} });
 
         // Forecast fill sits above the basemap's land but below its
@@ -164,7 +208,7 @@ function buildHtml(props: Props): string {
           id: 'forecast-fill',
           type: 'fill',
           source: 'forecast',
-          paint: { 'fill-color': ${buildColorRamp(min, max, isTercile)}, 'fill-opacity': 0.72 }
+          paint: { 'fill-color': ${buildColorRamp(min, max, isTercile, categories, stops)}, 'fill-opacity': 0.72 }
         });
 
         map.addLayer({
@@ -176,11 +220,54 @@ function buildHtml(props: Props): string {
 
         // Tap a cell to read its exact value — the legend gives the range,
         // this answers "what is it *here*".
+        // Starts matching nothing; the host swaps the filter in when a place
+        // is chosen. Sitting above the ordinary boundary line so a selected
+        // outline reads as selected rather than merely present.
+        map.addLayer({
+          id: 'boundary-selected',
+          type: 'line',
+          source: 'boundaries',
+          filter: ['==', ['get', 'name'], '__none__'],
+          paint: { 'line-color': '#111827', 'line-width': 2.4, 'line-opacity': 0.95 }
+        });
+
+        window.__setSelected = function (filter) {
+          if (!map.getLayer('boundary-selected')) return;
+          map.setFilter('boundary-selected', filter);
+        };
+        if (window.__pendingSelected) {
+          window.__setSelected(window.__pendingSelected);
+          window.__pendingSelected = null;
+        }
+
+        map.on('click', function (e) {
+          var hits = map.queryRenderedFeatures(e.point, { layers: ['forecast-fill'] });
+          if (hits.length) return;
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'dismiss' }));
+          }
+        });
+
         map.on('click', 'forecast-fill', function (e) {
           var f = e.features && e.features[0];
           if (!f) return;
           var p = f.properties || {};
           var place = p.district || p.region || 'Selected area';
+
+          // Report the tap to React Native as well as showing the popup. The
+          // popup answers "what is it here"; the message lets the host open a
+          // detail panel for the same place without a second gesture.
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'select',
+              lat: e.lngLat.lat,
+              lng: e.lngLat.lng,
+              region: p.region || null,
+              district: p.district || null,
+              label: String(p.label)
+            }));
+          }
+
           new maplibregl.Popup({ closeButton: false })
             .setLngLat(e.lngLat)
             .setHTML('<div style="font-family:system-ui,sans-serif;font-size:12px"><strong>' + place + '</strong><br/>' +
@@ -199,7 +286,21 @@ function buildHtml(props: Props): string {
 </html>`;
 }
 
-export function MapLibreChoropleth({ cells, min, max, geography, height, variableLabel, valueFormat, isTercile }: Props) {
+export function MapLibreChoropleth({
+  cells,
+  min,
+  max,
+  geography,
+  height,
+  variableLabel,
+  valueFormat,
+  isTercile,
+  palette,
+  onSelect,
+  onDismiss,
+  stops,
+  selected,
+}: Props) {
   const theme = useTheme();
   const webViewRef = useRef<WebView>(null);
 
@@ -207,8 +308,67 @@ export function MapLibreChoropleth({ cells, min, max, geography, height, variabl
   // otherwise every parent re-render would remount the map and lose the
   // user's pan/zoom position.
   const html = useMemo(
-    () => buildHtml({ cells, min, max, geography, height, variableLabel, valueFormat, isTercile }),
-    [cells, min, max, geography, height, variableLabel, valueFormat, isTercile],
+    () => buildHtml({ cells, min, max, geography, height, variableLabel, valueFormat, isTercile, palette, stops }),
+    // `palette` belongs here: without it the document kept the default
+    // three-colour ramp while the legend showed the variable's own five-band
+    // one, so the map and its key disagreed about what a colour meant.
+    [cells, min, max, geography, height, variableLabel, valueFormat, isTercile, palette, stops],
+  );
+
+  /**
+   * Push the selected outline into the running map.
+   *
+   * Deliberately not part of `html`: putting it there would rebuild the
+   * document on every selection, reloading the basemap and discarding the
+   * reader's pan and zoom just to thicken one line. If the map has not
+   * finished loading, the filter is parked on `window` and the load handler
+   * picks it up, so a selection made during startup is not silently dropped.
+   */
+  useEffect(() => {
+    const filter =
+      selected?.district && geography === 'district'
+        ? ['all', ['==', ['get', 'name'], selected.district], ['==', ['get', 'region'], selected.region ?? '']]
+        : selected?.region && geography === 'region'
+          ? ['==', ['get', 'name'], selected.region]
+          : ['==', ['get', 'name'], '__none__'];
+
+    webViewRef.current?.injectJavaScript(
+      `(function(){var f=${JSON.stringify(filter)};` +
+        `if(window.__setSelected){window.__setSelected(f);}else{window.__pendingSelected=f;}})();true;`,
+    );
+  }, [selected, geography, html]);
+
+  /**
+   * The WebView's only channel back.
+   *
+   * Parsed defensively and dropped on anything unexpected: the document is ours,
+   * but a malformed message must not take the screen down, and a `postMessage`
+   * is the one place injected JavaScript reaches the host.
+   */
+  const handleMessage = useCallback(
+    (event: WebViewMessageEvent) => {
+      try {
+        const payload = JSON.parse(event.nativeEvent.data) as Partial<MapSelection> & { type?: string };
+
+        if (payload.type === 'dismiss') {
+          onDismiss?.();
+          return;
+        }
+        if (!onSelect) return;
+        if (payload.type !== 'select' || typeof payload.lat !== 'number' || typeof payload.lng !== 'number') return;
+
+        onSelect({
+          lat: payload.lat,
+          lng: payload.lng,
+          region: payload.region ?? null,
+          district: payload.district ?? null,
+          label: String(payload.label ?? ''),
+        });
+      } catch {
+        // Not our message, or not JSON. Nothing to do.
+      }
+    },
+    [onSelect, onDismiss],
   );
 
   return (
@@ -217,6 +377,7 @@ export function MapLibreChoropleth({ cells, min, max, geography, height, variabl
         ref={webViewRef}
         originWhitelist={['*']}
         source={{ html }}
+        onMessage={handleMessage}
         style={{ flex: 1, backgroundColor: 'transparent' }}
         javaScriptEnabled
         domStorageEnabled

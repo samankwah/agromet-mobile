@@ -3,8 +3,10 @@ import { View } from 'react-native';
 
 import { schedulingBlocker } from '../../shared/notifications/notificationClient';
 import { useReminderStore } from '../../shared/state/reminderStore';
+import { useOnboardingStore } from '../../shared/state/onboardingStore';
 import { useSettingsStore } from '../../shared/state/settingsStore';
 import { useTheme } from '../../shared/theme/ThemeProvider';
+import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
 import { Divider } from '../../shared/ui/Divider';
 import { Screen } from '../../shared/ui/Screen';
@@ -42,12 +44,15 @@ import { ToggleSetting } from './components/ToggleSetting';
 export function SettingsScreen() {
   const theme = useTheme();
 
+  const resetWelcome = useOnboardingStore((state) => state.resetWelcome);
   const themeOverride = useSettingsStore((state) => state.themeOverride);
   const setThemeOverride = useSettingsStore((state) => state.setThemeOverride);
   const textSize = useSettingsStore((state) => state.textSize);
   const setTextSize = useSettingsStore((state) => state.setTextSize);
   const dataSaverEnabled = useSettingsStore((state) => state.dataSaverEnabled);
   const setDataSaverEnabled = useSettingsStore((state) => state.setDataSaverEnabled);
+  const preferOfflineDiagnosis = useSettingsStore((state) => state.preferOfflineDiagnosis);
+  const setPreferOfflineDiagnosis = useSettingsStore((state) => state.setPreferOfflineDiagnosis);
   const remindersEnabled = useSettingsStore((state) => state.notificationPrefs.remindersEnabled);
   const setNotificationPrefs = useSettingsStore((state) => state.setNotificationPrefs);
 
@@ -115,6 +120,20 @@ export function SettingsScreen() {
 
           <Divider />
 
+          {/* Off by default, because it is a downgrade for most farmers: the
+              online check covers many more crops and returns fuller advice.
+              Offered anyway because on a metered connection the answer that
+              costs no data is worth having, and the description says plainly
+              what is given up rather than selling it as a feature. */}
+          <ToggleSetting
+            label="Diagnose crops on this phone"
+            description="Use the offline check even when you have internet. It uses no data and works anywhere, but it only knows cassava diseases."
+            value={preferOfflineDiagnosis}
+            onChange={setPreferOfflineDiagnosis}
+          />
+
+          <Divider />
+
           <ToggleSetting
             label="Reminder alerts"
             description="Get notified when a farm reminder is due, even with the app closed."
@@ -125,6 +144,28 @@ export function SettingsScreen() {
           {blocker ? (
             <NotificationNotice blocker={blocker} onRequestPermission={requestPermission} />
           ) : null}
+        </Card>
+      </View>
+
+      {/* An action, not a preference — hence a button rather than a toggle, and
+          its own section rather than a row among the settings above. It exists
+          because the welcome screen is shown once per install: without this it
+          could not be demonstrated to an extension officer, or checked after a
+          change, without wiping the app's data. */}
+      <View style={{ gap: theme.spacing.sm }}>
+        <Text variant="h3">About this app</Text>
+        <Card style={{ gap: theme.spacing.md }}>
+          <Text variant="body" muted>
+            The introduction is shown once, the first time AgroMet opens.
+          </Text>
+          <Button
+            label="Show the welcome screen"
+            variant="outline"
+            // No navigation: clearing the flag is enough, because the root
+            // layout swaps the navigator for the welcome screen the moment it
+            // turns false.
+            onPress={resetWelcome}
+          />
         </Card>
       </View>
     </Screen>

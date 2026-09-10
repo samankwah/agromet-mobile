@@ -14,7 +14,7 @@ function jsonResponse(body: unknown, ok = true, status = 200) {
 /**
  * These three behaviours used to be covered only through LibraryScreen, which
  * was deleted when the chat tab took its slot. The FAQ data layer itself is
- * deliberately retained for the planned Mobile Menu (see
+ * deliberately retained though currently unplaced (see
  * `features/library/useFaqs.ts`), so its coverage had to survive the screen —
  * otherwise the kept files would quietly become untested the moment they
  * stopped being rendered.

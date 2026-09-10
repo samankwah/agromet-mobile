@@ -1,27 +1,58 @@
-import { MOCK_HOURLY_BY_DAY, MOCK_HOURLY_FORECASTS, MOCK_WEEKLY_FORECASTS } from '../data/mockForecast';
+import { HOME_LOCATIONS } from '../data/mockWeather';
 import type { DailyForecast, HourlyForecast, WeeklyForecast } from '../domain/forecast';
 import type { ForecastMapLayer } from '../domain/forecastMap';
 import type { SeasonalOutlook } from '../domain/seasonalOutlook';
-import type { SubseasonalOutlook } from '../domain/subseasonalOutlook';
 import { mockDelay, ServiceError } from './mockDelay';
+import { fetchWeatherBundle, toHourlyForecasts, toWeeklyForecast } from './openMeteo';
 import { MOCK_MAP_LAYERS } from '../data/mockMapLayers';
 
-function getWeekly(locationId: string): WeeklyForecast {
-  const record = MOCK_WEEKLY_FORECASTS[locationId];
-  if (!record) {
+/**
+ * Deterministic forecasts, from Open-Meteo.
+ *
+ * One upstream request carries current conditions, seven days and 168 hourly
+ * steps, so every function below draws on the same bundle rather than issuing
+ * its own call. The backend caches it for 30 minutes and the app falls back to
+ * Open-Meteo directly when the backend is unreachable — see `openMeteo.ts`.
+ *
+ * The probabilistic end of the timescale has split. `getSubseasonalOutlook` is
+ * real now and lives in `subseasonalService.ts`, backed by NOAA's GEFS ensemble
+ * through `/api/outlook/subseasonal`. `getSeasonalOutlook` below is still
+ * placeholder data: seasonal forecasts are issued monthly by the Copernicus
+ * multi-model service, which needs a CDS key and a different pipeline.
+ */
+
+function placeFor(locationId: string) {
+  const place = HOME_LOCATIONS.find((entry) => entry.id === locationId);
+  if (!place) {
     throw new ServiceError(`No forecast available for location "${locationId}"`);
   }
-  return record;
+  return place;
 }
 
-// --- Tier A: fully mocked this increment, Home depends on these ---
+async function getWeekly(locationId: string): Promise<WeeklyForecast> {
+  const place = placeFor(locationId);
+  const bundle = await fetchWeatherBundle(place.lat, place.lng);
+  const week = toWeeklyForecast(bundle, locationId);
+  if (week.days.length === 0) {
+    throw new ServiceError(`No forecast available for location "${locationId}"`);
+  }
+  return week;
+}
+
+async function getHours(locationId: string): Promise<HourlyForecast[]> {
+  const place = placeFor(locationId);
+  const bundle = await fetchWeatherBundle(place.lat, place.lng);
+  return toHourlyForecasts(bundle, locationId);
+}
+
+// --- Deterministic forecasts, live from Open-Meteo ---
 
 export async function getDailyForecast(locationId: string): Promise<DailyForecast> {
-  return mockDelay(getWeekly(locationId).days[0]);
+  return (await getWeekly(locationId)).days[0];
 }
 
 export async function getWeeklyForecast(locationId: string): Promise<WeeklyForecast> {
-  return mockDelay(getWeekly(locationId));
+  return getWeekly(locationId);
 }
 
 /** A single day from the week, with its full 24 hourly steps — what the
@@ -31,51 +62,46 @@ export async function getDayDetail(
   locationId: string,
   date: string,
 ): Promise<{ day: DailyForecast; hours: HourlyForecast[]; week: WeeklyForecast }> {
-  const week = getWeekly(locationId);
+  const place = placeFor(locationId);
+  const bundle = await fetchWeatherBundle(place.lat, place.lng);
+
+  const week = toWeeklyForecast(bundle, locationId);
   const day = week.days.find((entry) => entry.date === date);
   if (!day) {
     throw new ServiceError(`No forecast for ${date} at location "${locationId}"`);
   }
-  const hours = MOCK_HOURLY_BY_DAY[locationId]?.[date] ?? [];
-  return mockDelay({ day, hours, week });
+
+  // The bundle carries the whole week's hours; take the requested day's.
+  const hours = toHourlyForecasts(bundle, locationId).filter((hour) => hour.hour.startsWith(date));
+  return { day, hours, week };
 }
 
-/** The Forecasts tab's "Today" section — next ~6 hours. */
+/** The Forecasts tab's "Today" section — the next six hours.
+ *
+ * Sliced from the first step *after* now, not from midnight: the strip is a
+ * "what happens next" reading, and an hour already past is noise. */
 export async function getHourlyForecast(locationId: string): Promise<HourlyForecast[]> {
-  const hours = MOCK_HOURLY_FORECASTS[locationId];
-  if (!hours) {
+  const hours = await getHours(locationId);
+  const now = Date.now();
+  const upcoming = hours.filter((hour) => new Date(hour.hour).getTime() > now);
+
+  if (upcoming.length === 0) {
     throw new ServiceError(`No hourly forecast available for location "${locationId}"`);
   }
-  return mockDelay(hours);
+  return upcoming.slice(0, 6);
 }
 
 /**
  * Home's stable dependency — kept as a separate named export from
- * `getWeeklyForecast` even though both read the same mock record today, so
+ * `getWeeklyForecast` even though both read the same bundle today, so
  * Home's contract doesn't shift if a future Forecast Centre needs a
  * differently-shaped "weekly" response (e.g. more days, extra fields).
  */
 export async function getFeaturedWeeklyForecast(locationId: string): Promise<WeeklyForecast> {
-  return mockDelay(getWeekly(locationId));
+  return getWeekly(locationId);
 }
 
-// --- Tier B: signature + placeholder only, no screen consumes these yet ---
-
-const PLACEHOLDER_SUBSEASONAL: SubseasonalOutlook = {
-  locationId: 'accra',
-  issuedAt: new Date().toISOString(),
-  weekRangeStart: new Date(Date.now() + 14 * 24 * 60 * 60_000).toISOString().slice(0, 10),
-  weekRangeEnd: new Date(Date.now() + 28 * 24 * 60 * 60_000).toISOString().slice(0, 10),
-  rainfallOutlook: { category: 'above-normal', probabilityPct: 55 },
-  temperatureOutlook: { category: 'normal', probabilityPct: 45 },
-  confidenceLevel: 'moderate',
-  plainLanguageSummary:
-    'Rainfall in weeks 2-4 is more likely than not to be above the long-term average, but this is a probability, not a certainty. Conditions can still turn out drier than expected.',
-  farmerActionCard: {
-    headline: 'Plan with flexibility',
-    actions: ['Keep planting windows flexible over the next month.', 'Monitor weekly bulletins rather than acting on this outlook alone.'],
-  },
-};
+// --- Tier B: signature + placeholder only, no real source yet ---
 
 const PLACEHOLDER_SEASONAL: SeasonalOutlook = {
   regionId: 'northern',
@@ -94,10 +120,6 @@ const PLACEHOLDER_SEASONAL: SeasonalOutlook = {
     actions: ['Prepare drought-tolerant seed varieties as a backup.', 'Review seasonal advisories before committing to a planting date.'],
   },
 };
-
-export async function getSubseasonalOutlook(locationId: string): Promise<SubseasonalOutlook> {
-  return mockDelay({ ...PLACEHOLDER_SUBSEASONAL, locationId });
-}
 
 export async function getSeasonalOutlook(regionId: string): Promise<SeasonalOutlook> {
   return mockDelay({ ...PLACEHOLDER_SEASONAL, regionId });

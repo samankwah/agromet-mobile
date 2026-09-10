@@ -2,24 +2,17 @@ import React from 'react';
 import { View } from 'react-native';
 
 import type { WeeklyForecast } from '../../../shared/domain/forecast';
-import type { ForecastMapLayer } from '../../../shared/domain/forecastMap';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Card } from '../../../shared/ui/Card';
-import { MockDataTag } from '../../../shared/ui/MockDataTag';
 import { Text } from '../../../shared/ui/Text';
 import { DayRow } from './DayRow';
-import { MapPreviewCard } from './MapPreviewCard';
 
 type Props = {
   forecast: WeeklyForecast;
-  mapLayers: ForecastMapLayer[] | undefined;
-  mapStatus: 'pending' | 'error' | 'success';
-  mapError?: unknown;
-  onRetryMap: () => void;
 };
 
 /** Purpose two of the two-purpose screen: "what does the week look like." */
-export function WeekSection({ forecast, mapLayers, mapStatus, mapError, onRetryMap }: Props) {
+export function WeekSection({ forecast }: Props) {
   const theme = useTheme();
   const weekMinC = Math.min(...forecast.days.map((day) => day.tempMinC));
   const weekMaxC = Math.max(...forecast.days.map((day) => day.tempMaxC));
@@ -28,7 +21,6 @@ export function WeekSection({ forecast, mapLayers, mapStatus, mapError, onRetryM
     <View style={{ gap: theme.spacing.lg }}>
       <Card translucent style={{ gap: theme.spacing.sm }}>
         <Text variant="body">{forecast.summary}</Text>
-        <MockDataTag />
       </Card>
 
       <Card translucent style={{ padding: 0, overflow: 'hidden' }}>
@@ -44,8 +36,6 @@ export function WeekSection({ forecast, mapLayers, mapStatus, mapError, onRetryM
           </View>
         ))}
       </Card>
-
-      <MapPreviewCard layers={mapLayers} status={mapStatus} error={mapError} onRetry={onRetryMap} />
     </View>
   );
 }

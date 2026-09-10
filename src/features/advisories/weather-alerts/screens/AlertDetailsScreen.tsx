@@ -1,10 +1,15 @@
 import React, { useMemo } from 'react';
-import { View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 
-import { synthesiseAlerts } from '../../../../shared/domain/hazardAlerts';
-import type { WeatherAlert } from '../../../../shared/domain/weatherAlert';
+import { isCurrent, synthesiseAlerts } from '../../../../shared/domain/hazardAlerts';
+import {
+  alertAttribution,
+  alertUrgencyLabel,
+  type WeatherAlert,
+} from '../../../../shared/domain/weatherAlert';
 import { useHazardSummary } from '../../flood-drought/useHazards';
+import { useLocationStore } from '../../../../shared/state/locationStore';
 import { useTheme } from '../../../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../../../shared/ui/AsyncStateView';
 import { BulletList } from '../../../../shared/ui/BulletList';
@@ -27,10 +32,29 @@ export function AlertDetailsScreen({ alertId }: Props) {
   // offline from the cached snapshot, and it always shows the current reading
   // rather than whatever the band was when the row was tapped.
   const query = useHazardSummary();
-  const alert = useMemo(
-    () => synthesiseAlerts(query.data, []).find((entry) => entry.id === alertId),
-    [query.data, alertId],
-  );
+  // Scoped to the reader's own districts first, then unscoped.
+  //
+  // This used to pass `[]` unconditionally, which made `synthesiseAlerts` cover
+  // every region and name no district at all — so the place line here silently
+  // lost the district the banner had just shown.
+  //
+  // But scoping *only* to saved districts would break the other direction: a
+  // reminder saved months ago, or a link shared between neighbours, points at a
+  // region the reader may not have saved, and that alert would read "no longer
+  // active" while it was still in force. So the scoped pass supplies the
+  // district when there is one, and the unscoped pass guarantees the alert
+  // resolves either way.
+  const savedDistrictIds = useLocationStore((state) => state.savedDistrictIds);
+  const alert = useMemo(() => {
+    // Lapsed alerts are excluded here too, so a reminder that fires after the
+    // hazard has passed opens the "no longer active" state rather than a warning
+    // about weather that is over.
+    const matches = (entry: WeatherAlert) => entry.id === alertId && isCurrent(entry);
+    return (
+      synthesiseAlerts(query.data, savedDistrictIds).find(matches) ??
+      synthesiseAlerts(query.data, []).find(matches)
+    );
+  }, [query.data, savedDistrictIds, alertId]);
 
   return (
     <Screen>
@@ -51,8 +75,6 @@ export function AlertDetailsScreen({ alertId }: Props) {
 
 function AlertDetails({ alert }: { alert: WeatherAlert }) {
   const theme = useTheme();
-  const issued = new Date(alert.issuedAt);
-  const expires = new Date(alert.expiresAt);
 
   return (
     <View style={{ gap: theme.spacing.lg }}>
@@ -63,17 +85,45 @@ function AlertDetails({ alert }: { alert: WeatherAlert }) {
           {alert.district ? `${alert.district}, ` : ''}
           {alert.region} · {alert.hazardType}
         </Text>
+        {/* CAP urgency and certainty. Certainty is absent on a bulletin — a
+            forecaster's confidence is not something this app can compute — so
+            the line reads "Happening now" alone in that case. */}
+        <Text variant="body" muted>
+          {alertUrgencyLabel(alert)}
+          {alert.certainty ? ` · ${alert.certainty}` : ''}
+        </Text>
       </Card>
 
-      <Card style={{ gap: theme.spacing.xs }}>
+      {/* Stacked, not side by side. A timestamp with its relative form, and a
+          full source attribution, are both wider than a phone leaves beside a
+          label — laid out as rows they squeezed every label until it broke
+          mid-word. */}
+      <Card style={{ gap: theme.spacing.sm }}>
+        <DetailRow stacked label="Issued" value={stamp(alert.issuedAt)} />
+        <DetailRow stacked label="Expires" value={stamp(alert.expiresAt)} />
+        {/* CAP `sender`, given a row of its own beside the timings rather than
+            a muted caption at the foot of the screen. Whether a human issued
+            this or a model computed it is among the most important things on
+            the page, and it used to carry the weakest emphasis on it. */}
         <DetailRow
-          label="Issued"
-          value={`${issued.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} (${formatRelativeTime(alert.issuedAt)})`}
+          stacked
+          label={alert.provenance === 'issued' ? 'Issued by' : 'Computed by'}
+          // The full attribution, datasets and all — this row replaces the
+          // muted "Source:" caption that used to close the screen.
+          value={alert.source}
         />
-        <DetailRow
-          label="Expires"
-          value={`${expires.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} (${formatRelativeTime(alert.expiresAt)})`}
-        />
+        {alert.sourceUrl ? (
+          <Pressable
+            onPress={() => Linking.openURL(alert.sourceUrl as string)}
+            accessibilityRole="link"
+            accessibilityLabel={`Open ${alertAttribution(alert)} data source`}
+            style={{ minHeight: theme.minTouchTarget, justifyContent: 'center' }}
+          >
+            <Text variant="caption" color={theme.colors.accent}>
+              About the data behind this reading →
+            </Text>
+          </Pressable>
+        ) : null}
       </Card>
 
       {alert.evidence.length > 0 ? (
@@ -107,21 +157,39 @@ function AlertDetails({ alert }: { alert: WeatherAlert }) {
         />
       </Card>
 
-      <Card style={{ gap: theme.spacing.xs }}>
-        <Text variant="caption" muted>
-          Source: {alert.source}
-        </Text>
-      </Card>
-
       <Button label="Manage my districts" variant="outline" onPress={() => router.push('/saved-districts')} />
     </View>
   );
 }
 
 /**
+ * A timestamp and how long ago it was, on one line.
+ *
+ * No year: an alert is valid for a day at most, and `formatRelativeTime` already
+ * says "3 days ago" if a cached snapshot is older than it looks. Four characters
+ * of "2026" were the difference between this fitting a phone and not.
+ */
+function stamp(iso: string): string {
+  const at = new Date(iso).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  return `${at} · ${formatRelativeTime(iso)}`;
+}
+
+/**
  * When to be reminded about an alert: tomorrow at 07:00, pulled earlier if the
  * alert expires before then. Clamped to an hour from now at the very least, so
  * an alert expiring imminently still produces a reminder that can fire.
+ *
+ * That floor now always wins for a computed reading, whose window is ten minutes
+ * (`HAZARD_ALERT_VALIDITY_MINUTES`) — so the reminder fires about fifty minutes
+ * after the alert has come off the banner. Deliberate: a notification scheduled
+ * for eight minutes' time is one a farmer is still holding the phone for, which
+ * is no reminder at all. The alert stays reachable at `/alert/[id]`, and the
+ * screen says "no longer active" if conditions have since eased.
  */
 function reminderDueAt(expiresAt: string): Date {
   const tomorrowMorning = atTimeOfDay(new Date(Date.now() + 24 * 60 * 60 * 1000), 7);
