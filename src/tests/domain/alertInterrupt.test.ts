@@ -79,20 +79,22 @@ describe('isCurrent', () => {
 
 describe('interrupts', () => {
   /* The popup has to be rarer than the banner or it becomes something people
-     swipe away without reading. Today's live data has three regions at band
-     extreme and two at severe — popping for both tiers would interrupt a farmer
-     in Oti over a reading that has been steady for days. */
-  const CASES: [AlertSeverity, WeatherAlert['provenance'], boolean][] = [
-    ['watch', 'computed', false],
-    ['warning', 'computed', false],
-    ['emergency', 'computed', true],
-    ['watch', 'issued', true],
-    ['warning', 'issued', true],
-    ['emergency', 'issued', true],
+     swipe away without reading. A computed reading interrupts only when it is an
+     emergency AND happening now (`urgency: 'immediate'`) — a hail storm forecast
+     for tomorrow belongs on the banner, not the screen a day early. An issued
+     bulletin always interrupts, at any severity. */
+  const CASES: [AlertSeverity, WeatherAlert['provenance'], WeatherAlert['urgency'], boolean][] = [
+    ['watch', 'computed', 'immediate', false],
+    ['warning', 'computed', 'immediate', false],
+    ['emergency', 'computed', 'immediate', true],
+    ['emergency', 'computed', 'expected', false], // an emergency, but a day out
+    ['watch', 'issued', 'expected', true],
+    ['warning', 'issued', 'expected', true],
+    ['emergency', 'issued', 'immediate', true],
   ];
 
-  it.each(CASES)('a %s alert that is %s interrupts: %s', (severity, provenance, expected) => {
-    expect(interrupts(alert({ severity, provenance }))).toBe(expected);
+  it.each(CASES)('a %s alert that is %s / %s interrupts: %s', (severity, provenance, urgency, expected) => {
+    expect(interrupts(alert({ severity, provenance, urgency }))).toBe(expected);
   });
 });
 

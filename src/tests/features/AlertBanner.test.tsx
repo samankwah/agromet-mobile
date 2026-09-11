@@ -7,7 +7,8 @@ import { NetworkError } from '../../shared/api/http';
 import type { WeatherAlert } from '../../shared/domain/weatherAlert';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 
-jest.mock('expo-router', () => ({ router: { push: jest.fn(), back: jest.fn() } }));
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({ router: { push: (...args: unknown[]) => mockPush(...args), back: jest.fn() } }));
 
 // `mock`-prefixed so jest's hoisted factory is allowed to close over it.
 const mockOpenSettings = jest.fn();
@@ -27,34 +28,30 @@ function renderBanner(props: Partial<React.ComponentProps<typeof AlertBanner>> =
   return render(
     <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
       <ThemeProvider>
-        <AlertBanner
-          alerts={[]}
-          status="success"
-          onRetry={onRetry}
-          hasDistrictScope={false}
-          locationPrompt={false}
-          {...props}
-        />
+        <AlertBanner alerts={[]} status="success" onRetry={onRetry} locationPrompt={false} {...props} />
       </ThemeProvider>
     </SafeAreaProvider>,
   );
 }
 
+/** A severe-weather alert, the only kind the banner shows now. */
 function alert(overrides: Partial<WeatherAlert> = {}): WeatherAlert {
   return {
-    id: 'hazard:northern:flood',
-    headline: 'Severe flood risk in Northern',
-    region: 'Northern',
-    hazardType: 'Flood',
+    id: 'weather:kumasi:thunderstorm:2026-09-11',
+    headline: 'Thunderstorms likely this afternoon',
+    district: 'Kumasi',
+    region: 'Ashanti',
+    hazardType: 'Thunderstorm',
     severity: 'warning',
-    issuedAt: '2026-08-20T06:00:00.000Z',
-    expiresAt: '2026-08-21T06:00:00.000Z',
+    issuedAt: '2026-09-11T06:00:00.000Z',
+    expiresAt: '2026-09-11T23:59:59.000Z',
     urgency: 'expected',
-    certainty: 'possible',
+    certainty: 'likely',
     provenance: 'computed',
-    evidence: [],
-    farmerActions: ['Move livestock to higher ground now.'],
-    source: 'AgroMet hazard model (Open-Meteo, GloFAS v4)',
+    sourceUrl: 'https://open-meteo.com/',
+    evidence: ['Forecast: thunderstorms (weather code 95)'],
+    farmerActions: ['Bring livestock under cover.'],
+    source: 'AgroMet forecast (Open-Meteo)',
     ...overrides,
   };
 }
@@ -62,163 +59,89 @@ function alert(overrides: Partial<WeatherAlert> = {}): WeatherAlert {
 beforeEach(() => {
   onRetry.mockClear();
   mockOpenSettings.mockClear();
+  mockPush.mockClear();
 });
 
 describe('AlertBanner', () => {
-  /* Alerts are the one thing on Home with no fallback — hazardsService turns an
-     empty response into an error on purpose, so a stale snapshot is never
-     overwritten with nothing. That is right. What was wrong was showing it as a
-     full-width "Couldn't load this" panel above a screen whose weather had
-     loaded fine. */
   it('reports a failure in one line, not a panel', () => {
     renderBanner({ status: 'error', error: new NetworkError('Could not reach the AgroMet server.') });
 
     expect(screen.getByText(/Alerts need a connection to the AgroMet server/)).toBeTruthy();
-    // The loud AsyncStateView panel must not appear here.
     expect(screen.queryByText("Couldn't load this")).toBeNull();
   });
 
   it('says the rest of the page is still current, because it is', () => {
-    // The weather beneath comes from Open-Meteo directly and survives the
-    // AgroMet backend being down. Saying so is the difference between "one
-    // section is missing" and "the app is broken".
     renderBanner({ status: 'error', error: new NetworkError('nope') });
-
     expect(screen.getByText(/The weather below is up to date/)).toBeTruthy();
   });
 
   it('still offers a way back', () => {
     renderBanner({ status: 'error', error: new NetworkError('nope') });
-
     fireEvent.press(screen.getByLabelText('Retry loading alerts'));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
-  it('never claims there is nothing to report', () => {
-    // The calm "No active alerts" card is gone from every surface. A computed
-    // reading stands for ten minutes against a six-hourly model, so that card
-    // was what both Home and Advisories showed nearly all the time — a
-    // permanent, prominent report of no news.
-    renderBanner({ status: 'success', alerts: [], hasDistrictScope: true });
-    expect(screen.queryByText(/No active alerts/)).toBeNull();
-  });
-
-  /* No test rendered a populated card until now, which is exactly why the
-     unguarded `${alert.district}` below went unnoticed: these readings are
-     regional, so most alerts have no district and the card read "undefined,
-     Northern" to every farmer who had not saved one. */
-  it('names the region alone when the reading is not pinned to a district', () => {
+  it('shows the severe-weather alert and names the town it is for', () => {
     renderBanner({ status: 'success', alerts: [alert()] });
-
-    expect(screen.getByText('Northern')).toBeTruthy();
-    expect(screen.queryByText(/undefined/)).toBeNull();
+    expect(screen.getByText('Thunderstorms likely this afternoon')).toBeTruthy();
+    expect(screen.getByText('Kumasi, Ashanti')).toBeTruthy();
   });
 
-  it('names both when a saved district pins the reading', () => {
-    renderBanner({ status: 'success', alerts: [alert({ district: 'Tamale Metropolitan' })], hasDistrictScope: true });
-
-    expect(screen.getByText('Tamale Metropolitan, Northern')).toBeTruthy();
-  });
-
-  /* The CAP triple, on the card rather than one tap away. A model index and a
-     forecaster's bulletin call for different responses, and telling them apart
-     must not require opening anything. */
-  it('says on the card whether a model computed this or a forecaster issued it', () => {
+  it('opens that day in the forecast when tapped, not a separate alert screen', () => {
     renderBanner({ status: 'success', alerts: [alert()] });
-    expect(screen.getByText('Expected · possible · AgroMet hazard model')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText(/Thunderstorms likely this afternoon/));
+    expect(mockPush).toHaveBeenCalledWith('/forecast-day/2026-09-11');
+  });
 
-    screen.unmount();
-
+  it('renders the highest-severity alert when several are active', () => {
     renderBanner({
       status: 'success',
       alerts: [
-        alert({
-          headline: 'Bagre spillage under way',
-          severity: 'emergency',
-          urgency: 'immediate',
-          certainty: undefined,
-          provenance: 'issued',
-          source: 'Ghana Meteorological Agency (GMet)',
-        }),
+        alert({ severity: 'emergency', headline: 'Damaging winds today', hazardType: 'Strong wind' }),
+        alert({ headline: 'Heavy rain tomorrow', hazardType: 'Heavy rain' }),
       ],
     });
-    expect(screen.getByText('Happening now · Ghana Meteorological Agency (GMet)')).toBeTruthy();
-    expect(screen.queryByText(/AgroMet hazard model/)).toBeNull();
+    expect(screen.getByText('Damaging winds today')).toBeTruthy();
+    expect(screen.queryByText('Heavy rain tomorrow')).toBeNull();
   });
 
-  it('carries the same provenance into the accessibility label', () => {
-    // A screen-reader user gets the card as one string, so the distinction has
-    // to survive into it — not just into the visible caption.
-    renderBanner({ status: 'success', alerts: [alert()] });
-
-    const label = screen.getByLabelText(/Severe flood risk in Northern/).props.accessibilityLabel;
-    expect(label).toContain('AgroMet hazard model');
-    expect(label).not.toContain('undefined');
-  });
-
-  /* Nothing to raise, so nothing rendered. `alertBannerHasContent` is the
-     shared predicate AdvisoriesScreen also reads, so its heading and this card
-     can never disagree about whether the section exists. */
   describe('when there is nothing to raise', () => {
-    it('renders nothing at all', () => {
-      renderBanner({ status: 'success', alerts: [], hasDistrictScope: true });
+    it('renders nothing at all on a calm day', () => {
+      renderBanner({ status: 'success', alerts: [] });
       expect(alertBannerHasContent({ status: 'success', alerts: [], locationPrompt: false })).toBe(false);
-      expect(screen.queryByText(/alert/i)).toBeNull();
+      expect(screen.queryByText(/likely|rain|heat|wind/i)).toBeNull();
     });
 
-    it('renders nothing while the alerts are still loading', () => {
-      // The skeleton goes too. A placeholder promises content, and here the
-      // content usually never comes — a card-shaped shimmer that collapses a
-      // second later is a worse flicker than the card it stood in for.
-      renderBanner({ status: 'pending', alerts: [], hasDistrictScope: true });
-      expect(screen.queryByText(/alert/i)).toBeNull();
+    it('renders nothing while the forecast is still loading', () => {
+      renderBanner({ status: 'pending', alerts: [] });
       expect(screen.queryByLabelText('Loading')).toBeNull();
     });
 
-    it('renders nothing while location detection is still running', () => {
-      // No saved district and no detected one yet, but detection has not
-      // finished — so there is nothing to say, and nothing shows. No flash of a
-      // prompt that is about to be answered.
-      renderBanner({ status: 'success', alerts: [], hasDistrictScope: false, locationPrompt: false });
-      expect(screen.queryByText(/Alerts for where you are/)).toBeNull();
-      expect(alertBannerHasContent({ status: 'success', alerts: [], locationPrompt: false })).toBe(false);
-    });
-
-    it('still shows an alert when there is one', () => {
-      renderBanner({ status: 'success', alerts: [alert()], hasDistrictScope: true });
-      expect(screen.getByText('Severe flood risk in Northern')).toBeTruthy();
-    });
-
     it('still reports a failure, because not knowing is not the same as nothing', () => {
-      renderBanner({ status: 'error', error: new NetworkError('nope'), hasDistrictScope: true });
+      renderBanner({ status: 'error', error: new NetworkError('nope') });
       expect(screen.getByText(/Alerts need a connection/)).toBeTruthy();
       expect(alertBannerHasContent({ status: 'error', alerts: [], locationPrompt: false })).toBe(true);
     });
   });
 
-  /* The one empty state left. Alerts follow the farmer's location; this shows
-     only once detection has tried and come up empty. */
-  describe('when alerts are not localised', () => {
-    it('invites the farmer to choose districts by hand when no fix was found', () => {
-      renderBanner({ status: 'success', alerts: [], locationPrompt: true, locationPermission: 'granted' });
-
-      expect(screen.getByText(/Alerts for where you are/)).toBeTruthy();
-      expect(screen.getByText(/Choose districts manually/)).toBeTruthy();
-      expect(screen.queryByText(/No active alerts/)).toBeNull();
-      expect(alertBannerHasContent({ status: 'success', alerts: [], locationPrompt: true })).toBe(true);
-    });
-
-    it('offers system settings when the permission is denied', () => {
+  describe('when the banner is stuck on the default town', () => {
+    it('offers to turn location on, and gives way to a real alert', () => {
       renderBanner({ status: 'success', alerts: [], locationPrompt: true, locationPermission: 'denied' });
+      expect(screen.getByText(/Weather alerts are for Accra/)).toBeTruthy();
 
       fireEvent.press(screen.getByText(/Open settings/));
       expect(mockOpenSettings).toHaveBeenCalledTimes(1);
     });
 
-    it('gives way to a real alert the moment one arrives', () => {
+    it('shows the alert, not the prompt, once one exists', () => {
       renderBanner({ status: 'success', alerts: [alert()], locationPrompt: true });
-      expect(screen.getByText('Severe flood risk in Northern')).toBeTruthy();
-      expect(screen.queryByText(/Alerts for where you are/)).toBeNull();
+      expect(screen.getByText('Thunderstorms likely this afternoon')).toBeTruthy();
+      expect(screen.queryByText(/Weather alerts are for Accra/)).toBeNull();
+    });
+
+    it('does not show the prompt while location is still resolving', () => {
+      renderBanner({ status: 'success', alerts: [], locationPrompt: false });
+      expect(screen.queryByText(/Weather alerts are for Accra/)).toBeNull();
     });
   });
 });

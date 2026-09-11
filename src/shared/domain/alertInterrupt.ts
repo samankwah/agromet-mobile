@@ -36,13 +36,15 @@ export type AlertAck = {
  *
  * So: an **issued bulletin always interrupts** — a forecaster decided it
  * mattered, at whatever severity, and that is the one judgement the app does not
- * override. A **computed reading interrupts only at `emergency`** (band
- * `extreme`), which the band's own description defines as "among the most
- * extreme conditions on record for the time of year". Everything else has the
+ * override. A **computed reading interrupts only at `emergency` and only when
+ * it is happening now** (`urgency: 'immediate'`). A severe-weather alert for
+ * *tomorrow* can be an emergency — a hail storm in the forecast — but it should
+ * sit on the banner, not take the screen a day early. Everything else has the
  * banner.
  */
 export function interrupts(alert: WeatherAlert): boolean {
-  return alert.provenance === 'issued' || alert.severity === 'emergency';
+  if (alert.provenance === 'issued') return true;
+  return alert.severity === 'emergency' && alert.urgency === 'immediate';
 }
 
 /**

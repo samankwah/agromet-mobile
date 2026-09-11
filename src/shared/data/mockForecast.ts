@@ -51,6 +51,7 @@ function buildWeeklyForecast(locationId: string): WeeklyForecast {
     locationId,
     generatedAt: new Date().toISOString(),
     days,
+    weatherAlerts: [],
     summary:
       rainyDays >= 3
         ? 'A wetter-than-usual week ahead, with rain likely on more than half the days.'

@@ -86,10 +86,19 @@ export type WeatherAlert = {
  */
 export const COMPUTED_ALERT_ATTRIBUTION = 'AgroMet hazard model';
 
-/** Who is answerable for the alert, short enough for a caption. A bulletin
- * credits its issuer; a computed reading credits the model, never GMet. */
+/**
+ * Who is answerable for the alert, short enough for a caption.
+ *
+ * A bulletin credits its issuer verbatim ("Ghana Meteorological Agency
+ * (GMet)"). A computed reading credits its own model, never GMet — the flood
+ * index says "AgroMet hazard model", the severe-weather forecast says "AgroMet
+ * forecast". Both live in `alert.source` with a data-source parenthetical
+ * ("... (Open-Meteo, GloFAS v4)") that is too long for a caption, so it is
+ * trimmed here.
+ */
 export function alertAttribution(alert: WeatherAlert): string {
-  return alert.provenance === 'issued' ? alert.source : COMPUTED_ALERT_ATTRIBUTION;
+  if (alert.provenance === 'issued') return alert.source;
+  return alert.source.replace(/\s*\([^)]*\)\s*$/, '');
 }
 
 /** CAP `urgency`, in the words a farmer reads rather than CAP's vocabulary. */

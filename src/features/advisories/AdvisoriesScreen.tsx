@@ -1,22 +1,22 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { View } from 'react-native';
 import { Archive, Drop, Egg, Leaf } from 'phosphor-react-native';
 
-import { effectiveDistrictIds, useLocationStore } from '../../shared/state/locationStore';
+import { useLocationStore } from '../../shared/state/locationStore';
 import { HubGrid, HubTile } from '../../shared/ui/HubGrid';
 import { AppHeader } from '../../shared/ui/AppHeader';
 import { Screen } from '../../shared/ui/Screen';
 import { Text } from '../../shared/ui/Text';
 import { AlertBanner, alertBannerHasContent } from './weather-alerts/components/AlertBanner';
-import { useAlerts } from './weather-alerts/useAlerts';
+import { useWeatherAlerts } from './weather-alerts/useWeatherAlerts';
 import { useDetectedDistrict } from './weather-alerts/useDetectedDistrict';
 import { useHazardSummary } from './flood-drought/useHazards';
 
 /**
- * Composed screen. Weather Alerts is live inline, from the flood/drought index;
- * everything else is a tile in the grid below, routing out to its own screen —
- * the weekly crop and poultry advisories, the flood and drought monitor, and
- * the archive.
+ * Composed screen. Weather Alerts is live inline, the day's severe weather for
+ * the reader's town; everything else is a tile in the grid below, routing out to
+ * its own screen — the weekly crop and poultry advisories, the flood and drought
+ * monitor (where the flood/drought index now lives in full), and the archive.
  *
  * Every tile here goes somewhere. The last two were placeholders holding their
  * place in the information architecture until the features existed, which they
@@ -28,25 +28,17 @@ import { useHazardSummary } from './flood-drought/useHazards';
  * data the reader could not have guessed.
  */
 export function AdvisoriesScreen() {
-  const savedDistrictIds = useLocationStore((state) => state.savedDistrictIds);
-  const detectedDistrictId = useLocationStore((state) => state.detectedDistrictId);
-  const locationPermission = useLocationStore((state) => state.locationPermission);
-  const locationResolved = useLocationStore((state) => state.locationResolved);
+  const locationId = useLocationStore((state) => state.selectedLocationId);
   const hasHydrated = useLocationStore((state) => state.hasHydrated);
 
-  // Ask for location and resolve a district the first time Advisories mounts
-  // with nothing saved. No-ops on every later mount (and on Home's copy).
+  // Ask for location and pick the nearest town the first time Advisories mounts
+  // with nothing chosen. No-ops on every later mount (and on Home's copy).
   useDetectedDistrict();
 
-  const districtIds = useMemo(
-    () => effectiveDistrictIds(savedDistrictIds, detectedDistrictId),
-    [savedDistrictIds, detectedDistrictId],
-  );
-  const locationPrompt = hasHydrated && locationResolved && districtIds.length === 0;
-
-  const alerts = useAlerts(districtIds, hasHydrated);
-  // Same query key as the alerts banner and the monitor screen, so TanStack
-  // serves all three from one request.
+  // Shares the `['weeklyForecast', locationId]` query with Home and the
+  // Forecasts tab, so this section costs no extra request.
+  const alerts = useWeatherAlerts(locationId, hasHydrated);
+  // The Flood & drought tile's live figure.
   const hazards = useHazardSummary();
 
   return (
@@ -61,7 +53,7 @@ export function AdvisoriesScreen() {
       {alertBannerHasContent({
         status: alerts.status,
         alerts: alerts.alerts,
-        locationPrompt,
+        locationPrompt: alerts.locationPrompt,
       }) ? (
         <View>
           <Text variant="h3" style={{ marginBottom: 8 }}>
@@ -72,11 +64,8 @@ export function AdvisoriesScreen() {
             status={alerts.status}
             error={alerts.error}
             onRetry={alerts.refetch}
-            hasDistrictScope={districtIds.length > 0}
-            locationPrompt={locationPrompt}
-            locationPermission={locationPermission}
-            usingCachedFallback={alerts.usingCachedFallback}
-            cachedAt={alerts.cachedAt}
+            locationPrompt={alerts.locationPrompt}
+            locationPermission={alerts.locationPermission}
           />
         </View>
       ) : null}

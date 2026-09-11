@@ -2,6 +2,7 @@ import { HOME_LOCATIONS } from '../data/mockWeather';
 import type { DailyForecast, HourlyForecast, WeeklyForecast } from '../domain/forecast';
 import type { ForecastMapLayer } from '../domain/forecastMap';
 import type { SeasonalOutlook } from '../domain/seasonalOutlook';
+import { synthesiseWeatherAlerts } from '../domain/weatherHazards';
 import { mockDelay, ServiceError } from './mockDelay';
 import { fetchWeatherBundle, toHourlyForecasts, toWeeklyForecast } from './openMeteo';
 import { MOCK_MAP_LAYERS } from '../data/mockMapLayers';
@@ -36,6 +37,13 @@ async function getWeekly(locationId: string): Promise<WeeklyForecast> {
   if (week.days.length === 0) {
     throw new ServiceError(`No forecast available for location "${locationId}"`);
   }
+  // Derived from the same bundle, so the banner on Home and Advisories reads
+  // today's severe weather at no extra request. See domain/weatherHazards.ts.
+  week.weatherAlerts = synthesiseWeatherAlerts(bundle, {
+    locationId,
+    locationName: place.name,
+    region: place.region,
+  });
   return week;
 }
 
@@ -89,16 +97,6 @@ export async function getHourlyForecast(locationId: string): Promise<HourlyForec
     throw new ServiceError(`No hourly forecast available for location "${locationId}"`);
   }
   return upcoming.slice(0, 6);
-}
-
-/**
- * Home's stable dependency — kept as a separate named export from
- * `getWeeklyForecast` even though both read the same bundle today, so
- * Home's contract doesn't shift if a future Forecast Centre needs a
- * differently-shaped "weekly" response (e.g. more days, extra fields).
- */
-export async function getFeaturedWeeklyForecast(locationId: string): Promise<WeeklyForecast> {
-  return getWeekly(locationId);
 }
 
 // --- Tier B: signature + placeholder only, no real source yet ---

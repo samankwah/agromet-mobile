@@ -27,6 +27,21 @@ export type FixtureOptions = {
   overcastDay?: number;
   /** Day index to give sub-air apparent temperatures, as in Harmattan. */
   harmattanDay?: number;
+  /**
+   * Per-day overrides for the severe-weather fields, keyed by day index. Used by
+   * `weatherHazards` tests to trip one hazard at a time without hand-building a
+   * whole bundle.
+   */
+  severe?: Record<
+    number,
+    Partial<{
+      weatherCode: number;
+      rainMm: number;
+      rainProbability: number;
+      apparentMaxC: number;
+      windGustKph: number;
+    }>
+  >;
 };
 
 function isoDate(offsetDays: number): string {
@@ -43,7 +58,7 @@ function localStamp(date: string, hour: number): string {
 }
 
 export function buildOpenMeteoFixture(options: FixtureOptions = {}): Record<string, unknown> {
-  const { overcastDay = 4, harmattanDay = 5 } = options;
+  const { overcastDay = 4, harmattanDay = 5, severe = {} } = options;
 
   const dates = Array.from({ length: 7 }, (_, index) => isoDate(index));
 
@@ -53,6 +68,19 @@ export function buildOpenMeteoFixture(options: FixtureOptions = {}): Record<stri
   const dailyRainMm = [0, 0.2, 1.4, 12.6, 0.4, 0, 18.2];
   const dailyPop = [5, 20, 45, 85, 30, 5, 95];
   const dailyWind = [14, 16, 13, 21, 12, 26, 24];
+  // Calm by default: gusts a little above mean wind, feels-like a touch above
+  // air temp. A test that wants a hazard raises one of these via `severe`.
+  const dailyGust = dailyWind.map((w) => w + 8);
+  const dailyApparentMax = dailyMax.map((t) => t + 2);
+
+  Object.entries(severe).forEach(([dayKey, over]) => {
+    const day = Number(dayKey);
+    if (over.weatherCode !== undefined) dailyCodes[day] = over.weatherCode;
+    if (over.rainMm !== undefined) dailyRainMm[day] = over.rainMm;
+    if (over.rainProbability !== undefined) dailyPop[day] = over.rainProbability;
+    if (over.apparentMaxC !== undefined) dailyApparentMax[day] = over.apparentMaxC;
+    if (over.windGustKph !== undefined) dailyGust[day] = over.windGustKph;
+  });
 
   const hourlyTime: string[] = [];
   const temperature: number[] = [];
@@ -63,6 +91,7 @@ export function buildOpenMeteoFixture(options: FixtureOptions = {}): Record<stri
   const codes: number[] = [];
   const wind: number[] = [];
   const uv: number[] = [];
+  const cape: number[] = [];
 
   dates.forEach((date, dayIndex) => {
     const min = dailyMin[dayIndex];
@@ -90,10 +119,14 @@ export function buildOpenMeteoFixture(options: FixtureOptions = {}): Record<stri
       precipitation.push(wet ? Math.round((dailyRainMm[dayIndex] / 5) * 10) / 10 : 0);
       pop.push(wet ? dailyPop[dayIndex] : Math.round(dailyPop[dayIndex] * 0.4));
 
+      const stormDay = dailyCodes[dayIndex] >= 95;
+      // A storm day gets an afternoon convective window even when the daily rain
+      // total is low, so the hourly series can place it ("this afternoon").
+      const stormHour = stormDay && hour >= 14 && hour <= 17;
       if (dayIndex === overcastDay) {
         codes.push(3); // A genuinely uniform day: one condition, all 24 hours.
-      } else if (wet) {
-        codes.push(dailyCodes[dayIndex] >= 95 ? 95 : 61);
+      } else if (wet || stormHour) {
+        codes.push(stormDay ? 95 : 61);
       } else if (hour === 11 && dayIndex === 2) {
         // Thunder glyph on an hour with no measurable rain — normal upstream,
         // and the exact case the old suite forbade.
@@ -101,6 +134,9 @@ export function buildOpenMeteoFixture(options: FixtureOptions = {}): Record<stri
       } else {
         codes.push(dailyCodes[dayIndex] === 0 ? 0 : 2);
       }
+
+      // Convective energy peaks with the afternoon storm; near zero otherwise.
+      cape.push(stormHour ? 1800 : 120);
     }
   });
 
@@ -122,11 +158,13 @@ export function buildOpenMeteoFixture(options: FixtureOptions = {}): Record<stri
       weather_code: dailyCodes,
       temperature_2m_max: dailyMax,
       temperature_2m_min: dailyMin,
+      apparent_temperature_max: dailyApparentMax,
       precipitation_sum: dailyRainMm,
       precipitation_probability_max: dailyPop,
       sunrise: dates.map((date) => localStamp(date, 6)),
       sunset: dates.map((date) => localStamp(date, 18)),
       wind_speed_10m_max: dailyWind,
+      wind_gusts_10m_max: dailyGust,
     },
     hourly: {
       time: hourlyTime,
@@ -138,6 +176,7 @@ export function buildOpenMeteoFixture(options: FixtureOptions = {}): Record<stri
       weather_code: codes,
       wind_speed_10m: wind,
       uv_index: uv,
+      cape,
     },
   };
 }

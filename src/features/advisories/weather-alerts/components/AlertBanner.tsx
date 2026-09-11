@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { compareSeverityDesc, getSeverityMeta } from '../../../../shared/domain/alertSeverity';
 import { alertProvenanceLine, type WeatherAlert } from '../../../../shared/domain/weatherAlert';
-import { formatRelativeTime } from '../../../../shared/utils/formatRelativeTime';
 import { openLocationSettings, type LocationPermissionState } from '../../../../shared/location/locationClient';
 import { useTheme } from '../../../../shared/theme/ThemeProvider';
 import { Card } from '../../../../shared/ui/Card';
@@ -17,15 +16,10 @@ type Props = {
   status: 'pending' | 'error' | 'success';
   error?: unknown;
   onRetry: () => void;
-  /** True when alerts are scoped to something — a saved district or one that
-   * geolocation resolved. */
-  hasDistrictScope: boolean;
-  /** True when there is no scope and location detection has finished trying,
-   * so the card should invite the farmer to turn location on or pick manually. */
+  /** True when the banner is stuck on the default town because location was
+   * refused, so it should offer to turn location on. */
   locationPrompt: boolean;
   locationPermission?: LocationPermissionState;
-  usingCachedFallback?: boolean;
-  cachedAt?: string;
 };
 
 function highestSeverityAlert(alerts: WeatherAlert[]): WeatherAlert {
@@ -60,104 +54,61 @@ export function alertBannerHasContent({
 }
 
 /**
- * The highest-severity active alert, or nothing.
+ * The highest-severity severe-weather alert for the reader's town, or nothing.
  *
- * **There is no "no active alerts" state any more, on any surface.** A computed
- * reading stands for ten minutes (`HAZARD_ALERT_VALIDITY_MINUTES`) against a
- * model that refreshes every six hours, so that card was what both Home and
- * Advisories displayed almost all of the time: a permanent, prominent report
- * that there was no news. An alert announces itself when there is one — through
- * this card and through `AlertPopup` — and silence needs no announcement.
+ * **There is no "all clear" state.** The banner is empty on a calm day and
+ * shows a card only when a storm, downpour, dangerous heat or damaging wind is
+ * in the next day's forecast. It replaced the flood/drought index here, which
+ * held several regions at "severe" every day of the rains and so was permanent
+ * furniture (that index still lives, in full, on the Flood & Drought screen).
  *
- * The skeleton went with it. A placeholder promises content, and here the
- * content usually never comes, so a card-shaped shimmer collapsing a second
- * later is a worse flicker than the card it stood in for.
- *
- * The error case is handled here rather than by `AsyncStateView`, which is the
- * house pattern everywhere else. `AsyncStateView` swaps its whole region for a
- * "Couldn't load this" panel, and on Home that panel lands *above* a screen
- * whose weather, carousel and forecast have all loaded fine — implying the app
- * is down when only one section is. In districts where the connection drops
- * routinely, that is the first thing a farmer sees on a bad morning.
- *
- * So a failure degrades to one muted line instead. Not knowing is not the same
- * as nothing, which is why that line survives when the calm state did not. The
- * loud panel is still right on FloodDroughtScreen, where hazards are the whole
- * page and an error is the correct headline.
- *
- * Deliberately no mock fallback: inventing a flood warning is far worse than
- * saying nothing. hazardsService's own docblock argues the same.
+ * The error case is handled here rather than by `AsyncStateView`: that swaps the
+ * whole region for a "Couldn't load this" panel, and on Home it would land above
+ * a screen whose weather and forecast loaded fine, implying the app is down when
+ * one section is. So a failure degrades to one muted line instead.
  */
-export function AlertBanner({
-  alerts,
-  status,
-  error,
-  onRetry,
-  locationPrompt,
-  locationPermission,
-  usingCachedFallback,
-  cachedAt,
-}: Props) {
+export function AlertBanner({ alerts, status, error, onRetry, locationPrompt, locationPermission }: Props) {
   if (status === 'error') {
     return <AlertsUnavailable onRetry={onRetry} />;
   }
 
   if (!alertBannerHasContent({ status, alerts, locationPrompt })) return null;
 
-  // Alerts are not localised yet and detection has finished trying. Rendered
-  // outside `AsyncStateView` on purpose: it describes the reader's own settings,
-  // not the state of the alerts query, so it should not wait on a fetch to say
-  // something already known.
   if (alerts.length === 0) return <LocationPrompt permission={locationPermission} />;
 
-  return <AlertBannerCard alert={highestSeverityAlert(alerts)} usingCachedFallback={usingCachedFallback} cachedAt={cachedAt} />;
+  return <AlertBannerCard alert={highestSeverityAlert(alerts)} />;
 }
 
 /**
- * The one empty state left: alerts are not tied to anywhere yet.
- *
- * The app tries to place the farmer from their location on its own; this shows
- * when that could not happen — permission refused, or no fix. It leads with
- * turning location on (the path that needs no typing) and keeps the manual
- * district picker as the second option.
+ * Shown only when the banner is stuck on the default town (Accra) because
+ * location was refused and the farmer has not picked a town by hand. Everyone
+ * else gets the alert or nothing.
  */
 function LocationPrompt({ permission }: { permission?: LocationPermissionState }) {
   const theme = useTheme();
-  const denied = permission === 'denied';
 
   return (
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
         <Ionicons name="location-outline" size={20} color={theme.colors.accent} />
         <Text variant="bodyStrong" style={{ flex: 1 }}>
-          Alerts for where you are
+          Weather alerts are for Accra
         </Text>
       </View>
       <Text variant="body" muted style={{ marginTop: theme.spacing.xs }}>
-        {denied
-          ? 'Turn on location and AgroMet will send alerts for your area.'
-          : 'AgroMet could not find your area. Turn on location, or choose your districts by hand.'}
+        Turn on location for alerts where you are, or tap a town above to choose one.
       </Text>
-      {denied ? (
+      {permission === 'denied' ? (
         <Pressable
           onPress={openLocationSettings}
           accessibilityRole="button"
           style={{ marginTop: theme.spacing.sm, minHeight: theme.minTouchTarget, justifyContent: 'center' }}
         >
           <Text variant="body" color={theme.colors.accent}>
-            Open settings →
+            Open settings
           </Text>
         </Pressable>
       ) : null}
-      <Pressable
-        onPress={() => router.push('/saved-districts')}
-        accessibilityRole="button"
-        style={{ marginTop: theme.spacing.xs, minHeight: theme.minTouchTarget, justifyContent: 'center' }}
-      >
-        <Text variant="body" color={theme.colors.accent}>
-          Choose districts manually →
-        </Text>
-      </Pressable>
     </Card>
   );
 }
@@ -192,28 +143,23 @@ function AlertsUnavailable({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-function AlertBannerCard({
-  alert,
-  usingCachedFallback,
-  cachedAt,
-}: {
-  alert: WeatherAlert;
-  usingCachedFallback?: boolean;
-  cachedAt?: string;
-}) {
+/** The day this alert is for, from its id (`weather:<town>:<hazard>:<date>`).
+ * The banner opens that day's detail rather than a separate alert screen. */
+function alertDate(alert: WeatherAlert): string {
+  return alert.id.split(':')[3] ?? alert.issuedAt.slice(0, 10);
+}
+
+function AlertBannerCard({ alert }: { alert: WeatherAlert }) {
   const theme = useTheme();
   const meta = getSeverityMeta(alert.severity);
   const color = theme.severityColors[meta.colorToken];
-  // These readings are regional; a district is named only when one of the
-  // reader's saved districts pins it. Interpolating it unguarded rendered
-  // "undefined, Northern" — visibly, and in the accessibility label.
   const place = alert.district ? `${alert.district}, ${alert.region}` : alert.region;
 
   return (
     <Pressable
-      onPress={() => router.push(`/alert/${alert.id}`)}
+      onPress={() => router.push(`/forecast-day/${alertDate(alert)}`)}
       accessibilityRole="button"
-      accessibilityLabel={`${meta.a11yLabel}. ${alert.headline}, ${place}. ${alertProvenanceLine(alert)}. View details.`}
+      accessibilityLabel={`${meta.a11yLabel}. ${alert.headline}, ${place}. ${alertProvenanceLine(alert)}. See the forecast.`}
     >
       <Card raised style={{ borderLeftWidth: 4, borderLeftColor: color, gap: theme.spacing.xs }}>
         <SeverityBadge severity={alert.severity} />
@@ -223,19 +169,9 @@ function AlertBannerCard({
         <Text variant="body" muted numberOfLines={1}>
           {place}
         </Text>
-        {/* CAP's urgency, certainty and sender, on the card rather than one tap
-            away: "Expected · possible · AgroMet hazard model" and "Happening
-            now · Ghana Meteorological Agency (GMet)" call for different
-            responses, and a reader should not have to open anything to tell a
-            model index from a forecaster's bulletin. */}
         <Text variant="caption" muted numberOfLines={1}>
           {alertProvenanceLine(alert)}
         </Text>
-        {usingCachedFallback ? (
-          <Text variant="caption" muted>
-            Showing alerts saved {cachedAt ? formatRelativeTime(cachedAt) : 'earlier'}
-          </Text>
-        ) : null}
       </Card>
     </Pressable>
   );

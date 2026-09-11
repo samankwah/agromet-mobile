@@ -1,5 +1,5 @@
 import { getHourlyForecast, getSeasonalOutlook, getWeeklyForecast } from '../../shared/api/forecastService';
-import { stubWeatherFetch } from '../fixtures/openMeteo';
+import { buildOpenMeteoFixture, stubWeatherFetch } from '../fixtures/openMeteo';
 
 // Open-Meteo, stubbed. Without this the suite makes a live request per test —
 // slow, flaky, and dependent on someone else's uptime.
@@ -36,6 +36,19 @@ describe('forecastService', () => {
     for (const day of forecast.days) {
       expect(day.farmerInterpretation.length).toBeGreaterThan(0);
     }
+  });
+
+  it('getWeeklyForecast carries no severe-weather alert on a calm forecast', async () => {
+    const forecast = await getWeeklyForecast('accra');
+    expect(forecast.weatherAlerts).toEqual([]);
+  });
+
+  it('getWeeklyForecast surfaces a severe-weather alert when the forecast has one', async () => {
+    stubWeatherFetch(buildOpenMeteoFixture({ severe: { 0: { apparentMaxC: 44 } } }));
+    const forecast = await getWeeklyForecast('accra');
+    expect(forecast.weatherAlerts).toHaveLength(1);
+    expect(forecast.weatherAlerts[0].hazardType).toBe('Extreme heat');
+    expect(forecast.weatherAlerts[0].district).toBe('Accra');
   });
 
   it('getWeeklyForecast reports humidity per day, not a zero it never measured', async () => {

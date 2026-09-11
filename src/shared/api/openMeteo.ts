@@ -24,9 +24,9 @@ const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
  * the proxied one. */
 const CURRENT_FIELDS = 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m';
 const DAILY_FIELDS =
-  'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,sunrise,sunset,wind_speed_10m_max';
+  'weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,precipitation_sum,precipitation_probability_max,sunrise,sunset,wind_speed_10m_max,wind_gusts_10m_max';
 const HOURLY_FIELDS =
-  'temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,uv_index';
+  'temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,uv_index,cape';
 
 const FORECAST_DAYS = 7;
 
@@ -299,6 +299,9 @@ export function toWeeklyForecast(bundle: OpenMeteoBundle, locationId: string): W
     days,
     summary: narrative.summary,
     farmerActionCard: narrative.actionCard,
+    // Filled by `forecastService.getWeekly`, which has the bundle and the place.
+    // Left empty here so the mapper stays a pure shape transform.
+    weatherAlerts: [],
   };
 }
 
