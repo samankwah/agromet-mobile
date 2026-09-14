@@ -1,10 +1,10 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { SubseasonalSection } from '../../features/forecasts/components/SubseasonalSection';
-import { queryClient } from '../../shared/api/queryClient';
+import { createTestQueryClient } from '../testQueryClient';
 import type { SubseasonalCell, SubseasonalOutlookSet } from '../../shared/domain/subseasonalOutlook';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 
@@ -13,6 +13,27 @@ const TEST_SAFE_AREA_METRICS = {
   frame: { x: 0, y: 0, width: 360, height: 800 },
   insets: { top: 0, left: 0, right: 0, bottom: 0 },
 };
+
+/**
+ * A client of its own, with retries off, and a rejecting fetch: selecting a
+ * place in these tests fires SelectionDetail's own day-by-day series query
+ * (`useQuery(['subseasonalSeries', ...])`), which is real network on the
+ * shared app client — see HomeScreen.test.tsx for why that hangs the worker.
+ * None of these tests assert on that chart, so a fast rejection is enough.
+ */
+let client: QueryClient;
+
+beforeEach(() => {
+  client = createTestQueryClient();
+  globalThis.fetch = jest.fn(() =>
+    Promise.reject(new TypeError('Network request failed')),
+  ) as unknown as typeof fetch;
+});
+
+afterEach(() => {
+  client.clear();
+  jest.restoreAllMocks();
+});
 
 function cell(withProbabilities: boolean): SubseasonalCell {
   const probabilities = { below: 0.1, normal: 0.2, above: 0.7 };
@@ -40,12 +61,26 @@ function set(withProbabilities: boolean): SubseasonalOutlookSet {
   };
 }
 
-function renderSection(withProbabilities: boolean) {
+type RenderOverrides = {
+  outlookStatus?: 'pending' | 'error' | 'success';
+  outlookError?: unknown;
+  onRetryOutlook?: () => void;
+};
+
+function renderSection(withProbabilities: boolean, overrides: RenderOverrides = {}) {
   return render(
     <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
       <ThemeProvider>
-        <QueryClientProvider client={queryClient}>
-          <SubseasonalSection outlook={undefined} set={set(withProbabilities)} status="success" onRetry={() => {}} />
+        <QueryClientProvider client={client}>
+          <SubseasonalSection
+            outlook={undefined}
+            set={set(withProbabilities)}
+            status="success"
+            onRetry={() => {}}
+            outlookStatus={overrides.outlookStatus ?? 'success'}
+            outlookError={overrides.outlookError}
+            onRetryOutlook={overrides.onRetryOutlook ?? (() => {})}
+          />
         </QueryClientProvider>
       </ThemeProvider>
     </SafeAreaProvider>,
@@ -55,8 +90,8 @@ function renderSection(withProbabilities: boolean) {
 /** Render with the controls drawer open, which is where the controls live. It
  * starts closed so the map is unobstructed, so anything testing a control has
  * to open it first. */
-function renderWithControls(withProbabilities: boolean) {
-  const view = renderSection(withProbabilities);
+function renderWithControls(withProbabilities: boolean, overrides: RenderOverrides = {}) {
+  const view = renderSection(withProbabilities, overrides);
   fireEvent.press(view.getByLabelText('Expand map controls'));
   return view;
 }
@@ -130,26 +165,29 @@ describe('the empty probability view', () => {
  */
 describe('the controls drawer', () => {
   it('starts closed, leaving the map unobstructed', () => {
+    // The drawer no longer unmounts the controls on collapse (a scroll
+    // gesture needs something already there to scroll open — see
+    // Drawer.test.tsx), so the closed state is asserted through the handle's
+    // own label rather than the controls' presence in the tree.
     const { queryByLabelText } = renderSection(true);
 
-    expect(queryByLabelText('Forecast view')).toBeNull();
     expect(queryByLabelText('Expand map controls')).toBeTruthy();
+    expect(queryByLabelText('Collapse map controls')).toBeNull();
   });
 
   it('opens on the handle, and offers the way back', () => {
     const { getByLabelText, queryByLabelText } = renderSection(true);
     fireEvent.press(getByLabelText('Expand map controls'));
 
-    expect(queryByLabelText('Forecast view')).toBeTruthy();
     expect(queryByLabelText('Collapse map controls')).toBeTruthy();
   });
 
   it('keeps the legend visible while closed', () => {
     // The key is what makes the map readable, so it belongs to the map rather
     // than to the controls: closing the sheet must not take it away.
-    const { getByText } = renderSection(false);
+    const { getAllByText } = renderSection(false);
 
-    expect(getByText(/average of every forecast run/i)).toBeTruthy();
+    expect(getAllByText(/mm$/).length).toBeGreaterThan(0);
   });
 });
 
@@ -213,5 +251,36 @@ describe('the selected place panel', () => {
     fireEvent.press(getByLabelText('Close Bongo details'));
 
     expect(queryByText('Compared with normal')).toBeNull();
+  });
+});
+
+/**
+ * The reader's own town is a separate query from the map, so it can fail on
+ * its own — this is the bug: a rate-limited upstream (or a town without a
+ * baked baseline) used to make the personal card vanish silently while a
+ * perfectly healthy map sat right above it, with no error and no way to
+ * retry.
+ */
+describe('the reader\'s own town card', () => {
+  it('shows an error and a retry, not a silent gap, when only the personal card fails', () => {
+    const onRetryOutlook = jest.fn();
+    const { getByText } = renderWithControls(true, { outlookStatus: 'error', onRetryOutlook });
+
+    // The map (`set`) is healthy in this fixture, so its own controls must
+    // still be reachable — the failure is scoped to the card, not the screen.
+    expect(getByText('FORECAST VIEW')).toBeTruthy();
+
+    expect(getByText("Couldn't load this")).toBeTruthy();
+
+    fireEvent.press(getByText('Retry'));
+    expect(onRetryOutlook).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a loading skeleton, not a blank gap, while the personal card is pending', () => {
+    const { queryByText, getByLabelText } = renderWithControls(true, { outlookStatus: 'pending' });
+
+    expect(queryByText("Couldn't load this")).toBeNull();
+    // The map's own view stays reachable while only the card is loading.
+    expect(getByLabelText('Forecast view')).toBeTruthy();
   });
 });

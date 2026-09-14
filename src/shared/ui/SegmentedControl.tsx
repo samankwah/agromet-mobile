@@ -20,9 +20,23 @@ type Props = {
    * component, a themed appearance, not two parallel implementations.
    */
   variant?: Variant;
+  /**
+   * Forces every segment to the same width instead of sizing to its own
+   * label. Off by default — content-sizing means a short/long pair ("All"
+   * vs. a long district name) both stay legible, which is the more common
+   * shape in this app. Opt in where the highlighted segment's own size is
+   * what a reader compares across adjacent controls (the spatial outlook
+   * drawer's Geography/Variable row): without it, "Region" and "Rainfall"
+   * highlight at two different widths for no reason a reader can see, since
+   * each track only ever sizes itself off its own two labels. Only safe
+   * where the control itself sits in a definite-width container already —
+   * it does not fix an unbounded control's own width, only how its
+   * segments split whatever width it has.
+   */
+  equalWidth?: boolean;
 };
 
-export function SegmentedControl({ segments, selectedIndex, onChange, accessibilityLabel, variant = 'tab' }: Props) {
+export function SegmentedControl({ segments, selectedIndex, onChange, accessibilityLabel, variant = 'tab', equalWidth = false }: Props) {
   const theme = useTheme();
   const isPill = variant === 'pill';
 
@@ -51,15 +65,17 @@ export function SegmentedControl({ segments, selectedIndex, onChange, accessibil
             accessibilityState={{ selected: isSelected }}
             accessibilityLabel={segment}
             style={{
-              // Content-sized, then sharing leftover space equally
-              // (flexBasis 'auto' + flexGrow), rather than a rigid equal
-              // split. With uneven labels an equal split forces the
+              // Content-sized by default, then sharing leftover space
+              // equally (flexBasis 'auto' + flexGrow), rather than a rigid
+              // equal split. With uneven labels an equal split forces the
               // longest one to dictate the type size for every segment —
               // this way a long label simply takes the room it needs and
-              // all of them stay legible at full size.
+              // all of them stay legible at full size. `equalWidth` opts
+              // into the rigid split instead, once the caller has decided
+              // that trade is the right one here.
               flexGrow: 1,
               flexShrink: 1,
-              flexBasis: 'auto',
+              flexBasis: equalWidth ? 0 : 'auto',
               minHeight: isPill ? theme.minTouchTarget + 8 : theme.minTouchTarget - 6,
               alignItems: 'center',
               justifyContent: 'center',

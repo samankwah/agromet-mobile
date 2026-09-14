@@ -40,10 +40,10 @@ export type OpenMeteoBundle = {
  * WMO weather codes, mapped onto the app's own five-word vocabulary.
  *
  * The vocabulary is not free. `classifyCondition` matches on substrings, and
- * `mockForecast.ts`'s CONDITION_LADDER orders these five by severity — an
- * ordering `dayDetail.test.ts` restates and asserts against. A sixth string
- * would not crash anything; it would make `indexOf` return -1 and quietly
- * switch that assertion off. So everything folds into these five.
+ * `dayDetail.test.ts` restates this same five-word set, ordered by severity,
+ * and asserts against it. A sixth string would not crash anything; it would
+ * make that ordering assertion quietly stop meaning anything. So everything
+ * folds into these five.
  *
  * Codes: 0 clear, 1-3 cloud cover, 45/48 fog, 51-57 drizzle, 61-67 rain,
  * 71-77 snow (never in Ghana, mapped for completeness), 80-82 rain showers,
@@ -61,9 +61,8 @@ export function conditionFromWmo(code: number): string {
   return 'Sunny';
 }
 
-/** The after-dark reading. Mirrors `afterDark` in mockForecast.ts: only the
- * clear and lightly-clouded kinds have one, because rain, storms and overcast
- * look the same at night. */
+/** The after-dark reading. Only the clear and lightly-clouded kinds have
+ * one, because rain, storms and overcast look the same at night. */
 function afterDark(condition: string): string {
   if (condition === 'Sunny') return 'Clear night';
   if (condition === 'Partly cloudy') return 'Partly cloudy night';
@@ -71,7 +70,7 @@ function afterDark(condition: string): string {
 }
 
 /** Ghana spans 5°N-11°N, so day length barely shifts and a fixed window is
- * accurate. Matches `isNightHour` in mockForecast.ts. */
+ * accurate. */
 function isNightHour(hour: number): boolean {
   return hour < 6 || hour >= 18;
 }

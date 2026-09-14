@@ -1,117 +1,196 @@
-import React, { useEffect, useState } from 'react';
-import { Keyboard, Platform, Pressable, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, View, type LayoutChangeEvent } from 'react-native';
+import BottomSheet, {
+  BottomSheetFooter,
+  BottomSheetScrollView,
+  type BottomSheetFooterProps,
+  type BottomSheetHandleProps,
+} from '@gorhom/bottom-sheet';
 
 import { useTheme } from '../theme/ThemeProvider';
 
 type Props = {
   expanded: boolean;
-  onToggle: () => void;
-  /** Rendered only while expanded — the filter controls. */
+  /** Fired with the sheet's own new state — from the handle, from a drag,
+   * and from a scroll gesture that pushes the sheet past its collapsed
+   * height. Replaces the old `onToggle`: once the sheet can change itself
+   * (by being dragged or scrolled open), the caller needs to be told which
+   * way it moved rather than just "something happened, flip your flag". */
+  onExpandedChange: (expanded: boolean) => void;
+  /** The filter controls, scrolled in the space above the footer. Rendered
+   * always, not just while expanded: unmounting on every collapse was what
+   * made a scroll gesture unable to reveal them, since there was nothing
+   * there yet to scroll to. */
   children: React.ReactNode;
-  /** Rendered in both states — the legend, per the reference screenshots
-   * (visible whether the drawer is expanded or collapsed). */
+  /** A pinned footer, not part of the scroll — the legend, per the reference
+   * screenshots (visible whether the drawer is expanded or collapsed, and
+   * never carried away by scrolling the controls above it). */
   persistentContent: React.ReactNode;
 };
 
 /**
  * A bottom drawer overlaid on a full-bleed map, matching the reference
- * screenshots' interaction: expanded shows every filter control above an
- * always-visible legend; collapsed shows just the legend, leaving the map
- * fully visible. A lightweight custom View, not a bottom-sheet library —
- * this only needs a two-state toggle, not drag-gesture physics. The
- * collapse affordance is a plain drag-handle bar (the standard pattern for
- * this — iOS/Android/most bottom sheets use exactly this, not a chevron
- * icon), tappable across its full row for a comfortable touch target.
- */
-/**
- * How much of the screen the drawer may take when expanded.
+ * screenshots' interaction: expanded shows every filter control above the
+ * legend; collapsed shows just the legend, leaving the map mostly visible.
  *
- * Expanded, it is a sheet the reader asked for, so it takes the room it needs
- * to show its content in one piece rather than as a cramped scroll. What it
- * must not do is take the whole thing: the strip of map left showing is both
- * the reminder of what is underneath and the target for the tap that puts the
- * sheet away.
- *
- * A percentage, not a computed number, because it has to resolve against the
- * drawer's own containing block. Measuring the *window* instead was wrong by
- * exactly the height of the screen header: the cap came out taller than the
- * space the drawer actually sits in, so it never bound and the sheet covered
- * the map completely, leaving nothing to tap to dismiss it.
+ * Built on `@gorhom/bottom-sheet` rather than a plain View: a farmer
+ * scrolling the filter list expects the sheet itself to rise to meet the
+ * gesture (as Google/Apple Maps' sheets do) before the list starts
+ * scrolling inside it, and getting that gesture handoff right — a drag on
+ * the handle, a scroll that should expand the sheet first and only scroll
+ * its content once fully open, a scroll-to-top that should collapse it
+ * again — is exactly what this library exists to do correctly across iOS
+ * and Android. A hand-rolled PanGestureHandler chasing the same behaviour
+ * would be re-solving a solved problem, worse.
  */
-const DRAWER_MAX_HEIGHT = '85%';
+const EXPANDED_SNAP_POINT = '85%';
+// Used for exactly one frame, before the handle and footer have measured
+// themselves for real (see `collapsedHeight` below) — close enough that
+// nothing visibly jumps once the real number replaces it.
+const COLLAPSED_FALLBACK_HEIGHT = 140;
 
-export function Drawer({ expanded, onToggle, children, persistentContent }: Props) {
+export function Drawer({ expanded, onExpandedChange, children, persistentContent }: Props) {
   const theme = useTheme();
-  const keyboardHeight = useKeyboardHeight();
+  const sheetRef = useRef<BottomSheet>(null);
+
+  // Collapsed must show the handle and the legend and *nothing else* — a
+  // reader complained the search field was peeking in under a guessed
+  // constant. The legend's own height isn't a constant (tercile vs.
+  // continuous mode render a different number of lines), so it and the
+  // handle measure themselves via onLayout instead, and their sum is the
+  // exact height that has room for the two of them and nothing more.
+  const [handleHeight, setHandleHeight] = useState(0);
+  const [footerHeight, setFooterHeight] = useState(0);
+  const collapsedHeight = handleHeight && footerHeight ? Math.ceil(handleHeight + footerHeight) : COLLAPSED_FALLBACK_HEIGHT;
+  const snapPoints = useMemo(() => [collapsedHeight, EXPANDED_SNAP_POINT], [collapsedHeight]);
+
+  // The sheet is driven imperatively (gorhom's documented pattern for a
+  // controlled index) rather than via a reactive `index` prop, so a
+  // programmatic change (selecting a place on the map, tapping past its
+  // edge to dismiss it) and a gesture-driven one (dragging the handle,
+  // scrolling the list open) go through the same snapToIndex call and can
+  // never fight each other over what the "real" index is. Re-runs once the
+  // real `collapsedHeight` replaces the fallback, so a still-collapsed sheet
+  // adopts the corrected height rather than sitting at the guess forever.
+  useEffect(() => {
+    sheetRef.current?.snapToIndex(expanded ? 1 : 0);
+  }, [expanded, collapsedHeight]);
+
+  const handleSheetChange = useCallback(
+    (index: number) => onExpandedChange(index >= 1),
+    [onExpandedChange],
+  );
+
+  // Read from a ref rather than closed over directly, so `handleComponent`
+  // below can be created once and never remounted — see its own comment.
+  const latest = useRef({ expanded, onExpandedChange });
+  latest.current = { expanded, onExpandedChange };
+
+  const handleComponent = useCallback(
+    (props: BottomSheetHandleProps) => (
+      <Handle
+        {...props}
+        expanded={latest.current.expanded}
+        onPress={() => latest.current.onExpandedChange(!latest.current.expanded)}
+        onLayout={(event: LayoutChangeEvent) => setHandleHeight(event.nativeEvent.layout.height)}
+      />
+    ),
+    [],
+  );
+
+  // A footer, not the top of the scroll content: gorhom pins this to the
+  // bottom of the sheet and pads the scrollable area above it by exactly its
+  // height automatically, so the legend never scrolls out of view and the
+  // controls never render underneath it.
+  const footerComponent = useCallback(
+    (props: BottomSheetFooterProps) => (
+      <BottomSheetFooter {...props}>
+        <View
+          onLayout={(event: LayoutChangeEvent) => setFooterHeight(event.nativeEvent.layout.height)}
+          style={{
+            backgroundColor: theme.colors.bg,
+            paddingHorizontal: theme.spacing.lg,
+            paddingTop: theme.spacing.sm,
+            paddingBottom: theme.spacing.lg,
+            borderTopWidth: 1,
+            borderTopColor: theme.colors.border,
+          }}
+        >
+          {persistentContent}
+        </View>
+      </BottomSheetFooter>
+    ),
+    [persistentContent, theme],
+  );
 
   return (
-    <View
-      style={{
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: keyboardHeight,
-        maxHeight: DRAWER_MAX_HEIGHT,
+    <BottomSheet
+      ref={sheetRef}
+      index={expanded ? 1 : 0}
+      snapPoints={snapPoints}
+      onChange={handleSheetChange}
+      handleComponent={handleComponent}
+      footerComponent={footerComponent}
+      // A visible top edge, not just a corner radius: collapsed, the sheet is
+      // now only as tall as the handle and the legend, and without its own
+      // stroke that shrunk panel read as bare text floating on the map
+      // rather than a sheet sitting over it.
+      backgroundStyle={{
         backgroundColor: theme.colors.bg,
         borderTopLeftRadius: theme.radii.lg + 6,
         borderTopRightRadius: theme.radii.lg + 6,
-        paddingHorizontal: theme.spacing.lg,
-        paddingBottom: theme.spacing.lg,
-        gap: theme.spacing.lg,
-        ...theme.elevation.raised,
+        borderTopWidth: 1,
+        borderColor: theme.colors.border,
       }}
+      // The search field inside `children` needs the sheet to ride up with
+      // the keyboard rather than sit behind it — gorhom's own handling here
+      // replaces what used to be a bespoke iOS-only keyboard-height listener.
+      keyboardBehavior="interactive"
+      keyboardBlurBehavior="restore"
+      android_keyboardInputMode="adjustResize"
     >
-      <Pressable
-        onPress={onToggle}
-        accessibilityRole="button"
-        accessibilityLabel={expanded ? 'Collapse map controls' : 'Expand map controls'}
-        accessibilityState={{ expanded }}
-        style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: theme.spacing.md, marginTop: -theme.spacing.xs }}
+      <BottomSheetScrollView
+        contentContainerStyle={{ paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.lg, gap: theme.spacing.lg }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        // Off by default: without it the scroll content's own bottom padding
+        // stays whatever `contentContainerStyle` says, the footer is drawn
+        // on top of it regardless, and the last control ends up underneath
+        // the legend. This measures the footer and adds its height to the
+        // padding automatically, so scrolling to the end lands content above
+        // the footer rather than behind it.
+        enableFooterMarginAdjustment
       >
-        <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.border }} />
-      </Pressable>
-
-      {expanded ? <View style={{ gap: theme.spacing.lg, flexShrink: 1 }}>{children}</View> : null}
-      {persistentContent}
-    </View>
+        {children}
+      </BottomSheetScrollView>
+    </BottomSheet>
   );
 }
 
 /**
- * How far the keyboard currently intrudes.
- *
- * The drawer is anchored to the bottom of the screen, and React Native does not
- * move an absolutely positioned view for the keyboard the way it does a
- * scrolling form. So the search field inside it, and the results list under
- * that, ended up behind the keyboard the moment anyone tapped to type: the box
- * looked broken because the thing it produced was never visible.
- *
- * Listening rather than using `KeyboardAvoidingView`, which pads a container
- * from the bottom and would fight the absolute positioning instead of
- * cooperating with it.
- *
- * iOS only, and that is the whole subtlety: Expo's Android default is
- * `softwareKeyboardLayoutMode: "resize"`, so the window itself shrinks and
- * `bottom: 0` is already above the keyboard. Offsetting there too would lift
- * the sheet by the keyboard's height twice and strand it mid-screen. iOS
- * overlays the keyboard without resizing, so it needs the offset.
+ * The collapse affordance is a plain drag-handle bar (the standard pattern
+ * for this — iOS/Android/most bottom sheets use exactly this, not a chevron
+ * icon), tappable across its full row for a comfortable touch target on top
+ * of the drag gesture gorhom's own handle container already attaches around
+ * whatever `handleComponent` renders.
  */
-function useKeyboardHeight(): number {
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+function Handle({
+  expanded,
+  onPress,
+  onLayout,
+}: BottomSheetHandleProps & { expanded: boolean; onPress: () => void; onLayout: (event: LayoutChangeEvent) => void }) {
+  const theme = useTheme();
 
-  useEffect(() => {
-    if (Platform.OS !== 'ios') return;
-
-    // `Will` rather than `Did`, so the sheet travels with the keyboard instead
-    // of snapping into place after it has finished.
-    const show = Keyboard.addListener('keyboardWillShow', (event) => setKeyboardHeight(event.endCoordinates?.height ?? 0));
-    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardHeight(0));
-
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
-
-  return keyboardHeight;
+  return (
+    <Pressable
+      onPress={onPress}
+      onLayout={onLayout}
+      accessibilityRole="button"
+      accessibilityLabel={expanded ? 'Collapse map controls' : 'Expand map controls'}
+      accessibilityState={{ expanded }}
+      style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: theme.spacing.md }}
+    >
+      <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.border }} />
+    </Pressable>
+  );
 }

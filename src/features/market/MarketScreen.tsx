@@ -166,13 +166,19 @@ export function MarketScreen() {
           />
         </View>
 
-        <Dropdown
-          label="Category"
-          options={COMMODITY_CATEGORIES.map((name) => ({ id: name, label: name }))}
-          selectedId={category}
-          onSelect={setCategory}
-        />
-        <Dropdown label="Prices for" options={regionOptions} selectedId={region} onSelect={setRegion} />
+        <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+          <View style={{ flex: 1 }}>
+            <Dropdown
+              label="Category"
+              options={COMMODITY_CATEGORIES.map((name) => ({ id: name, label: name }))}
+              selectedId={category}
+              onSelect={setCategory}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Dropdown label="Prices for" options={regionOptions} selectedId={region} onSelect={setRegion} />
+          </View>
+        </View>
       </View>
 
       <AsyncStateView

@@ -1,10 +1,10 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { SpatialOutlookView } from '../../features/forecasts/spatial-outlook/SpatialOutlookView';
-import { queryClient } from '../../shared/api/queryClient';
+import { createTestQueryClient } from '../testQueryClient';
 import { SPATIAL_VARIABLES } from '../../shared/api/spatialOutlookService';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 
@@ -14,11 +14,30 @@ const TEST_SAFE_AREA_METRICS = {
   insets: { top: 0, left: 0, right: 0, bottom: 0 },
 };
 
+/**
+ * A client of its own, with retries off, and a rejecting fetch — see
+ * HomeScreen.test.tsx. Nothing here asserts on loaded data, only the
+ * drawer's own local state.
+ */
+let client: QueryClient;
+
+beforeEach(() => {
+  client = createTestQueryClient();
+  globalThis.fetch = jest.fn(() =>
+    Promise.reject(new TypeError('Network request failed')),
+  ) as unknown as typeof fetch;
+});
+
+afterEach(() => {
+  client.clear();
+  jest.restoreAllMocks();
+});
+
 function renderView() {
   const utils = render(
     <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
       <ThemeProvider>
-        <QueryClientProvider client={queryClient}>
+        <QueryClientProvider client={client}>
           <SpatialOutlookView seasonal={undefined} />
         </QueryClientProvider>
       </ThemeProvider>
@@ -34,10 +53,14 @@ function renderView() {
 
 describe('SpatialOutlookView', () => {
   it('lands with the selector drawer collapsed, showing just the map and legend', () => {
-    const { queryByText, getByLabelText } = renderView();
+    // The drawer no longer unmounts the selectors on collapse (a scroll
+    // gesture needs something already there to scroll open — see
+    // Drawer.test.tsx), so the collapsed state is asserted through the
+    // handle's own label rather than the selectors' presence in the tree.
+    const { queryByLabelText, getByLabelText } = renderView();
 
     expect(getByLabelText('Expand map controls')).toBeTruthy();
-    expect(queryByText('FORECAST VIEW')).toBeNull();
+    expect(queryByLabelText('Collapse map controls')).toBeNull();
   });
 
   it('reveals the selectors once the drawer is expanded', () => {

@@ -121,6 +121,9 @@ export function ForecastsScreen({ requestedSegment }: Props = {}) {
               status={subseasonalSet.status}
               error={subseasonalSet.error}
               onRetry={subseasonalSet.refetch}
+              outlookStatus={subseasonal.status}
+              outlookError={subseasonal.error}
+              onRetryOutlook={subseasonal.refetch}
             />
           ) : (
             <SpatialOutlookView seasonal={seasonal.data} />
@@ -172,12 +175,7 @@ export function ForecastsScreen({ requestedSegment }: Props = {}) {
               >
                 {renderHeader(true)}
                 {segmentIndex === 0 ? (
-                  <TodaySection
-                    conditions={conditions.data}
-                    today={today!}
-                    hourly={hourly.data!}
-                    actionCard={weekly.data!.farmerActionCard}
-                  />
+                  <TodaySection conditions={conditions.data} today={today!} hourly={hourly.data!} />
                 ) : (
                   <WeekSection forecast={weekly.data!} />
                 )}

@@ -1,10 +1,10 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ForecastsScreen } from '../../features/forecasts/ForecastsScreen';
-import { queryClient } from '../../shared/api/queryClient';
+import { createTestQueryClient } from '../testQueryClient';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 
 // See HomeScreen.test.tsx for why initialMetrics is required in Jest.
@@ -12,6 +12,26 @@ const TEST_SAFE_AREA_METRICS = {
   frame: { x: 0, y: 0, width: 360, height: 800 },
   insets: { top: 0, left: 0, right: 0, bottom: 0 },
 };
+
+/**
+ * A client of its own, with retries off, and a rejecting fetch: none of the
+ * tests in this file assert on loaded data, only on structure/navigation, so
+ * a fast, always-failing fetch is enough — and avoids the shared app client's
+ * `retry: 2` scheduling backoff timers that outlive the test.
+ */
+let client: QueryClient;
+
+beforeEach(() => {
+  client = createTestQueryClient();
+  globalThis.fetch = jest.fn(() =>
+    Promise.reject(new TypeError('Network request failed')),
+  ) as unknown as typeof fetch;
+});
+
+afterEach(() => {
+  client.clear();
+  jest.restoreAllMocks();
+});
 
 /** A smoke test — confirms the screen mounts without throwing in the same
  * provider order as the real app/_layout.tsx, and that all four forecast
@@ -21,7 +41,7 @@ describe('ForecastsScreen', () => {
     const { getByText } = render(
       <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
         <ThemeProvider>
-          <QueryClientProvider client={queryClient}>
+          <QueryClientProvider client={client}>
             <ForecastsScreen />
           </QueryClientProvider>
         </ThemeProvider>
@@ -49,7 +69,7 @@ describe('ForecastsScreen', () => {
       return render(
         <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
           <ThemeProvider>
-            <QueryClientProvider client={queryClient}>
+            <QueryClientProvider client={client}>
               <ForecastsScreen requestedSegment={requestedSegment} />
             </QueryClientProvider>
           </ThemeProvider>
@@ -79,7 +99,7 @@ describe('ForecastsScreen', () => {
       rerender(
         <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
           <ThemeProvider>
-            <QueryClientProvider client={queryClient}>
+            <QueryClientProvider client={client}>
               <ForecastsScreen requestedSegment="daily" />
             </QueryClientProvider>
           </ThemeProvider>
@@ -101,7 +121,7 @@ describe('ForecastsScreen', () => {
       rerender(
         <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
           <ThemeProvider>
-            <QueryClientProvider client={queryClient}>
+            <QueryClientProvider client={client}>
               <ForecastsScreen requestedSegment="" />
             </QueryClientProvider>
           </ThemeProvider>

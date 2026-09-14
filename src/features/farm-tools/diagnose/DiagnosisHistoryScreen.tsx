@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Image, Pressable, View } from 'react-native';
+import { FlatList, Image, Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
@@ -80,14 +80,21 @@ export function DiagnosisHistoryScreen() {
   }
 
   return (
-    <Screen>
-      {history.map((entry) => (
-        <HistoryRow key={entry.id} entry={entry} onOpen={() => setOpen(entry)} />
-      ))}
-
-      <Text variant="caption" muted>
-        Kept on this phone only, so it works without a connection.
-      </Text>
+    <Screen scroll={false}>
+      {/* Capped at 50 (MAX_ENTRIES in diagnosisHistory.ts), but still every
+          row carries an image — FlatList mounts only what's on screen rather
+          than all 50 on every focus. */}
+      <FlatList
+        data={history}
+        keyExtractor={(entry) => entry.id}
+        renderItem={({ item }) => <HistoryRow entry={item} onOpen={() => setOpen(item)} />}
+        contentContainerStyle={{ gap: theme.spacing.lg }}
+        ListFooterComponent={
+          <Text variant="caption" muted>
+            Kept on this phone only, so it works without a connection.
+          </Text>
+        }
+      />
     </Screen>
   );
 }

@@ -4,10 +4,10 @@ import { buildOpenMeteoFixture, stubWeatherFetch } from '../fixtures/openMeteo';
 const LOCATION = 'accra';
 
 /**
- * Mirrors the vocabulary `openMeteo.conditionFromWmo` emits, and the severity
- * order `mockForecast.ts`'s CONDITION_LADDER uses. Deliberately restated here
- * rather than imported, so reordering severity in one place without the other
- * fails loudly.
+ * The closed vocabulary `openMeteo.conditionFromWmo` maps every WMO weather
+ * code onto. Deliberately restated here rather than imported, so a sixth
+ * string added to that mapping without a matching icon/backdrop fails this
+ * suite loudly instead of silently reaching a screen that doesn't know it.
  */
 const SEVERITY = ['Sunny', 'Partly cloudy', 'Overcast', 'Scattered showers', 'Thunderstorms likely'];
 const NIGHT_VARIANTS = ['Clear night', 'Partly cloudy night'];
@@ -108,8 +108,9 @@ describe('getDayDetail', () => {
 
   it('keeps every condition inside the vocabulary the icons and backdrops know', async () => {
     // A sixth string would not crash: classifyCondition falls back to 'cloudy'
-    // and SEVERITY.indexOf returns -1, quietly switching the ordering check off
-    // rather than failing it. So the vocabulary itself has to be asserted.
+    // and the icon/backdrop lookups fall back too, quietly rendering the
+    // wrong glyph rather than failing. So the vocabulary itself has to be
+    // asserted directly.
     const week = await getWeeklyForecast(LOCATION);
     for (const day of week.days) {
       const detail = await getDayDetail(LOCATION, day.date);

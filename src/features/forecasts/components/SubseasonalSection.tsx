@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 
@@ -37,7 +37,7 @@ import { buildSubseasonalCells, deterministicRange, selectionPlaceName } from '.
 import type { Place } from '../subseasonal/places';
 import { PlaceSearch } from './PlaceSearch';
 import { SubseasonalSpreadChart } from './SubseasonalSpreadChart';
-import { SpatialOutlookSkeleton } from './ForecastSkeletons';
+import { SpatialOutlookSkeleton, SubseasonalOutlookSkeleton } from './ForecastSkeletons';
 
 type Props = {
   /** The reader's own town, shown as guidance inside the drawer. */
@@ -47,6 +47,17 @@ type Props = {
   status: 'pending' | 'error' | 'success';
   error?: unknown;
   onRetry: () => void;
+  /**
+   * The reader's own town is a separate query from the map (`set`), keyed by
+   * location rather than the nationwide field, so it can fail — or lack a
+   * baked baseline — independently of a perfectly healthy map. Kept apart
+   * from `status`/`error` above rather than merged: merging would blank the
+   * map out whenever only the personal card fails, which is worse than the
+   * card failing on its own.
+   */
+  outlookStatus: 'pending' | 'error' | 'success';
+  outlookError?: unknown;
+  onRetryOutlook: () => void;
 };
 
 /** Matches the Seasonal segment's map exactly, so switching between the two
@@ -76,7 +87,16 @@ const VARIABLES: SubseasonalVariableId[] = ['rainfall', 'temperature'];
  * honest version of a district view: the model's real detail under a familiar
  * boundary, rather than detail invented to fill one.
  */
-export function SubseasonalSection({ outlook, set, status, error, onRetry }: Props) {
+export function SubseasonalSection({
+  outlook,
+  set,
+  status,
+  error,
+  onRetry,
+  outlookStatus,
+  outlookError,
+  onRetryOutlook,
+}: Props) {
   const theme = useTheme();
   const { isOnline } = useNetworkStatus();
   const [drawerExpanded, setDrawerExpanded] = useState(false);
@@ -148,24 +168,17 @@ export function SubseasonalSection({ outlook, set, status, error, onRetry }: Pro
   );
 
   const legend = isEmpty ? null : (
-    <View style={{ gap: theme.spacing.xs }}>
-      <ColorScaleLegend
-        min={min}
-        max={max}
-        unit={isProbability ? '' : unitFor(variable)}
-        mode={isProbability ? 'tercile' : 'continuous'}
-        valueFormat={valueFormat}
-        categories={isProbability ? palette : undefined}
-        bounds={isProbability ? TERCILE_BOUNDS : undefined}
-        stops={stops}
-        unitPlacement="value"
-      />
-      <Text variant="caption" muted>
-        {isProbability
-          ? 'Compared with what this area normally gets at this time of year. Deeper colour means the forecasts agree more strongly.'
-          : `The average of every forecast run for the window, in ${unitFor(variable)}.`}
-      </Text>
-    </View>
+    <ColorScaleLegend
+      min={min}
+      max={max}
+      unit={isProbability ? '' : unitFor(variable)}
+      mode={isProbability ? 'tercile' : 'continuous'}
+      valueFormat={valueFormat}
+      categories={isProbability ? palette : undefined}
+      bounds={isProbability ? TERCILE_BOUNDS : undefined}
+      stops={stops}
+      unitPlacement="value"
+    />
   );
 
   return (
@@ -235,8 +248,11 @@ export function SubseasonalSection({ outlook, set, status, error, onRetry }: Pro
           )}
         </View>
 
-        <Drawer expanded={drawerExpanded} onToggle={() => setDrawerExpanded((open) => !open)} persistentContent={legend}>
-            <ScrollView contentContainerStyle={{ gap: theme.spacing.lg }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        {/* Drawer supplies the one scroll container for everything below the
+            legend — a nested ScrollView here would fight it for the drag/
+            scroll gesture that expands the sheet. */}
+        <Drawer expanded={drawerExpanded} onExpandedChange={setDrawerExpanded} persistentContent={legend}>
+            <View style={{ gap: theme.spacing.lg }}>
               <PlaceSearch onSelect={handleSearch} />
 
               {isEmpty || !selection ? null : (
@@ -251,6 +267,14 @@ export function SubseasonalSection({ outlook, set, status, error, onRetry }: Pro
                 />
               )}
 
+              {/* Matches the Seasonal segment's own selector style
+                  (SpatialOutlookView) — a caps FieldLabel over a pill, no
+                  grid or card grouping them. Forecast View keeps the full
+                  width: "Deterministic" is the one label here too long to
+                  share a row and still read at full size — split three
+                  ways, each pill segment would get on the order of 50px.
+                  Geography and Variable both have short labels, so they
+                  share a row (grid 2) instead of each taking a full one. */}
               <View>
                 <FieldLabel>FORECAST VIEW</FieldLabel>
                 <SegmentedControl
@@ -259,32 +283,50 @@ export function SubseasonalSection({ outlook, set, status, error, onRetry }: Pro
                   onChange={setViewIndex}
                   accessibilityLabel="Forecast view"
                   variant="pill"
+                  equalWidth
                 />
               </View>
 
-              <View>
-                <FieldLabel>GEOGRAPHY</FieldLabel>
-                <SegmentedControl
-                  segments={GEOGRAPHY_SEGMENTS}
-                  selectedIndex={geographyIndex}
-                  onChange={setGeographyIndex}
-                  accessibilityLabel="Geography"
-                  variant="pill"
-                />
+              <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+                <View style={{ flex: 1 }}>
+                  <FieldLabel>GEOGRAPHY</FieldLabel>
+                  <SegmentedControl
+                    segments={GEOGRAPHY_SEGMENTS}
+                    selectedIndex={geographyIndex}
+                    onChange={setGeographyIndex}
+                    accessibilityLabel="Geography"
+                    variant="pill"
+                    equalWidth
+                  />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <FieldLabel>VARIABLE</FieldLabel>
+                  <SegmentedControl
+                    segments={VARIABLE_SEGMENTS}
+                    selectedIndex={variableIndex}
+                    onChange={setVariableIndex}
+                    accessibilityLabel="Outlook variable"
+                    variant="pill"
+                    equalWidth
+                  />
+                </View>
               </View>
 
-              <View>
-                <FieldLabel>VARIABLE</FieldLabel>
-                <SegmentedControl
-                  segments={VARIABLE_SEGMENTS}
-                  selectedIndex={variableIndex}
-                  onChange={setVariableIndex}
-                  accessibilityLabel="Outlook variable"
-                  variant="pill"
-                />
-              </View>
-
-              {outlook ? <ReaderGuidance outlook={outlook} /> : null}
+              {/* The reader's own town is a separate query from the map above,
+                  so it can fail on its own — a rate-limited upstream, or a
+                  town whose grid cell has no baked baseline yet — while the
+                  map stays perfectly healthy. Wrapped in its own
+                  AsyncStateView rather than folded into the map's status so a
+                  personal-card failure never blanks the map underneath it. */}
+              <AsyncStateView
+                status={outlookStatus}
+                error={outlookError}
+                onRetry={onRetryOutlook}
+                skeleton={<SubseasonalOutlookSkeleton />}
+              >
+                {outlook ? <ReaderGuidance outlook={outlook} /> : null}
+              </AsyncStateView>
 
               {/* The caveats and the provenance, grouped once at the foot rather
                   than interleaved with the controls. Each was true where it
@@ -314,7 +356,7 @@ export function SubseasonalSection({ outlook, set, status, error, onRetry }: Pro
                   </Text>
                 ) : null}
               </View>
-          </ScrollView>
+            </View>
         </Drawer>
       </View>
     </AsyncStateView>

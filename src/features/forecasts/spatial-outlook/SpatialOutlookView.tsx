@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 
 import type { SeasonalOutlook } from '../../../shared/domain/seasonalOutlook';
 import { useNetworkStatus } from '../../../shared/net/useNetworkStatus';
@@ -101,7 +101,7 @@ export function SpatialOutlookView({ seasonal }: Props) {
 
       <Drawer
         expanded={drawerExpanded}
-        onToggle={() => setDrawerExpanded((previous) => !previous)}
+        onExpandedChange={setDrawerExpanded}
         persistentContent={
           dataset ? (
             <View style={{ gap: theme.spacing.xs }}>
@@ -119,7 +119,10 @@ export function SpatialOutlookView({ seasonal }: Props) {
           ) : null
         }
       >
-        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }} contentContainerStyle={{ gap: theme.spacing.lg }}>
+        {/* Drawer supplies the one scroll container, shared with the legend
+            above — a nested ScrollView here would fight it for the drag/
+            scroll gesture that expands the sheet. */}
+        <View style={{ gap: theme.spacing.lg }}>
           <View>
             <FieldLabel>FORECAST VIEW</FieldLabel>
             <SegmentedControl
@@ -128,6 +131,7 @@ export function SpatialOutlookView({ seasonal }: Props) {
               onChange={(index) => setForecastView(index === 0 ? 'probability' : 'deterministic')}
               accessibilityLabel="Forecast view"
               variant="pill"
+              equalWidth
             />
           </View>
 
@@ -139,6 +143,7 @@ export function SpatialOutlookView({ seasonal }: Props) {
               onChange={(index) => setGeography(index === 0 ? 'region' : 'district')}
               accessibilityLabel="Geography level"
               variant="pill"
+              equalWidth
             />
           </View>
 
@@ -169,7 +174,7 @@ export function SpatialOutlookView({ seasonal }: Props) {
           ) : null}
 
           <MockDataTag />
-        </ScrollView>
+        </View>
       </Drawer>
     </View>
   );

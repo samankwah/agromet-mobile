@@ -1,3 +1,10 @@
+// react-native-gesture-handler's own official Jest setup — required as of
+// the subseasonal/seasonal map's bottom sheet (@gorhom/bottom-sheet, built on
+// this), or its native module throws under Jest's Node environment on first
+// render. Reanimated needs no equivalent: since Reanimated 3 it detects Jest
+// itself and swaps to a synchronous JS mock automatically.
+require('react-native-gesture-handler/jestSetup');
+
 // AsyncStorage's native module doesn't exist under Jest's Node
 // environment — mock it with the library's own official in-memory mock so
 // anything that touches it (Zustand's persist middleware, shared/storage/
@@ -31,6 +38,56 @@ const mockWebView = (() => {
 })();
 
 jest.mock('react-native-webview', () => ({ WebView: mockWebView, default: mockWebView }));
+
+// @gorhom/bottom-sheet's own scroll handling calls Reanimated's
+// `useAnimatedScrollHandler`, which requires the Babel worklet plugin to have
+// marked its handler functions at compile time. That marking does not happen
+// for this library's own source under Jest's transform — a Metro-vs-Jest
+// difference, not an app bug; the real sheet works fine on device — so a
+// stand-in that captures this component's actual contract (a ref exposing
+// `snapToIndex`, a `handleComponent`/`footerComponent` render prop, plain
+// scrollable children) is what lets `shared/ui/Drawer.tsx` and its consumers
+// be tested at all, the same trade a native module with no Jest binary
+// already makes above for `react-native-webview`.
+const mockBottomSheet = (() => {
+  const React = require('react');
+  const { View } = require('react-native');
+
+  const BottomSheet = React.forwardRef(({ handleComponent: Handle, footerComponent: Footer, children }, ref) => {
+    React.useImperativeHandle(ref, () => ({
+      snapToIndex: () => {},
+      snapToPosition: () => {},
+      expand: () => {},
+      collapse: () => {},
+      close: () => {},
+      forceClose: () => {},
+    }));
+    const dummyAnimatedProp = { value: 0 };
+    return React.createElement(
+      View,
+      null,
+      Handle ? React.createElement(Handle, { animatedIndex: dummyAnimatedProp, animatedPosition: dummyAnimatedProp }) : null,
+      children,
+      Footer ? React.createElement(Footer, { animatedFooterPosition: dummyAnimatedProp }) : null,
+    );
+  });
+  BottomSheet.displayName = 'BottomSheet';
+
+  const BottomSheetScrollView = React.forwardRef((props, ref) => React.createElement(View, { ...props, ref }));
+  BottomSheetScrollView.displayName = 'BottomSheetScrollView';
+
+  const BottomSheetFooter = ({ children }) => React.createElement(View, null, children);
+  BottomSheetFooter.displayName = 'BottomSheetFooter';
+
+  return { BottomSheet, BottomSheetScrollView, BottomSheetFooter };
+})();
+
+jest.mock('@gorhom/bottom-sheet', () => ({
+  __esModule: true,
+  default: mockBottomSheet.BottomSheet,
+  BottomSheetScrollView: mockBottomSheet.BottomSheetScrollView,
+  BottomSheetFooter: mockBottomSheet.BottomSheetFooter,
+}));
 
 // NetInfo is native too. Its own official mock reports a connected state,
 // which is what we want by default — components that branch on

@@ -3,9 +3,8 @@ import { ScrollView, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import type { CurrentWeather } from '../../../shared/domain/currentWeather';
-import type { DailyForecast, HourlyForecast, WeeklyForecast } from '../../../shared/domain/forecast';
+import type { DailyForecast, HourlyForecast } from '../../../shared/domain/forecast';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { BulletList } from '../../../shared/ui/BulletList';
 import { Card } from '../../../shared/ui/Card';
 import { CloudRain, Drop, NavigationArrow, Thermometer } from 'phosphor-react-native';
 
@@ -15,6 +14,7 @@ import { ON_BACKDROP_COLOR, ON_BACKDROP_MUTED } from '../../../shared/ui/Weather
 import { formatTemperature } from '../../../shared/utils/formatTemperature';
 import { formatWind } from '../../../shared/utils/formatWind';
 import { getConditionIcon } from '../../../shared/utils/getConditionIcon';
+import { dayHeadline } from '../../../shared/utils/weatherNarrative';
 import { HourlyStripItem } from './HourlyStripItem';
 import { MapPreviewCard } from './MapPreviewCard';
 
@@ -22,7 +22,6 @@ type Props = {
   conditions: CurrentWeather;
   today: DailyForecast;
   hourly: HourlyForecast[];
-  actionCard: WeeklyForecast['farmerActionCard'];
 };
 
 /**
@@ -33,7 +32,7 @@ type Props = {
  * (see ForecastsScreen) — that way text and icons come out light-on-dark
  * automatically rather than each component needing bespoke colours.
  */
-export function TodaySection({ conditions, today, hourly, actionCard }: Props) {
+export function TodaySection({ conditions, today, hourly }: Props) {
   const theme = useTheme();
 
   return (
@@ -88,12 +87,15 @@ export function TodaySection({ conditions, today, hourly, actionCard }: Props) {
         temperatureC={conditions.temperatureC}
       />
 
+      {/* Today's own reading, not the week's — the week's headline and
+          bullets already sit on the Weekly tab, and showing the same card
+          twice was the bug. `dayHeadline`/`farmerInterpretation` are both
+          keyed off this single day's numbers. */}
       <Card translucent raised style={{ gap: theme.spacing.sm }}>
-        <Text variant="h3">{actionCard.headline}</Text>
+        <Text variant="h3">{dayHeadline(today)}</Text>
         <Text variant="body" muted>
           {today.farmerInterpretation}
         </Text>
-        <BulletList items={actionCard.actions} accent />
       </Card>
     </View>
   );

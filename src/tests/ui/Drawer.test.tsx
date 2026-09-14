@@ -1,81 +1,63 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Text, View } from 'react-native';
 
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { Drawer } from '../../shared/ui/Drawer';
 
-function renderDrawer(expanded: boolean) {
+function renderDrawer(expanded: boolean, onExpandedChange: (next: boolean) => void = () => {}) {
   return render(
-    <ThemeProvider>
-      <Drawer expanded={expanded} onToggle={() => {}} persistentContent={<Text>legend</Text>}>
-        <View testID="controls">
-          <Text>controls</Text>
-        </View>
-      </Drawer>
-    </ThemeProvider>,
+    <GestureHandlerRootView>
+      <ThemeProvider>
+        <Drawer expanded={expanded} onExpandedChange={onExpandedChange} persistentContent={<Text>legend</Text>}>
+          <View testID="controls">
+            <Text>controls</Text>
+          </View>
+        </Drawer>
+      </ThemeProvider>
+    </GestureHandlerRootView>,
   );
 }
 
-function flatten(style: unknown): Record<string, unknown> {
-  return Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
-}
-
-/** The first node in the rendered host tree whose style carries `key`. Reading
- * the tree rather than adding a testID, since nothing else in shared/ui has
- * one and a prop that exists only for a test earns its keep poorly. */
-function styleWith(tree: unknown, key: string): Record<string, unknown> | null {
-  if (!tree || typeof tree !== 'object') return null;
-  const node = tree as { props?: { style?: unknown }; children?: unknown[] };
-  const style = flatten(node.props?.style);
-  if (style[key] !== undefined) return style;
-
-  for (const child of node.children ?? []) {
-    const found = styleWith(child, key);
-    if (found) return found;
-  }
-  return null;
-}
-
 /**
- * The drawer is anchored to the bottom of a full-bleed map and grows upward.
- * Uncapped, a tall enough set of controls pushes its own drag handle off the
- * top of the screen, and the handle is the only way to collapse it: the reader
- * is left holding a panel they cannot put down. Observed on the subseasonal map
- * once the detail chart joined the three selectors.
+ * The drawer is a real bottom sheet (`@gorhom/bottom-sheet`) now, not a
+ * plain `View` sized by `maxHeight` — so what is worth asserting from plain
+ * render-tree tests is its React-level contract: the handle's accessible
+ * state and the toggle it fires, and that both the legend and the controls
+ * are actually in the tree to be scrolled to. The sheet's own height,
+ * snapping and the scroll-to-expand handoff are gesture/layout behaviour
+ * gorhom is responsible for and Jest's Node environment cannot lay out —
+ * that is what the emulator, not this file, verifies.
  */
 describe('Drawer', () => {
-  it('opens far enough to show its content, but never over the whole screen', () => {
-    const { toJSON } = renderDrawer(true);
-    const style = styleWith(toJSON(), 'maxHeight');
+  it('keeps both the legend and the controls in the tree, collapsed or expanded', () => {
+    // Unlike the old plain-View drawer, the controls are never unmounted on
+    // collapse: a scroll gesture has to have something already there to
+    // scroll open. Observed as a regression once the controls only rendered
+    // after the reader had already expanded the sheet some other way.
+    const collapsed = renderDrawer(false);
+    expect(collapsed.getByText('legend')).toBeTruthy();
+    expect(collapsed.getByTestId('controls')).toBeTruthy();
 
-    expect(style).not.toBeNull();
-    // A percentage, so it resolves against the drawer's containing block rather
-    // than the whole window: measuring the window overshot by the height of the
-    // screen header, the cap never bound, and the sheet covered the map
-    // entirely -- leaving nothing to tap to dismiss it.
-    const maxHeight = style?.maxHeight;
-    expect(typeof maxHeight).toBe('string');
-
-    const share = Number(String(maxHeight).replace('%', ''));
-    // Both bounds matter: too short and the sheet is a cramped scroll, too tall
-    // and there is no map left to tap.
-    expect(share).toBeGreaterThan(60);
-    expect(share).toBeLessThan(100);
+    const expanded = renderDrawer(true);
+    expect(expanded.getByText('legend')).toBeTruthy();
+    expect(expanded.getByTestId('controls')).toBeTruthy();
   });
 
-  it('lets the expanded block give way, so a scrolling child gets a bounded box', () => {
-    // Without this the cap alone does nothing: the content keeps its natural
-    // height and simply overflows the clipped container.
-    const { toJSON } = renderDrawer(true);
+  it('labels the handle by the state it is in, not the state it leads to', () => {
+    const { getByLabelText, queryByLabelText } = renderDrawer(false);
 
-    expect(styleWith(toJSON(), 'flexShrink')?.flexShrink).toBe(1);
+    expect(getByLabelText('Expand map controls')).toBeTruthy();
+    expect(queryByLabelText('Collapse map controls')).toBeNull();
   });
 
-  it('keeps the legend when collapsed and drops the controls', () => {
-    const { getByText, queryByTestId } = renderDrawer(false);
+  it('reports the flipped state when the handle is pressed', () => {
+    const onExpandedChange = jest.fn();
+    const { getByLabelText } = renderDrawer(false, onExpandedChange);
 
-    expect(getByText('legend')).toBeTruthy();
-    expect(queryByTestId('controls')).toBeNull();
+    fireEvent.press(getByLabelText('Expand map controls'));
+
+    expect(onExpandedChange).toHaveBeenCalledWith(true);
   });
 });

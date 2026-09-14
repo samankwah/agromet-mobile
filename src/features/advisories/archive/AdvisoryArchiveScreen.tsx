@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
 import type { ArchivedAdvisory } from '../../../shared/domain/weeklyAdvisory';
@@ -25,6 +25,49 @@ import {
   UNSET,
 } from './archiveFilters';
 import { useAdvisoryArchive } from './useAdvisoryArchive';
+
+type YearGroup = ReturnType<typeof groupByYear>[number];
+
+/**
+ * One year's card, unchanged from before this screen was virtualized —
+ * still one chamfered Card wrapping every row for the year, divided by
+ * hairlines. Rendered as a single FlatList item rather than inlined, so a
+ * year that has scrolled off screen can be unmounted instead of staying
+ * resident.
+ */
+function YearGroupCard({
+  group,
+  filter,
+  onOpen,
+}: {
+  group: YearGroup;
+  filter: ArchiveFilterState;
+  onOpen: (entry: ArchivedAdvisory) => void;
+}) {
+  const theme = useTheme();
+
+  return (
+    <View style={{ gap: theme.spacing.sm }}>
+      <YearMarker year={group.year} count={group.entries.length} />
+
+      {/* One card per year, rows divided by hairlines. Seven floating cards
+          read as seven unrelated things; rows under one edge read as a
+          list. */}
+      <Card style={{ paddingHorizontal: 0, paddingVertical: 0, overflow: 'hidden' }}>
+        {group.entries.map((entry, index) => (
+          <ArchiveRow
+            key={entry.id}
+            entry={entry}
+            first={index === 0}
+            matched={matchedActivities(entry, filter)}
+            showRegion={filter.region === UNSET}
+            onOpen={onOpen}
+          />
+        ))}
+      </Card>
+    </View>
+  );
+}
 
 /**
  * A year marker: the label, a rule running to the count.
@@ -105,92 +148,86 @@ export function AdvisoryArchiveScreen() {
   const update = (change: Partial<ArchiveFilterState>) =>
     setFilter((current) => narrowArchiveFilters(current, change));
 
+  // Not scrolling: the results render through a FlatList below (virtualized
+  // so a growing archive never mounts every year at once), and a FlatList
+  // inside a ScrollView both warns and defeats its own windowing. Search and
+  // the filter controls sit as fixed siblings above it instead of scrolling
+  // away with the results — matching ArchiveSkeleton's own assumption that
+  // the search field stays on screen throughout the load.
   return (
-    <Screen>
-      <SearchField
-        value={filter.query}
-        onChange={(query) => update({ query })}
-        placeholder="Search titles and activities"
-        accessibilityLabel="Search advisories"
-      />
+    <Screen scroll={false}>
+      <View style={{ flex: 1, gap: theme.spacing.lg }}>
+        <SearchField
+          value={filter.query}
+          onChange={(query) => update({ query })}
+          placeholder="Search titles and activities"
+          accessibilityLabel="Search advisories"
+        />
 
-      <ArchiveFilters
-        entries={entries}
-        value={filter}
-        onChange={update}
-        onClear={() => setFilter(EMPTY_ARCHIVE_FILTERS)}
-      />
+        <ArchiveFilters
+          entries={entries}
+          value={filter}
+          onChange={update}
+          onClear={() => setFilter(EMPTY_ARCHIVE_FILTERS)}
+        />
 
-      <AsyncStateView
-        status={archive.status}
-        error={archive.error}
-        onRetry={archive.refetch}
-        skeleton={<ArchiveSkeleton />}
-      >
-        <View style={{ gap: theme.spacing.lg }}>
-          {/* Three situations, three different things to say. A single generic
-              "nothing here" would leave a farmer unable to tell an unpublished
-              district from a lost connection. */}
-          {fallback !== null ? (
-            <Card style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-              <Text variant="body" muted style={{ flex: 1 }}>
-                {fallback === 'empty'
-                  ? 'Nothing has been published yet. These are samples, showing what will appear once your extension office uploads an advisory.'
-                  : 'The server could not be reached, so these are samples rather than your own advisories.'}
-              </Text>
-              <MockDataTag />
-            </Card>
-          ) : archive.usingCachedFallback ? (
-            <Text variant="caption" muted>
-              Showing advisories saved{' '}
-              {archive.cachedAt ? formatRelativeTime(archive.cachedAt) : 'earlier'}
-            </Text>
-          ) : null}
-
-          {visible.length === 0 ? (
-            <Card style={{ gap: theme.spacing.xs }}>
-              <Text variant="bodyStrong">
-                {active > 0 ? 'No advisories match' : 'Nothing in the archive'}
-              </Text>
-              <Text variant="body" muted>
-                {active > 0
-                  ? 'Try a different activity, or clear a filter.'
-                  : 'Published advisories will appear here.'}
-              </Text>
-            </Card>
-          ) : (
-            <>
+        <AsyncStateView
+          status={archive.status}
+          error={archive.error}
+          onRetry={archive.refetch}
+          skeleton={<ArchiveSkeleton />}
+        >
+          <View style={{ flex: 1, gap: theme.spacing.lg }}>
+            {/* Three situations, three different things to say. A single generic
+                "nothing here" would leave a farmer unable to tell an unpublished
+                district from a lost connection. */}
+            {fallback !== null ? (
+              <Card style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+                <Text variant="body" muted style={{ flex: 1 }}>
+                  {fallback === 'empty'
+                    ? 'Nothing has been published yet. These are samples, showing what will appear once your extension office uploads an advisory.'
+                    : 'The server could not be reached, so these are samples rather than your own advisories.'}
+                </Text>
+                <MockDataTag />
+              </Card>
+            ) : archive.usingCachedFallback ? (
               <Text variant="caption" muted>
-                {visible.length} {visible.length === 1 ? 'advisory' : 'advisories'}
-                {visible.length !== entries.length ? ` of ${entries.length}` : ''}
-                {scope ? ` · ${scope}` : ''}
+                Showing advisories saved{' '}
+                {archive.cachedAt ? formatRelativeTime(archive.cachedAt) : 'earlier'}
               </Text>
+            ) : null}
 
-              {groups.map((group) => (
-                <View key={group.year} style={{ gap: theme.spacing.sm }}>
-                  <YearMarker year={group.year} count={group.entries.length} />
-
-                  {/* One card per year, rows divided by hairlines. Seven
-                      floating cards read as seven unrelated things; rows under
-                      one edge read as a list. */}
-                  <Card style={{ paddingHorizontal: 0, paddingVertical: 0, overflow: 'hidden' }}>
-                    {group.entries.map((entry, index) => (
-                      <ArchiveRow
-                        key={entry.id}
-                        entry={entry}
-                        first={index === 0}
-                        matched={matchedActivities(entry, filter)}
-                        showRegion={filter.region === UNSET}
-                        onOpen={openAdvisory}
-                      />
-                    ))}
-                  </Card>
-                </View>
-              ))}
-            </>
-          )}
-        </View>
-      </AsyncStateView>
+            {visible.length === 0 ? (
+              <Card style={{ gap: theme.spacing.xs }}>
+                <Text variant="bodyStrong">
+                  {active > 0 ? 'No advisories match' : 'Nothing in the archive'}
+                </Text>
+                <Text variant="body" muted>
+                  {active > 0
+                    ? 'Try a different activity, or clear a filter.'
+                    : 'Published advisories will appear here.'}
+                </Text>
+              </Card>
+            ) : (
+              <FlatList
+                style={{ flex: 1 }}
+                data={groups}
+                keyExtractor={(group) => group.year}
+                renderItem={({ item }) => <YearGroupCard group={item} filter={filter} onOpen={openAdvisory} />}
+                contentContainerStyle={{ gap: theme.spacing.lg }}
+                ListHeaderComponent={
+                  <Text variant="caption" muted>
+                    {visible.length} {visible.length === 1 ? 'advisory' : 'advisories'}
+                    {visible.length !== entries.length ? ` of ${entries.length}` : ''}
+                    {scope ? ` · ${scope}` : ''}
+                  </Text>
+                }
+                ListHeaderComponentStyle={{ marginBottom: theme.spacing.sm }}
+              />
+            )}
+          </View>
+        </AsyncStateView>
+      </View>
     </Screen>
   );
 }

@@ -123,19 +123,33 @@ export function PhotoCapture({ imageUri, onChange }: Props) {
 
   if (isCameraOpen) {
     return (
+      // `CameraView` no longer supports children — nesting the Cancel/Capture
+      // row inside it (as this used to) throws "The <CameraView> component
+      // does not support children. This may lead to inconsistent behaviour
+      // or crashes", which is exactly what a farmer saw as the buttons (and
+      // sometimes the whole camera) vanishing right after opening it. The
+      // overlay has to be a sibling, absolutely positioned over the preview
+      // — which is the fix the warning itself names.
       <Card style={{ padding: 0, overflow: 'hidden', aspectRatio: 3 / 4 }}>
-        <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back">
-          <View style={{ flex: 1, justifyContent: 'flex-end', padding: theme.spacing.lg }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Button label="Cancel" variant="outline" onPress={() => setIsCameraOpen(false)} />
-              <Button
-                label="Capture"
-                onPress={capturePhoto}
-                icon={<Ionicons name="camera" size={18} color={theme.colors.onAccent} />}
-              />
-            </View>
+        <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back" />
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            padding: theme.spacing.lg,
+          }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Button label="Cancel" variant="outline" onPress={() => setIsCameraOpen(false)} />
+            <Button
+              label="Capture"
+              onPress={capturePhoto}
+              icon={<Ionicons name="camera" size={18} color={theme.colors.onAccent} />}
+            />
           </View>
-        </CameraView>
+        </View>
       </Card>
     );
   }

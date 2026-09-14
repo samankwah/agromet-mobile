@@ -1,12 +1,12 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
 import { DayDetailScreen } from '../../features/forecasts/day-detail/DayDetailScreen';
 import { getWeeklyForecast } from '../../shared/api/forecastService';
-import { queryClient } from '../../shared/api/queryClient';
+import { createTestQueryClient } from '../testQueryClient';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { stubWeatherFetch } from '../fixtures/openMeteo';
 
@@ -21,11 +21,13 @@ const TEST_SAFE_AREA_METRICS = {
   insets: { top: 0, left: 0, right: 0, bottom: 0 },
 };
 
+let client: QueryClient;
+
 function renderScreen(date: string) {
   return render(
     <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
       <ThemeProvider>
-        <QueryClientProvider client={queryClient}>
+        <QueryClientProvider client={client}>
           <DayDetailScreen date={date} />
         </QueryClientProvider>
       </ThemeProvider>
@@ -44,10 +46,18 @@ describe('DayDetailScreen', () => {
     date = (await getWeeklyForecast('accra')).days[0].date;
   });
 
+  // A client of its own, with retries off: even with fetch always
+  // succeeding via stubWeatherFetch(), the shared app client's `retry: 2` /
+  // background-refetch machinery schedules an internal timer that outlives
+  // the test — see HomeScreen.test.tsx.
   beforeEach(() => {
     stubWeatherFetch();
-    queryClient.clear();
+    client = createTestQueryClient();
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    client.clear();
   });
 
   it('shows the header immediately, before the forecast has loaded', () => {

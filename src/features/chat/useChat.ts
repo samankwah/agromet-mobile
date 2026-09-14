@@ -130,6 +130,20 @@ export function describeChatError(error: unknown): string {
 export function useChat() {
   const [state, dispatch] = useReducer(reducer, { messages: [], pendingId: null, lastDelivery: null });
 
+  // `retry`'s identity is what `MessageList`'s memoized `renderItem` actually
+  // depends on to skip re-rendering old bubbles — closing over `state`
+  // directly would rebuild it on every dispatch within a turn (ask, answer,
+  // fail all touch `state.messages`), which defeats that memoization just as
+  // thoroughly as not memoizing at all. Read the latest state through a ref
+  // instead, so `retry` needs to change identity only when `run`/`runPhoto`
+  // themselves do. Written in an effect rather than during render: a render
+  // can be started and discarded before it commits, and this ref must only
+  // ever reflect state that actually landed.
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
   const selectedLocationId = useLocationStore((store) => store.selectedLocationId);
   const favouriteCrops = useSettingsStore((store) => store.favouriteCrops);
 
@@ -156,16 +170,32 @@ export function useChat() {
   // Written after every settled turn rather than on every keystroke of state:
   // the transcript only changes when a turn lands, and a write per turn on a
   // low-end phone is nothing.
+  //
+  // "After every settled turn" is now enforced, not just intended: `ask`
+  // changes `state.messages` too (the question joins the transcript before
+  // it has an answer), and this effect used to fire — and pay for a full
+  // rewrite of up to 200 messages — on that write as well as on the one that
+  // follows it. `loadChatHistory`'s `settledMessages()` already drops any
+  // question with no answer under it, so that first write could never be the
+  // thing restored; skipping it while a turn is pending halves the writes
+  // for nothing lost.
   const hydrated = useRef(false);
   useEffect(() => {
     if (!hydrated.current) {
       hydrated.current = true;
       if (state.messages.length === 0) return;
     }
+    if (state.pendingId !== null) return;
     saveChatHistory(state.messages);
-  }, [state.messages]);
+  }, [state.messages, state.pendingId]);
 
-  const mutation = useMutation({
+  // Destructured rather than kept as `mutation.mutate` at the call site
+  // below: `mutate` itself is what react-query keeps referentially stable
+  // across renders, but the object it hangs off is a fresh one every render
+  // (it also carries `isPending`, `data`, ...) — depending on the whole
+  // object in `run` below would rebuild it, and therefore `retry`, on every
+  // render regardless of `state`.
+  const { mutate } = useMutation({
     mutationFn: sendChatMessage,
     // Explicit even though mutations already default to no retries: silently
     // retrying a 25-second request twice is a minute-long hang with nothing
@@ -175,7 +205,7 @@ export function useChat() {
 
   const run = useCallback(
     (id: string, text: string, history: ChatTurn[]) => {
-      mutation.mutate(
+      mutate(
         { message: text, history, userContext },
         {
           onSuccess: (reply) => {
@@ -200,7 +230,7 @@ export function useChat() {
         },
       );
     },
-    [mutation, userContext],
+    [mutate, userContext],
   );
 
   const send = useCallback(
@@ -275,8 +305,12 @@ export function useChat() {
 
   const retry = useCallback(
     (id: string) => {
-      const message = state.messages.find((entry) => entry.id === id);
-      if (!message || state.pendingId) return;
+      // Through the ref, not `state` directly — see the comment on
+      // `stateRef` above. This is what lets `retry` keep one identity for
+      // the life of the transcript instead of a new one every turn.
+      const { messages, pendingId } = stateRef.current;
+      const message = messages.find((entry) => entry.id === id);
+      if (!message || pendingId) return;
 
       dispatch({ type: 'retry', id });
 
@@ -289,9 +323,9 @@ export function useChat() {
         return;
       }
 
-      run(id, message.text, historyFor(state.messages, id));
+      run(id, message.text, historyFor(messages, id));
     },
-    [run, runPhoto, state.messages, state.pendingId],
+    [run, runPhoto],
   );
 
   const clear = useCallback(() => {

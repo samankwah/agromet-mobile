@@ -15,6 +15,63 @@ type Row =
   | { key: string; kind: 'date'; label: string }
   | { key: string; kind: 'message'; message: ChatMessage; isFirstInGroup: boolean; state: BubbleState };
 
+type MessageRowItem = Extract<Row, { kind: 'message' }>;
+
+type MessageRowProps = {
+  item: MessageRowItem;
+  isSending: boolean;
+  onRetry: (id: string) => void;
+  onToggleSpeech?: (id: string, text: string) => void;
+  speakingId?: string | null;
+  onOpenActions: (message: ChatMessage) => void;
+};
+
+/**
+ * One message bubble, memoized.
+ *
+ * `onRetry`/`onToggleSpeech`/`onOpenActions` arrive id-agnostic from
+ * `MessageList` (stable once useChat's own retry is — see useChat.ts), and
+ * are bound to this row's own message id here rather than in the caller, so
+ * the closures below depend only on this row's own (stable) message id and
+ * not on anything that changes elsewhere in the transcript.
+ */
+const MessageRow = React.memo(function MessageRow({
+  item,
+  isSending,
+  onRetry,
+  onToggleSpeech,
+  speakingId,
+  onOpenActions,
+}: MessageRowProps) {
+  const theme = useTheme();
+  const handleRetry = useCallback(() => onRetry(item.message.id), [onRetry, item.message.id]);
+  const handleToggleSpeech = useCallback(
+    () => onToggleSpeech?.(item.message.id, item.message.text),
+    [onToggleSpeech, item.message.id, item.message.text],
+  );
+  const handleLongPress = useCallback(() => onOpenActions(item.message), [onOpenActions, item.message]);
+
+  return (
+    <View style={{ marginTop: item.isFirstInGroup ? theme.spacing.md : theme.spacing.xs }}>
+      <MessageBubble
+        message={item.message}
+        state={item.state}
+        isFirstInGroup={item.isFirstInGroup}
+        errorMessage={item.message.errorText}
+        onRetry={handleRetry}
+        retryDisabled={isSending}
+        // Only finished answers: reading the farmer's own words back, or
+        // speaking a reply that failed to arrive, would be noise.
+        onToggleSpeech={
+          onToggleSpeech && item.message.role === 'assistant' && item.state !== 'failed' ? handleToggleSpeech : undefined
+        }
+        isSpeaking={speakingId === item.message.id}
+        onLongPress={handleLongPress}
+      />
+    </View>
+  );
+});
+
 type Props = {
   messages: ChatMessage[];
   isSending: boolean;
@@ -123,6 +180,48 @@ export function MessageList({ messages, isSending, onRetry, onToggleSpeech, spea
     return isSending ? [{ key: 'typing', kind: 'typing' }, ...reversed] : reversed;
   }, [messages, isSending]);
 
+  // Was an inline closure passed straight to `FlatList`, rebuilt on every
+  // render of this list. `MessageRow` above is the half of the fix that
+  // matters more: memoized rows only skip re-rendering when their own props
+  // are unchanged, and `rows` above is rebuilt element-for-element on every
+  // recompute (a new message, `isSending` flipping) — so today, `MessageRow`
+  // still re-renders down the whole list on every turn regardless of this.
+  // Fixing that fully means `rows` reusing row objects for messages that
+  // did not change, which is a larger change to the grouping/day-separator
+  // logic above; this is the smaller, still-real half — a stable `renderItem`
+  // and stable id-bound handlers per row.
+  const renderItem = useCallback(
+    ({ item }: { item: Row }) => {
+      if (item.kind === 'typing') {
+        return (
+          <View style={{ marginTop: theme.spacing.xs }}>
+            <TypingIndicator />
+          </View>
+        );
+      }
+
+      if (item.kind === 'date') {
+        return (
+          <View style={{ marginTop: theme.spacing.lg, marginBottom: theme.spacing.xs }}>
+            <DateSeparator label={item.label} />
+          </View>
+        );
+      }
+
+      return (
+        <MessageRow
+          item={item}
+          isSending={isSending}
+          onRetry={onRetry}
+          onToggleSpeech={onToggleSpeech}
+          speakingId={speakingId}
+          onOpenActions={setActionsFor}
+        />
+      );
+    },
+    [theme, isSending, onRetry, onToggleSpeech, speakingId],
+  );
+
   return (
     <>
       <FlatList
@@ -152,45 +251,7 @@ export function MessageList({ messages, isSending, onRetry, onToggleSpeech, spea
         maxToRenderPerBatch={8}
         windowSize={7}
         removeClippedSubviews
-        renderItem={({ item }) => {
-          if (item.kind === 'typing') {
-            return (
-              <View style={{ marginTop: theme.spacing.xs }}>
-                <TypingIndicator />
-              </View>
-            );
-          }
-
-          if (item.kind === 'date') {
-            return (
-              <View style={{ marginTop: theme.spacing.lg, marginBottom: theme.spacing.xs }}>
-                <DateSeparator label={item.label} />
-              </View>
-            );
-          }
-
-          return (
-            <View style={{ marginTop: item.isFirstInGroup ? theme.spacing.md : theme.spacing.xs }}>
-              <MessageBubble
-                message={item.message}
-                state={item.state}
-                isFirstInGroup={item.isFirstInGroup}
-                errorMessage={item.message.errorText}
-                onRetry={() => onRetry(item.message.id)}
-                retryDisabled={isSending}
-                // Only finished answers: reading the farmer's own words back, or
-                // speaking a reply that failed to arrive, would be noise.
-                onToggleSpeech={
-                  onToggleSpeech && item.message.role === 'assistant' && item.state !== 'failed'
-                    ? () => onToggleSpeech(item.message.id, item.message.text)
-                    : undefined
-                }
-                isSpeaking={speakingId === item.message.id}
-                onLongPress={() => setActionsFor(item.message)}
-              />
-            </View>
-          );
-        }}
+        renderItem={renderItem}
       />
 
       <OptionSheet

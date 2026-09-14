@@ -1,6 +1,7 @@
 import React from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 import type { DailyForecast, WeeklyForecast } from '../../../shared/domain/forecast';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -56,26 +57,41 @@ export function FeaturedForecastCard({ forecast, status, error, onRetry }: Props
  * Equal flex is what keeps the row honest at every text size the settings offer
  * — at extra-large the columns narrow together instead of the last two falling
  * off the card. Each label is clamped to one line for the same reason.
+ *
+ * Each column is its own `Pressable` to that day's detail page, nested inside
+ * the card's own `Pressable` (which opens the 7-day list). RN's responder
+ * system hands the touch to the innermost one, so tapping a day never falls
+ * through to the card-wide navigation — the reader lands on the day they
+ * actually tapped, not on the weekly list with an extra tap still owed.
  */
 function WeekStrip({ days }: { days: DailyForecast[] }) {
   const theme = useTheme();
 
   return (
     <View style={{ flexDirection: 'row', marginTop: theme.spacing.xs }}>
-      {days.map((day, index) => (
-        <View key={day.date} style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-          <Text variant="caption" muted numberOfLines={1}>
-            {index === 0 ? 'Today' : weekdayLabel(day.date)}
-          </Text>
-          <Ionicons name={getConditionIcon(day.condition)} size={17} color={theme.colors.muted} />
-          <Text variant="bodyStrong" numberOfLines={1}>
-            {formatDegrees(day.tempMaxC)}
-          </Text>
-          <Text variant="caption" muted numberOfLines={1}>
-            {formatDegrees(day.tempMinC)}
-          </Text>
-        </View>
-      ))}
+      {days.map((day, index) => {
+        const label = index === 0 ? 'Today' : weekdayLabel(day.date);
+        return (
+          <Pressable
+            key={day.date}
+            onPress={() => router.push(`/forecast-day/${day.date}`)}
+            accessibilityRole="button"
+            accessibilityLabel={`${label}, ${day.condition}, high ${formatDegrees(day.tempMaxC)}, low ${formatDegrees(day.tempMinC)}. Open full forecast.`}
+            style={({ pressed }) => ({ flex: 1, alignItems: 'center', gap: 3, opacity: pressed ? 0.6 : 1 })}
+          >
+            <Text variant="caption" muted numberOfLines={1}>
+              {label}
+            </Text>
+            <Ionicons name={getConditionIcon(day.condition)} size={17} color={theme.colors.muted} />
+            <Text variant="bodyStrong" numberOfLines={1}>
+              {formatDegrees(day.tempMaxC)}
+            </Text>
+            <Text variant="caption" muted numberOfLines={1}>
+              {formatDegrees(day.tempMinC)}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }

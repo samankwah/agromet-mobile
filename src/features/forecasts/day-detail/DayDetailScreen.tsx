@@ -10,7 +10,6 @@ import type { DailyForecast, HourlyForecast, WeeklyForecast } from '../../../sha
 import { useLocationStore } from '../../../shared/state/locationStore';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../../shared/ui/AsyncStateView';
-import { BulletList } from '../../../shared/ui/BulletList';
 import { Card } from '../../../shared/ui/Card';
 import { DetailRow } from '../../../shared/ui/DetailRow';
 import { Divider } from '../../../shared/ui/Divider';
@@ -25,6 +24,7 @@ import { Text } from '../../../shared/ui/Text';
 import { formatTemperature } from '../../../shared/utils/formatTemperature';
 import { formatWind } from '../../../shared/utils/formatWind';
 import { getConditionIcon } from '../../../shared/utils/getConditionIcon';
+import { HOT_DAY_C } from '../../../shared/utils/weatherNarrative';
 import { DayStrip } from './DayStrip';
 import { HourlyConditionStrip, hasVaryingConditions } from './HourlyConditionStrip';
 import { DayDetailSkeleton } from '../components/ForecastSkeletons';
@@ -41,9 +41,18 @@ function hourOf(iso: string): number {
   return new Date(iso).getUTCHours();
 }
 
-/** Builds the plain-language recap the reference shows, from the day's own
+/**
+ * Builds the plain-language recap the reference shows, from the day's own
  * hourly curve rather than canned text — so it always matches the chart
- * directly above it. */
+ * directly above it.
+ *
+ * Impact-first, and deliberately about *when* rather than *whether*: the
+ * rain/fieldwork read already has its own card further down ("What This
+ * Means For Your Farm"), so restating rainfall probability and mm here would
+ * be the same sentence twice on one screen. This one earns its place by
+ * saying something the chart alone doesn't — which hours are worth planning
+ * heavy or outdoor work around.
+ */
 function buildDailySummary(day: DailyForecast, hours: HourlyForecast[]): string {
   if (hours.length === 0) return day.farmerInterpretation;
 
@@ -51,12 +60,21 @@ function buildDailySummary(day: DailyForecast, hours: HourlyForecast[]): string 
   const coolest = hours.reduce((a, b) => (b.tempC < a.tempC ? b : a));
   const fmt = (h: HourlyForecast) => new Date(h.hour).toLocaleTimeString(undefined, { hour: 'numeric', timeZone: 'UTC' });
   const weekday = new Date(day.date).toLocaleDateString(undefined, { weekday: 'long' });
+  const swing = warmest.tempC - coolest.tempC;
 
-  return (
-    `${weekday}'s low will be ${formatTemperature(coolest.tempC)} around ${fmt(coolest)}, ` +
-    `and the high will be ${formatTemperature(warmest.tempC)} around ${fmt(warmest)}. ` +
-    `Rain is most likely at ${day.rainfallProbabilityPct}% chance, with about ${day.rainfallMm} mm expected.`
-  );
+  if (warmest.tempC >= HOT_DAY_C) {
+    return (
+      `${weekday} gets hot by ${fmt(warmest)}, up to ${formatTemperature(warmest.tempC)}. Do heavy work before then, ` +
+      `or after it cools back to ${formatTemperature(coolest.tempC)}.`
+    );
+  }
+  if (swing >= 8) {
+    return (
+      `${weekday} warms from ${formatTemperature(coolest.tempC)} near ${fmt(coolest)} to ${formatTemperature(warmest.tempC)} ` +
+      `by ${fmt(warmest)}. Morning is the easier time to work.`
+    );
+  }
+  return `${weekday} stays much the same all day, ${formatTemperature(coolest.tempC)} to ${formatTemperature(warmest.tempC)}. Any time is fine to work.`;
 }
 
 type Props = { date: string };
@@ -583,7 +601,6 @@ function DayDetail({
         <Text variant="body" muted>
           {day.farmerInterpretation}
         </Text>
-        <BulletList items={week.farmerActionCard.actions} accent />
       </Card>
     </View>
   );
