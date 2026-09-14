@@ -1,15 +1,16 @@
 import React from 'react';
 import { Pressable, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
-import type { WeeklyForecast } from '../../../shared/domain/forecast';
+import type { DailyForecast, WeeklyForecast } from '../../../shared/domain/forecast';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../../shared/ui/AsyncStateView';
-import { Card } from '../../../shared/ui/Card';
-import { MockDataTag } from '../../../shared/ui/MockDataTag';
 import { Text } from '../../../shared/ui/Text';
-import { formatRelativeTime } from '../../../shared/utils/formatRelativeTime';
-import { formatTemperature } from '../../../shared/utils/formatTemperature';
+import { formatDegrees } from '../../../shared/utils/formatTemperature';
+import { getConditionIcon } from '../../../shared/utils/getConditionIcon';
+import { FeaturedForecastSkeleton } from './HomeSkeletons';
+import { TeaserCard } from './TeaserCard';
 
 type Props = {
   forecast: WeeklyForecast | undefined;
@@ -18,50 +19,86 @@ type Props = {
   onRetry: () => void;
 };
 
-/** Home's teaser into the (not-yet-built) Forecasts tab — today + next 2
- * days' range plus a one-line plain-language summary, never presented as
- * more certain than a short-range forecast actually is (contrast with the
- * subseasonal/seasonal outlook types, which carry a mandatory uncertainty
- * summary for exactly this reason). Presentational only — data comes from
- * useHomeData, same pattern as every other Home card. */
+/**
+ * Home's week at a glance, above the fold of the Forecasts tab.
+ *
+ * It used to promise "7-day outlook" and show three days, left-aligned against
+ * an empty half-card, with the minimum temperature as an unlabelled grey number
+ * under the maximum — no icon, no way to tell which figure was which. It also
+ * repeated the "Updated X ago" caption that the conditions card directly above
+ * already carries, from the same fetch.
+ *
+ * Now it shows the week it names: seven equal columns, each with the day, what
+ * the sky is doing, and the high over the low. The timestamp is gone as a
+ * duplicate. This is a glance, not a replacement for the Forecasts tab's day
+ * rows — which is why there is no rainfall column and no range bar here.
+ */
 export function FeaturedForecastCard({ forecast, status, error, onRetry }: Props) {
-  const theme = useTheme();
-
   return (
-    <AsyncStateView status={status} error={error} onRetry={onRetry}>
+    <AsyncStateView status={status} error={error} onRetry={onRetry} skeleton={<FeaturedForecastSkeleton />}>
       {forecast ? (
-        <Pressable
-          onPress={() => router.push('/(tabs)/forecasts')}
-          accessibilityRole="button"
-          accessibilityLabel="Featured weekly forecast. View Forecasts tab."
+        <TeaserCard
+          label="This week"
+          href="/(tabs)/forecasts?segment=weekly"
+          action="7-day forecast"
+          accessibilityLabel={`This week: ${forecast.summary} View the 7-day forecast.`}
         >
-          <Card style={{ gap: theme.spacing.sm }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <Text variant="caption" muted>
-                7-day outlook
-              </Text>
-              <Text variant="caption" muted>
-                Updated {formatRelativeTime(forecast.generatedAt)}
-              </Text>
-            </View>
-            <Text variant="body">{forecast.summary}</Text>
-            <View style={{ flexDirection: 'row', gap: theme.spacing.lg }}>
-              {forecast.days.slice(0, 3).map((day) => (
-                <View key={day.date} style={{ alignItems: 'center' }}>
-                  <Text variant="caption" muted>
-                    {new Date(day.date).toLocaleDateString(undefined, { weekday: 'short' })}
-                  </Text>
-                  <Text variant="bodyStrong">{formatTemperature(day.tempMaxC)}</Text>
-                  <Text variant="caption" muted>
-                    {formatTemperature(day.tempMinC)}
-                  </Text>
-                </View>
-              ))}
-            </View>
-            <MockDataTag />
-          </Card>
-        </Pressable>
+          <Text variant="body">{forecast.summary}</Text>
+          <WeekStrip days={forecast.days} />
+        </TeaserCard>
       ) : null}
     </AsyncStateView>
   );
+}
+
+/**
+ * Seven columns, sized by `flex` rather than a fixed width.
+ *
+ * Equal flex is what keeps the row honest at every text size the settings offer
+ * — at extra-large the columns narrow together instead of the last two falling
+ * off the card. Each label is clamped to one line for the same reason.
+ *
+ * Each column is its own `Pressable` to that day's detail page, nested inside
+ * the card's own `Pressable` (which opens the 7-day list). RN's responder
+ * system hands the touch to the innermost one, so tapping a day never falls
+ * through to the card-wide navigation — the reader lands on the day they
+ * actually tapped, not on the weekly list with an extra tap still owed.
+ */
+function WeekStrip({ days }: { days: DailyForecast[] }) {
+  const theme = useTheme();
+
+  return (
+    <View style={{ flexDirection: 'row', marginTop: theme.spacing.xs }}>
+      {days.map((day, index) => {
+        const label = index === 0 ? 'Today' : weekdayLabel(day.date);
+        return (
+          <Pressable
+            key={day.date}
+            onPress={() => router.push(`/forecast-day/${day.date}`)}
+            accessibilityRole="button"
+            accessibilityLabel={`${label}, ${day.condition}, high ${formatDegrees(day.tempMaxC)}, low ${formatDegrees(day.tempMinC)}. Open full forecast.`}
+            style={({ pressed }) => ({ flex: 1, alignItems: 'center', gap: 3, opacity: pressed ? 0.6 : 1 })}
+          >
+            <Text variant="caption" muted numberOfLines={1}>
+              {label}
+            </Text>
+            <Ionicons name={getConditionIcon(day.condition)} size={17} color={theme.colors.muted} />
+            <Text variant="bodyStrong" numberOfLines={1}>
+              {formatDegrees(day.tempMaxC)}
+            </Text>
+            <Text variant="caption" muted numberOfLines={1}>
+              {formatDegrees(day.tempMinC)}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Open-Meteo dates are plain `YYYY-MM-DD`, which `new Date` reads as UTC
+ * midnight. Ghana is UTC+0, so the weekday is the right one without any
+ * timezone handling — the same assumption `openMeteo.ts` documents. */
+function weekdayLabel(date: string): string {
+  return new Date(date).toLocaleDateString(undefined, { weekday: 'short' });
 }

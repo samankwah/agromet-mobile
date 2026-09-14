@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 
 import type { SeasonalOutlook } from '../../../shared/domain/seasonalOutlook';
 import { useNetworkStatus } from '../../../shared/net/useNetworkStatus';
@@ -17,6 +17,7 @@ import { MockDataTag } from '../../../shared/ui/MockDataTag';
 import { SegmentedControl } from '../../../shared/ui/SegmentedControl';
 import { Text } from '../../../shared/ui/Text';
 import { useSpatialOutlookData } from './useSpatialOutlookData';
+import { SpatialOutlookSkeleton } from '../components/ForecastSkeletons';
 
 const FORECAST_VIEW_SEGMENTS = ['Probability', 'Deterministic'];
 const GEOGRAPHY_SEGMENTS = ['Region', 'District'];
@@ -41,7 +42,10 @@ type Props = {
 export function SpatialOutlookView({ seasonal }: Props) {
   const theme = useTheme();
   const { isOnline } = useNetworkStatus();
-  const [drawerExpanded, setDrawerExpanded] = useState(true);
+  // Starts collapsed: on arrival the map is the thing to see, with just the
+  // legend showing beneath it. The reader taps the handle to bring the
+  // selectors up when they want to change what the map shows.
+  const [drawerExpanded, setDrawerExpanded] = useState(false);
 
   const {
     forecastView,
@@ -63,7 +67,7 @@ export function SpatialOutlookView({ seasonal }: Props) {
 
   return (
     <View style={{ flex: 1 }}>
-      <AsyncStateView status={status} error={error} onRetry={refetch}>
+      <AsyncStateView status={status} error={error} onRetry={refetch} skeleton={<SpatialOutlookSkeleton />}>
         {/* Online: MapLibre over a CARTO basemap, so the forecast reads
             against real place names and roads. Offline: fall back to the
             SVG renderer, which draws the same data from the boundary file
@@ -97,7 +101,7 @@ export function SpatialOutlookView({ seasonal }: Props) {
 
       <Drawer
         expanded={drawerExpanded}
-        onToggle={() => setDrawerExpanded((previous) => !previous)}
+        onExpandedChange={setDrawerExpanded}
         persistentContent={
           dataset ? (
             <View style={{ gap: theme.spacing.xs }}>
@@ -115,7 +119,10 @@ export function SpatialOutlookView({ seasonal }: Props) {
           ) : null
         }
       >
-        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }} contentContainerStyle={{ gap: theme.spacing.lg }}>
+        {/* Drawer supplies the one scroll container, shared with the legend
+            above — a nested ScrollView here would fight it for the drag/
+            scroll gesture that expands the sheet. */}
+        <View style={{ gap: theme.spacing.lg }}>
           <View>
             <FieldLabel>FORECAST VIEW</FieldLabel>
             <SegmentedControl
@@ -124,6 +131,7 @@ export function SpatialOutlookView({ seasonal }: Props) {
               onChange={(index) => setForecastView(index === 0 ? 'probability' : 'deterministic')}
               accessibilityLabel="Forecast view"
               variant="pill"
+              equalWidth
             />
           </View>
 
@@ -135,6 +143,7 @@ export function SpatialOutlookView({ seasonal }: Props) {
               onChange={(index) => setGeography(index === 0 ? 'region' : 'district')}
               accessibilityLabel="Geography level"
               variant="pill"
+              equalWidth
             />
           </View>
 
@@ -165,7 +174,7 @@ export function SpatialOutlookView({ seasonal }: Props) {
           ) : null}
 
           <MockDataTag />
-        </ScrollView>
+        </View>
       </Drawer>
     </View>
   );

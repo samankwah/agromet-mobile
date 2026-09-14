@@ -1,4 +1,11 @@
 import { getHourlyForecast, getSeasonalOutlook, getWeeklyForecast } from '../../shared/api/forecastService';
+import { buildOpenMeteoFixture, stubWeatherFetch } from '../fixtures/openMeteo';
+
+// Open-Meteo, stubbed. Without this the suite makes a live request per test —
+// slow, flaky, and dependent on someone else's uptime.
+beforeEach(() => {
+  stubWeatherFetch();
+});
 
 describe('forecastService', () => {
   it('getWeeklyForecast returns 7 days for a known town', async () => {
@@ -16,6 +23,43 @@ describe('forecastService', () => {
 
   it('getHourlyForecast rejects an unknown location', async () => {
     await expect(getHourlyForecast('not-a-real-town')).rejects.toThrow();
+  });
+
+  it('getWeeklyForecast carries a summary and actions derived from the numbers', async () => {
+    // No weather provider emits these — they are generated from the forecast
+    // (see utils/weatherNarrative.ts). Non-optional in the domain type, so an
+    // empty one would render as a blank card.
+    const forecast = await getWeeklyForecast('accra');
+    expect(forecast.summary.length).toBeGreaterThan(0);
+    expect(forecast.farmerActionCard.headline.length).toBeGreaterThan(0);
+    expect(forecast.farmerActionCard.actions.length).toBeGreaterThan(0);
+    for (const day of forecast.days) {
+      expect(day.farmerInterpretation.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('getWeeklyForecast carries no severe-weather alert on a calm forecast', async () => {
+    const forecast = await getWeeklyForecast('accra');
+    expect(forecast.weatherAlerts).toEqual([]);
+  });
+
+  it('getWeeklyForecast surfaces a severe-weather alert when the forecast has one', async () => {
+    stubWeatherFetch(buildOpenMeteoFixture({ severe: { 0: { apparentMaxC: 44 } } }));
+    const forecast = await getWeeklyForecast('accra');
+    expect(forecast.weatherAlerts).toHaveLength(1);
+    expect(forecast.weatherAlerts[0].hazardType).toBe('Extreme heat');
+    expect(forecast.weatherAlerts[0].district).toBe('Accra');
+  });
+
+  it('getWeeklyForecast reports humidity per day, not a zero it never measured', async () => {
+    // Open-Meteo has no daily humidity aggregate, so it is meaned from the
+    // day's hourly series. Left at zero it would read as very dry air rather
+    // than as a missing value.
+    const forecast = await getWeeklyForecast('accra');
+    for (const day of forecast.days) {
+      expect(day.humidityPct).toBeGreaterThan(0);
+      expect(day.humidityPct).toBeLessThanOrEqual(100);
+    }
   });
 
   it('getSeasonalOutlook rainfall probability categories sum to ~100 — a probabilistic outlook should never imply more or less than full coverage across its own categories', async () => {

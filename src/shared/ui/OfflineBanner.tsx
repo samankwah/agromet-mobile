@@ -33,7 +33,7 @@ export function OfflineBanner() {
     >
       <Ionicons name="cloud-offline-outline" size={16} color={theme.colors.surface} />
       <Text variant="caption" color={theme.colors.surface}>
-        You&apos;re offline — showing saved data where available.
+        You&apos;re offline. Showing saved data where available.
       </Text>
     </View>
   );

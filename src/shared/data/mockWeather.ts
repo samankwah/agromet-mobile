@@ -1,27 +1,60 @@
 import type { CurrentWeather } from '../domain/currentWeather';
 
 /**
- * The 10 towns AgroMet's mobile Home screen supports (the user's exact
- * requested list — cross-referenced against the web app's `ghanaCities`
- * array in frontend/src/pages/Home.jsx for coordinates/region). Structured
- * as one record per town keyed by id so appending more later is a one-line
- * addition, not a refactor.
+ * The towns the Home carousel offers, in the order they appear.
  *
- * Obuasi (from an earlier increment) is deliberately dropped — it isn't in
- * the user's exact 10-town list. Its district catalog entry stays (see
- * districts.ts) since district-level content can still reference it.
+ * The user's exact list, ordered as they gave it — which runs roughly along the
+ * coast from the Togo border westward, then north through the middle belt to the
+ * Upper regions. Keeping that order is deliberate: the carousel is a marquee, so
+ * the sequence reads as a journey up the country rather than an arbitrary jumble.
+ *
+ * All sixteen regions are represented, which matters beyond the carousel —
+ * `region` is what matches a town to a flood/drought reading, and
+ * `districts.ts` maps every id here to an MMDA so district-scoped advisories
+ * resolve for whichever town is selected.
+ *
+ * **Yendi is Northern, not North East.** It was listed as North East before,
+ * which is wrong: Yendi remained in Northern Region when North East was carved
+ * out in 2018, and North East's capital is Nalerigu (now its own entry below).
+ * The error was invisible while it was only a label; it is not invisible now
+ * that `region` selects which hazard reading a town inherits.
+ *
+ * The file is still named `mockWeather` for the mock records further down, which
+ * nothing live reads any more — the real readings come from Open-Meteo.
  */
 export const HOME_LOCATIONS: { id: string; name: string; lat: number; lng: number; region: string }[] = [
+  { id: 'aflao', name: 'Aflao', lat: 6.1189, lng: 1.1918, region: 'Volta' },
+  { id: 'anloga', name: 'Anloga', lat: 5.7947, lng: 0.8972, region: 'Volta' },
   { id: 'accra', name: 'Accra', lat: 5.6037, lng: -0.187, region: 'Greater Accra' },
-  { id: 'kumasi', name: 'Kumasi', lat: 6.6885, lng: -1.6244, region: 'Ashanti' },
-  { id: 'tamale', name: 'Tamale', lat: 9.4034, lng: -0.8424, region: 'Northern' },
-  { id: 'bolgatanga', name: 'Bolgatanga', lat: 10.7856, lng: -0.8514, region: 'Upper East' },
-  { id: 'damongo', name: 'Damongo', lat: 9.0842, lng: -1.815, region: 'Savannah' },
+  { id: 'kasoa', name: 'Kasoa', lat: 5.5347, lng: -0.4167, region: 'Central' },
+  { id: 'winneba', name: 'Winneba', lat: 5.3511, lng: -0.6231, region: 'Central' },
   { id: 'cape-coast', name: 'Cape Coast', lat: 5.1054, lng: -1.2466, region: 'Central' },
-  { id: 'koforidua', name: 'Koforidua', lat: 6.0941, lng: -0.2631, region: 'Eastern' },
-  { id: 'tema', name: 'Tema', lat: 5.6698, lng: -0.0166, region: 'Greater Accra' },
+  { id: 'takoradi', name: 'Takoradi', lat: 4.8845, lng: -1.7554, region: 'Western' },
+  { id: 'axim', name: 'Axim', lat: 4.8699, lng: -2.2405, region: 'Western' },
   { id: 'ho', name: 'Ho', lat: 6.6009, lng: 0.4709, region: 'Volta' },
-  { id: 'yendi', name: 'Yendi', lat: 9.4427, lng: -0.0093, region: 'North East' },
+  { id: 'koforidua', name: 'Koforidua', lat: 6.0941, lng: -0.2631, region: 'Eastern' },
+  { id: 'akim-oda', name: 'Akim Oda', lat: 5.9271, lng: -0.9847, region: 'Eastern' },
+  { id: 'kwahu-tafo', name: 'Kwahu Tafo', lat: 6.6167, lng: -0.6333, region: 'Eastern' },
+  { id: 'kumasi', name: 'Kumasi', lat: 6.6885, lng: -1.6244, region: 'Ashanti' },
+  { id: 'obuasi', name: 'Obuasi', lat: 6.2028, lng: -1.6703, region: 'Ashanti' },
+  { id: 'tarkwa', name: 'Tarkwa', lat: 5.3004, lng: -1.9959, region: 'Western' },
+  { id: 'sefwi-bekwai', name: 'Sefwi Bekwai', lat: 6.2, lng: -2.3167, region: 'Western North' },
+  { id: 'kete-krachi', name: 'Kete Krachi', lat: 7.7944, lng: -0.05, region: 'Oti' },
+  { id: 'atebubu', name: 'Atebubu', lat: 7.75, lng: -0.9833, region: 'Bono East' },
+  { id: 'ejura', name: 'Ejura', lat: 7.3833, lng: -1.3667, region: 'Ashanti' },
+  { id: 'kintampo', name: 'Kintampo', lat: 8.0563, lng: -1.7306, region: 'Bono East' },
+  { id: 'goaso', name: 'Goaso', lat: 6.8009, lng: -2.5303, region: 'Ahafo' },
+  { id: 'sunyani', name: 'Sunyani', lat: 7.3378, lng: -2.3267, region: 'Bono' },
+  { id: 'techiman', name: 'Techiman', lat: 7.5931, lng: -1.9381, region: 'Bono East' },
+  { id: 'sampa', name: 'Sampa', lat: 7.9333, lng: -2.6833, region: 'Bono' },
+  { id: 'yendi', name: 'Yendi', lat: 9.4427, lng: -0.0093, region: 'Northern' },
+  { id: 'tamale', name: 'Tamale', lat: 9.4034, lng: -0.8424, region: 'Northern' },
+  { id: 'bole', name: 'Bole', lat: 9.0333, lng: -2.4833, region: 'Savannah' },
+  { id: 'damongo', name: 'Damongo', lat: 9.0842, lng: -1.815, region: 'Savannah' },
+  { id: 'bolgatanga', name: 'Bolgatanga', lat: 10.7856, lng: -0.8514, region: 'Upper East' },
+  { id: 'nalerigu', name: 'Nalerigu', lat: 10.5167, lng: -0.3667, region: 'North East' },
+  { id: 'wa', name: 'Wa', lat: 10.06, lng: -2.5057, region: 'Upper West' },
+  { id: 'jirapa', name: 'Jirapa', lat: 10.5333, lng: -2.7, region: 'Upper West' },
 ];
 
 export const DEFAULT_LOCATION_ID = 'accra';
@@ -131,17 +164,6 @@ export const MOCK_CURRENT_CONDITIONS: Record<string, CurrentWeather> = {
     rainfallMm: 4,
     humidityPct: 84,
     windKph: 10,
-  }),
-  tema: forLocation('tema', {
-    observedAt: minutesAgo(11),
-    temperatureC: 28,
-    minC: 25,
-    maxC: 30,
-    feelsLikeC: 30,
-    condition: 'Partly cloudy',
-    rainfallMm: 0,
-    humidityPct: 77,
-    windKph: 16,
   }),
   ho: forLocation('ho', {
     observedAt: minutesAgo(15),

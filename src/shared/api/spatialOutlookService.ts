@@ -54,7 +54,7 @@ export async function getSpatialOutlookGrid(query: SpatialOutlookQuery): Promise
     // legend describes categories rather than the variable's own units —
     // labelling a tercile map "mm" would be actively wrong.
     legend: isTercile
-      ? { min: 0, max: 2, unit: `${variable.label} — likelihood` }
+      ? { min: 0, max: 2, unit: `${variable.label} likelihood` }
       : { min: Math.min(...values), max: Math.max(...values), unit: variable.unit },
     generatedAt: new Date().toISOString(),
   };

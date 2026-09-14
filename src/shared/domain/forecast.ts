@@ -1,3 +1,5 @@
+import type { WeatherAlert } from './weatherAlert';
+
 /**
  * Short-range forecast types — the deterministic end of the forecast
  * timescale spectrum (contrast with subseasonalOutlook.ts/seasonalOutlook.ts,
@@ -45,4 +47,12 @@ export type WeeklyForecast = {
     headline: string;
     actions: string[];
   };
+  /**
+   * Severe-weather alerts for this location, today and tomorrow — thunderstorm,
+   * heavy rain, extreme heat, strong wind. Derived from the same Open-Meteo
+   * bundle these days come from (see `shared/domain/weatherHazards.ts`), so the
+   * banner on Home and Advisories costs no extra request. Empty on a calm day,
+   * which is the point: the old flood-index banner was never empty.
+   */
+  weatherAlerts: WeatherAlert[];
 };

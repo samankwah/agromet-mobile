@@ -95,7 +95,7 @@ export function CycleProgressCard({ cycle, activities, totalWeeks, onSetStatus, 
         <Text variant="bodyStrong">This week</Text>
         {dueNow.length === 0 ? (
           <Text variant="body" muted>
-            Nothing scheduled for week {cycle.currentWeek} — keep up routine monitoring.
+            Nothing scheduled for week {cycle.currentWeek}. Keep up routine monitoring.
           </Text>
         ) : (
           dueNow.map((activity) => (

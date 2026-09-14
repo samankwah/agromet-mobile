@@ -19,7 +19,7 @@ export const MOCK_NEWS: NewsUpdate[] = [
     id: 'news-son-forecast-update',
     title: 'Start-of-season forecast now available for the Northern belt',
     summary:
-      'The season-onset outlook for Northern, Savannah, and Upper regions has been published — check the Advisories tab for details.',
+      'The season-onset outlook for Northern, Savannah, and Upper regions has been published. Check the Advisories tab for details.',
     publishedAt: daysAgo(5),
     category: 'announcement',
   },

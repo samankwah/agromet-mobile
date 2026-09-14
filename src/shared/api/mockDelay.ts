@@ -11,8 +11,14 @@ export function mockDelay<T>(value: T, ms = 400): Promise<T> {
  * etc.) so callers can distinguish "no data for this input" from an
  * unexpected bug. */
 export class ServiceError extends Error {
-  constructor(message: string) {
+  /** HTTP status, when the error came from a real response. Lets a caller
+   * distinguish "not found" from "not ready yet" without matching on the
+   * message text. Absent for mock-service failures. */
+  readonly status?: number;
+
+  constructor(message: string, status?: number) {
     super(message);
     this.name = 'ServiceError';
+    this.status = status;
   }
 }

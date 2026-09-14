@@ -109,3 +109,28 @@ export function monotoneAreaPath(points: PathPoint[], toX: (x: number) => number
   const base = baselineY.toFixed(2);
   return `${line} L ${lastX} ${base} L ${firstX} ${base} Z`;
 }
+
+
+/**
+ * A closed ribbon between two curves, for an uncertainty band.
+ *
+ * The upper edge is drawn forward and the lower edge back, so the two meet as
+ * one filled shape. Both edges use the same monotone smoothing as
+ * `monotoneLinePath`, which matters: a straight-segment band under a smoothed
+ * mean line would show the line crossing outside its own band wherever the
+ * curve bulges.
+ */
+export function monotoneBandPath(
+  upper: PathPoint[],
+  lower: PathPoint[],
+  toX: (x: number) => number,
+  toY: (y: number) => number,
+): string {
+  if (upper.length === 0 || lower.length === 0) return '';
+
+  const top = monotoneLinePath(upper, toX, toY);
+  // Reversed, and with its leading "M" turned into a "L" so the two halves join
+  // instead of starting a second subpath.
+  const bottom = monotoneLinePath([...lower].reverse(), toX, toY).replace(/^M/, 'L');
+  return `${top} ${bottom} Z`;
+}

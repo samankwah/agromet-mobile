@@ -58,6 +58,28 @@ describe('getJson', () => {
     await expect(getJson('/api/enhanced-calendars/999')).rejects.toBeInstanceOf(ServiceError);
   });
 
+  it('prefers the sentence the server wrote to the status code', async () => {
+    /* Some of these are written for the reader: the chat quota answers 429 with
+       "try again in about 15 minutes", which is worth far more to a farmer than
+       "the server rejected the request (429)". */
+    mockFetch.mockResolvedValue(jsonResponse({ detail: 'Please try again in about 15 minutes.' }, false, 429));
+
+    const error = (await getJson('/api/chat').catch((e) => e)) as ServiceError;
+
+    expect(error.message).toBe('Please try again in about 15 minutes.');
+    expect(error.status).toBe(429);
+  });
+
+  it('falls back to the status when the detail is not something to read out', async () => {
+    /* A validation error's `detail` is a list of field objects, and a proxy's is
+       a diagnostic. Both are server-shaped, not reader-shaped. */
+    mockFetch.mockResolvedValue(jsonResponse({ detail: [{ loc: ['body', 'message'], msg: 'too long' }] }, false, 422));
+
+    const error = (await getJson('/api/chat').catch((e) => e)) as ServiceError;
+
+    expect(error.message).toBe('The server rejected the request (422).');
+  });
+
   it('turns a transport failure into a NetworkError, distinguishable from a rejection', async () => {
     mockFetch.mockRejectedValue(new TypeError('Network request failed'));
 

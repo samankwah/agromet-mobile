@@ -2,9 +2,20 @@ import React from 'react';
 import { ActivityIndicator, Pressable, View, type PressableProps } from 'react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
+import { ON_BACKDROP_COLOR } from './PhotoBackdrop';
 import { Text } from './Text';
 
-type Variant = 'primary' | 'secondary' | 'outline';
+/**
+ * `onBackdrop` is the only variant whose colours are fixed rather than themed:
+ * it sits on a photograph, which is as dark as it is in both schemes.
+ *
+ * A light hairline and a light label over a faint translucent fill — not a solid
+ * white button. The fill is what the reference does not need and this app does:
+ * the reference sits on near-black, while a photograph varies underneath, and a
+ * bare outline would leave the label's contrast to whatever happened to be
+ * behind it.
+ */
+type Variant = 'primary' | 'secondary' | 'outline' | 'onBackdrop';
 
 type Props = Omit<PressableProps, 'children' | 'style'> & {
   label: string;
@@ -25,9 +36,23 @@ export function Button({ label, variant = 'primary', loading, disabled, icon, ..
   const isDisabled = disabled || loading;
 
   const backgroundColor =
-    variant === 'primary' ? theme.colors.accent : variant === 'secondary' ? theme.colors.surfaceStrong : 'transparent';
-  const textColor = variant === 'primary' ? theme.colors.onAccent : variant === 'outline' ? theme.colors.accent : theme.colors.text;
-  const borderColor = variant === 'outline' ? theme.colors.accent : 'transparent';
+    variant === 'primary'
+      ? theme.colors.accent
+      : variant === 'onBackdrop'
+        ? 'rgba(255,255,255,0.14)'
+        : variant === 'secondary'
+          ? theme.colors.surfaceStrong
+          : 'transparent';
+  const textColor =
+    variant === 'primary'
+      ? theme.colors.onAccent
+      : variant === 'onBackdrop'
+        ? ON_BACKDROP_COLOR
+        : variant === 'outline'
+          ? theme.colors.accent
+          : theme.colors.text;
+  const borderColor =
+    variant === 'outline' ? theme.colors.accent : variant === 'onBackdrop' ? ON_BACKDROP_COLOR : 'transparent';
 
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ disabled: isDisabled, busy: loading }} disabled={isDisabled} {...rest}>
@@ -41,7 +66,7 @@ export function Button({ label, variant = 'primary', loading, disabled, icon, ..
             minHeight: theme.minTouchTarget,
             paddingHorizontal: theme.spacing.lg,
             borderRadius: theme.radii.md,
-            borderWidth: variant === 'outline' ? 1 : 0,
+            borderWidth: variant === 'outline' || variant === 'onBackdrop' ? 1 : 0,
             borderColor,
             backgroundColor,
             opacity: isDisabled ? 0.6 : pressed ? 0.85 : 1,

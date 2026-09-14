@@ -59,7 +59,7 @@ export const MOCK_ADVISORIES: AgroAdvisory[] = [
     publishedAt: daysAgo(1),
     validUntil: daysFromNow(6),
     summary:
-      'Conditions along the coast remain settled this week with no significant rainfall expected — a good window for weeding and fertilizer application.',
+      'Conditions along the coast remain settled this week with no significant rainfall expected, a good window for weeding and fertilizer application.',
     farmerActions: [
       'Apply fertilizer while soil moisture is adequate but fields are not waterlogged.',
       'Complete weeding before the next rains.',

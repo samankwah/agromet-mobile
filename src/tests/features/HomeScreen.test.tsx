@@ -1,11 +1,20 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { HomeScreen } from '../../features/home/HomeScreen';
-import { queryClient } from '../../shared/api/queryClient';
+import { createTestQueryClient } from '../testQueryClient';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
+
+/* Home's quick actions route via `router` and its carousel flows under
+   `useFocusEffect`; neither has a navigation context in a bare render. The flow
+   is stubbed out entirely — see CityCarousel.test.tsx for why an endless
+   animation must not run here. */
+jest.mock('expo-router', () => ({
+  router: { push: jest.fn(), back: jest.fn() },
+  useFocusEffect: () => {},
+}));
 
 // react-native-safe-area-context needs explicit initial metrics in Jest —
 // there's no native layout pass to derive them from, so SafeAreaProvider
@@ -25,19 +34,39 @@ const TEST_SAFE_AREA_METRICS = {
  * Queries are gated on `hasHydrated` (false at first render, before the
  * Zustand persist middleware resolves), so this renders the loading state
  * for every card — exactly what a farmer's first frame looks like.
+ *
+ * A client of its own, with retries off, and a rejecting fetch: the shared
+ * app client sets `retry: 2`, which schedules backoff timers that outlive
+ * the test and hang the worker once hydration flips the queries on.
  */
+let client: QueryClient;
+
+beforeEach(() => {
+  client = createTestQueryClient();
+  globalThis.fetch = jest.fn(() =>
+    Promise.reject(new TypeError('Network request failed')),
+  ) as unknown as typeof fetch;
+});
+
+afterEach(() => {
+  client.clear();
+  jest.restoreAllMocks();
+});
+
 describe('HomeScreen', () => {
   it('renders the branded header without crashing', () => {
-    const { getByText } = render(
+    const { getByLabelText } = render(
       <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
         <ThemeProvider>
-          <QueryClientProvider client={queryClient}>
+          <QueryClientProvider client={client}>
             <HomeScreen />
           </QueryClientProvider>
         </ThemeProvider>
       </SafeAreaProvider>,
     );
 
-    expect(getByText('AgroMet Ghana')).toBeTruthy();
+    // The header is the real logo lockup now (HomeHeader.tsx), not the words —
+    // it carries the app's name as its accessibility label.
+    expect(getByLabelText('AgroMet Ghana')).toBeTruthy();
   });
 });

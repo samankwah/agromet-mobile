@@ -41,8 +41,8 @@ export const SPATIAL_VARIABLES: SpatialOutlookVariable[] = [
  */
 export const SPATIAL_SEASONS: SpatialPeriod[] = [
   { id: 'northern', label: 'Northern (single season)' },
-  { id: 'southern-major', label: 'Southern — Major Season' },
-  { id: 'southern-minor', label: 'Southern — Minor Season' },
+  { id: 'southern-major', label: 'Southern, Major Season' },
+  { id: 'southern-minor', label: 'Southern, Minor Season' },
 ];
 
 /** Standard meteorological trimester codes, matching the reference

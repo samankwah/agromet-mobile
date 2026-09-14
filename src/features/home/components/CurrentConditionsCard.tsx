@@ -5,12 +5,14 @@ import type { CurrentWeather } from '../../../shared/domain/currentWeather';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../../shared/ui/AsyncStateView';
 import { Card } from '../../../shared/ui/Card';
-import { MockDataTag } from '../../../shared/ui/MockDataTag';
+import { ArrowsVertical, CloudRain, Drop, NavigationArrow, Thermometer } from 'phosphor-react-native';
+
 import { StatTile } from '../../../shared/ui/StatTile';
 import { Text } from '../../../shared/ui/Text';
 import { formatRelativeTime } from '../../../shared/utils/formatRelativeTime';
 import { formatTemperature } from '../../../shared/utils/formatTemperature';
 import { formatWind } from '../../../shared/utils/formatWind';
+import { CurrentConditionsSkeleton } from './HomeSkeletons';
 
 type Props = {
   conditions: CurrentWeather | undefined;
@@ -23,7 +25,7 @@ export function CurrentConditionsCard({ conditions, status, error, onRetry }: Pr
   const theme = useTheme();
 
   return (
-    <AsyncStateView status={status} error={error} onRetry={onRetry}>
+    <AsyncStateView status={status} error={error} onRetry={onRetry} skeleton={<CurrentConditionsSkeleton />}>
       {conditions ? (
         <Card style={{ gap: theme.spacing.md }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -39,17 +41,16 @@ export function CurrentConditionsCard({ conditions, status, error, onRetry }: Pr
           </View>
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: theme.spacing.md, columnGap: theme.spacing.lg }}>
-            <StatTile icon="thermometer-outline" label="Feels like" value={formatTemperature(conditions.feelsLikeC)} />
+            <StatTile icon={Thermometer} label="Feels like" value={formatTemperature(conditions.feelsLikeC)} />
             <StatTile
-              icon="swap-vertical-outline"
+              icon={ArrowsVertical}
               label="Min / Max"
               value={`${formatTemperature(conditions.minC)} / ${formatTemperature(conditions.maxC)}`}
             />
-            <StatTile icon="rainy-outline" label="Rainfall" value={`${conditions.rainfallMm} mm`} />
-            <StatTile icon="water-outline" label="Humidity" value={`${conditions.humidityPct}%`} />
-            <StatTile icon="navigate-outline" label="Wind" value={formatWind(conditions.windKph)} />
+            <StatTile icon={CloudRain} label="Rainfall" value={`${conditions.rainfallMm} mm`} />
+            <StatTile icon={Drop} label="Humidity" value={`${conditions.humidityPct}%`} />
+            <StatTile icon={NavigationArrow} label="Wind" value={formatWind(conditions.windKph)} />
           </View>
-          <MockDataTag />
         </Card>
       ) : null}
     </AsyncStateView>

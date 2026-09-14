@@ -8,7 +8,9 @@ import { DetailRow } from '../../../../shared/ui/DetailRow';
 import { Text } from '../../../../shared/ui/Text';
 import { fallbackActivityColor, fitSwatchToScheme } from '../../../../shared/utils/activityColor';
 import { getActivityIcon } from '../../../../shared/utils/classifyActivity';
-import { activityRuns, formatActivityDates, formatWeekRange } from '../gridGeometry';
+import { activityRuns, formatActivityDates, formatWeekRange, weekStartDate } from '../gridGeometry';
+import { RemindMeButton } from '../../reminders/components/RemindMeButton';
+import { atTimeOfDay } from '../../../../shared/utils/dates';
 
 type Props = {
   activity: CalendarActivity | null;
@@ -97,6 +99,30 @@ export function ActivityDetailSheet({ activity, totalWeeks, weekOneDate, current
               Week numbers are counted from the start of the cycle. Start a cycle to see these as real dates.
             </Text>
           ) : null}
+
+          {/* A reminder needs a real date, and a week number only becomes one
+              once a cycle is running — so this either offers the reminder or
+              says exactly what is missing. */}
+          <RemindMeButton
+            label="Remind me"
+            disabledReason={
+              weekOneDate
+                ? null
+                : 'Start a cycle on this calendar to turn its week numbers into dates you can be reminded about.'
+            }
+            seed={
+              weekOneDate && span
+                ? {
+                    title: activity.activityName,
+                    // 07:00 on the morning the activity's first week begins.
+                    dueAt: atTimeOfDay(weekStartDate(weekOneDate, span.start), 7).toISOString(),
+                    repeat: 'none',
+                    source: 'calendar-activity',
+                    sourceRef: { activityId: activity.activityId, activityName: activity.activityName },
+                  }
+                : {}
+            }
+          />
         </Pressable>
       </Pressable>
     </Modal>

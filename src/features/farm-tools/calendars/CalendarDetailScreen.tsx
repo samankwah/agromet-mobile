@@ -22,6 +22,7 @@ import { CalendarGrid } from './components/CalendarGrid';
 import { buildMonthBands, buildWeekBlockBands, resolveWeekOneDate } from './gridGeometry';
 import { useCalendarDetail } from './useCalendars';
 import { useProductionCycle } from './useProductionCycle';
+import { CalendarDetailSkeleton } from './components/CalendarSkeletons';
 
 // Two views, not three. The third was a fitted whole-season grid that
 // gave each week 6px on a phone — see CalendarGrid for why it is gone.
@@ -62,11 +63,11 @@ export function CalendarDetailScreen({ id }: Props) {
     <Screen>
       {usingCachedFallback ? (
         <Text variant="caption" muted>
-          Showing the copy saved {formatRelativeTime(cachedAt!)} — the server could not be reached.
+          Showing the copy saved {formatRelativeTime(cachedAt!)}. The server could not be reached.
         </Text>
       ) : null}
 
-      <AsyncStateView status={status} error={error} onRetry={refetch}>
+      <AsyncStateView status={status} error={error} onRetry={refetch} skeleton={<CalendarDetailSkeleton />}>
         {calendar ? (
           <View style={{ gap: theme.spacing.lg }}>
             <View style={{ gap: theme.spacing.xs }}>
@@ -159,7 +160,7 @@ export function CalendarDetailScreen({ id }: Props) {
             <Card>
               <Text variant="caption" muted>
                 {weekOneDate
-                  ? 'Dates come from your cycle start date. This is a planning guide — use it alongside the weekly forecast rather than instead of it.'
+                  ? 'Dates come from your cycle start date. This is a planning guide. Use it alongside the weekly forecast rather than instead of it.'
                   : 'Week numbers are counted from the start of the cycle, not from a date in the year. Start a cycle to see them as dates.'}
               </Text>
             </Card>

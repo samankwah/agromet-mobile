@@ -28,9 +28,30 @@ export type CachedQueryResult<T> = {
   /** True when what's on screen came from disk, not the network. */
   usingCachedFallback: boolean;
   cachedAt: string | undefined;
+  /**
+   * When what is on screen was obtained, in milliseconds.
+   *
+   * A number rather than a date so it can be a `useMemo` dependency — which is
+   * what it exists for: anything derived from this data *and* the clock (an
+   * alert lapsing, a "3 hours ago" caption) needs a value that changes on each
+   * refetch, or it never recomputes.
+   */
+  dataUpdatedAt: number;
   isFetching: boolean;
   refetch: () => void;
 };
+
+/**
+ * The longest `gcTime` that survives a `setTimeout`.
+ *
+ * TanStack Query schedules garbage collection with `setTimeout(gcTime)`, and
+ * Node and Hermes both store the delay as a signed 32-bit int — anything above
+ * 2^31-1 ms (~24.8 days) overflows and is clamped to **1 ms**, so a `gcTime` of
+ * 30 days collected the cache immediately on unmount, the exact opposite of
+ * what was asked for. Callers may state whatever retention they mean; it is
+ * capped here so the ceiling lives in one place instead of in each call site.
+ */
+const MAX_GC_TIME = 21 * 24 * 60 * 60 * 1000;
 
 export function useCachedQuery<T>(params: {
   queryKey: QueryKey;
@@ -46,7 +67,13 @@ export function useCachedQuery<T>(params: {
   const queryClient = useQueryClient();
   const [fallback, setFallback] = useState<{ value: T; cachedAt: string } | null>(null);
 
-  const query = useQuery({ queryKey, queryFn, enabled, staleTime, gcTime });
+  const query = useQuery({
+    queryKey,
+    queryFn,
+    enabled,
+    staleTime,
+    gcTime: gcTime === undefined ? undefined : Math.min(gcTime, MAX_GC_TIME),
+  });
 
   useEffect(() => {
     if (query.status === 'success' && query.data !== undefined) {
@@ -78,6 +105,10 @@ export function useCachedQuery<T>(params: {
     data: query.status === 'success' ? query.data : fallback?.value,
     usingCachedFallback,
     cachedAt: fallback?.cachedAt,
+    // The disk snapshot's own age when that is what is showing; TanStack's
+    // `dataUpdatedAt` describes the failed network attempt, not the value.
+    dataUpdatedAt:
+      usingCachedFallback && fallback ? new Date(fallback.cachedAt).getTime() : query.dataUpdatedAt,
     isFetching: query.isFetching,
     refetch,
   };

@@ -1,12 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 
 import {
-  getForecastMapLayers,
   getHourlyForecast,
   getSeasonalOutlook,
-  getSubseasonalOutlook,
   getWeeklyForecast,
 } from '../../shared/api/forecastService';
+import { getSubseasonalOutlook, getSubseasonalOutlookSet } from '../../shared/api/subseasonalService';
 import { getCurrentConditions } from '../../shared/api/weatherService';
 import { HOME_LOCATIONS } from '../../shared/data/mockWeather';
 import { useLocationStore } from '../../shared/state/locationStore';
@@ -53,15 +52,19 @@ export function useForecastsData() {
     enabled: hasHydrated,
   });
 
-  const seasonal = useQuery({
-    queryKey: ['seasonalOutlook', regionId],
-    queryFn: () => getSeasonalOutlook(regionId),
+  // The national picture behind the map. Its own key rather than a slice of the
+  // card's query, because it does not vary by town — sixteen regions are the
+  // same sixteen wherever the reader is standing, so switching town must not
+  // refetch it.
+  const subseasonalSet = useQuery({
+    queryKey: ['subseasonalOutlookSet'],
+    queryFn: getSubseasonalOutlookSet,
     enabled: hasHydrated,
   });
 
-  const mapLayers = useQuery({
-    queryKey: ['forecastMapLayers'],
-    queryFn: getForecastMapLayers,
+  const seasonal = useQuery({
+    queryKey: ['seasonalOutlook', regionId],
+    queryFn: () => getSeasonalOutlook(regionId),
     enabled: hasHydrated,
   });
 
@@ -71,7 +74,7 @@ export function useForecastsData() {
     hourly,
     weekly,
     subseasonal,
+    subseasonalSet,
     seasonal,
-    mapLayers,
   };
 }

@@ -17,6 +17,7 @@ type SettingsState = UserSettings & {
   toggleFavouriteDistrict: (districtId: string) => void;
   toggleFavouriteCrop: (crop: string) => void;
   setLivestockType: (value: UserSettings['livestockType']) => void;
+  setPreferOfflineDiagnosis: (value: boolean) => void;
   setNotificationPrefs: (value: Partial<UserSettings['notificationPrefs']>) => void;
 };
 
@@ -28,7 +29,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   favouriteDistrictIds: [],
   favouriteCrops: [],
   livestockType: 'none',
-  notificationPrefs: { alertsEnabled: true, advisoriesEnabled: true, bulletinsEnabled: true },
+  preferOfflineDiagnosis: false,
+  notificationPrefs: { alertsEnabled: true, advisoriesEnabled: true, bulletinsEnabled: true, remindersEnabled: true },
 };
 
 function toggleInArray(list: string[], value: string): string[] {
@@ -46,6 +48,7 @@ export const useSettingsStore = create<SettingsState>()(
       toggleFavouriteDistrict: (districtId) => set({ favouriteDistrictIds: toggleInArray(get().favouriteDistrictIds, districtId) }),
       toggleFavouriteCrop: (crop) => set({ favouriteCrops: toggleInArray(get().favouriteCrops, crop) }),
       setLivestockType: (value) => set({ livestockType: value }),
+      setPreferOfflineDiagnosis: (value) => set({ preferOfflineDiagnosis: value }),
       setNotificationPrefs: (value) => set({ notificationPrefs: { ...get().notificationPrefs, ...value } }),
     }),
     {

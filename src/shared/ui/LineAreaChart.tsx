@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Line, Path, Stop, Text as SvgText } from 'react-native-svg';
 
 import { useTheme } from '../theme/ThemeProvider';
-import { monotoneAreaPath, monotoneLinePath } from '../utils/monotonePath';
+import { monotoneAreaPath, monotoneBandPath, monotoneLinePath } from '../utils/monotonePath';
 
 export type ChartPoint = { x: number; y: number; label?: string };
 
@@ -37,6 +37,15 @@ type Props = {
   extremeLabels?: { high: string; low: string };
   /** Clamp the y domain (precipitation is always 0-100). */
   yDomain?: { min: number; max: number };
+  /**
+   * An uncertainty ribbon behind the line, drawn in the series colour at low
+   * opacity.
+   *
+   * Added for the subseasonal ensemble, where the spread *is* the forecast and a
+   * lone mean line would hide it. Optional, and the five existing callers pass
+   * nothing: a single deterministic series has no band to draw.
+   */
+  band?: { upper: ChartPoint[]; lower: ChartPoint[] };
 };
 
 const PAD_BOTTOM = 30; // room for the time axis, clear of the plot floor
@@ -54,7 +63,7 @@ const PAD_TOP_MARKED = 18; // room for the H/L labels above the line
  * what keeps 24 hourly readings from reading as a polygon while guaranteeing
  * the line never rises above the "H" marker labelling the day's high.
  */
-export function LineAreaChart({ points, width, height, color, yTicks, formatY, xLabels, markExtremes, extremeLabels, yDomain }: Props) {
+export function LineAreaChart({ points, width, height, color, yTicks, formatY, xLabels, markExtremes, extremeLabels, yDomain, band }: Props) {
   const theme = useTheme();
 
   const padTop = markExtremes ? PAD_TOP_MARKED : 8;
@@ -66,7 +75,13 @@ export function LineAreaChart({ points, width, height, color, yTicks, formatY, x
   // the area's closing edge is the same one the curve was built from.
   const sorted = React.useMemo(() => [...points].sort((a, b) => a.x - b.x), [points]);
 
-  const ys = sorted.map((p) => p.y);
+  // The band joins the domain, or a band wider than the line would be clipped
+  // at the plot edge and read as though the ensemble agreed more than it does.
+  const ys = [
+    ...sorted.map((p) => p.y),
+    ...(band ? band.upper.map((p) => p.y) : []),
+    ...(band ? band.lower.map((p) => p.y) : []),
+  ];
   const minY = yDomain?.min ?? Math.min(...ys);
   const maxY = yDomain?.max ?? Math.max(...ys);
   const span = maxY - minY || 1;
@@ -81,6 +96,14 @@ export function LineAreaChart({ points, width, height, color, yTicks, formatY, x
 
   const linePath = monotoneLinePath(sorted, toX, toY);
   const areaPath = monotoneAreaPath(sorted, toX, toY, baselineY);
+  const bandPath = band
+    ? monotoneBandPath(
+        [...band.upper].sort((a, b) => a.x - b.x),
+        [...band.lower].sort((a, b) => a.x - b.x),
+        toX,
+        toY,
+      )
+    : null;
 
   const highPoint = sorted.reduce((a, b) => (b.y > a.y ? b : a), sorted[0]);
   const lowPoint = sorted.reduce((a, b) => (b.y < a.y ? b : a), sorted[0]);
@@ -130,7 +153,10 @@ export function LineAreaChart({ points, width, height, color, yTicks, formatY, x
         {/* Separates the plot from its value labels. */}
         <Line x1={plotW} y1={padTop} x2={plotW} y2={baselineY} stroke={theme.colors.border} strokeWidth={1} opacity={0.8} />
 
-        <Path d={areaPath} fill={`url(#${gradientId})`} />
+        {/* Behind the area and the line: the band is context, not the subject. */}
+        {bandPath ? <Path d={bandPath} fill={color} opacity={0.18} /> : null}
+
+        <Path d={areaPath} fill={bandPath ? 'none' : `url(#${gradientId})`} />
         <Path d={linePath} stroke={color} strokeWidth={3.5} fill="none" strokeLinejoin="round" strokeLinecap="round" />
 
         {markExtremes && highPoint && lowPoint ? (

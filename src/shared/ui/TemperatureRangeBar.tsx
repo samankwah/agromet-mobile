@@ -1,7 +1,17 @@
 import React from 'react';
 import { View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTheme } from '../theme/ThemeProvider';
+
+/**
+ * A conventional cold-to-hot thermal scale, not a theme colour: blue at the
+ * low end, through teal and yellow, to red at the high end. This is the
+ * reading a temperature bar is expected to have — unlike a single-hue tint
+ * of `chartTemp`, "blue" and "red" carry the cold/hot meaning on their own,
+ * before a viewer even looks at the numbers either side of the bar.
+ */
+const TEMPERATURE_SCALE = ['#2b6cb0', '#38b2ac', '#ecc94b', '#ed8936', '#e53e3e'] as const;
 
 type Props = {
   minC: number;
@@ -41,20 +51,23 @@ export function TemperatureRangeBar({ minC, maxC, weekMinC, weekMaxC }: Props) {
   const theme = useTheme();
   const { startPct, widthPct } = computeRangeBarPosition(minC, maxC, weekMinC, weekMaxC);
 
+  // The segment's left edge sits at the day's low and its right edge at the
+  // day's high (computeRangeBarPosition places both against the week's own
+  // range), so the gradient's cool-to-warm sweep reads the bar the same way
+  // it's already laid out: low on the left, high on the right.
+
   return (
     <View style={{ height: 4, borderRadius: 2, backgroundColor: theme.colors.border, overflow: 'hidden' }}>
-      <View
+      <LinearGradient
+        colors={TEMPERATURE_SCALE}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
         style={{
           position: 'absolute',
           left: `${startPct}%`,
           width: `${widthPct}%`,
           height: 4,
           borderRadius: 2,
-          // The same series colour the day-detail temperature chart uses, so
-          // temperature is encoded identically in the list and the chart.
-          // Not `warning`, which is a reserved status colour — a normal
-          // 29°C day is not an alert.
-          backgroundColor: theme.colors.chartTemp,
         }}
       />
     </View>

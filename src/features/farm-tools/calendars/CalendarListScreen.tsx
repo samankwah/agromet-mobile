@@ -14,18 +14,19 @@ import { formatRelativeTime } from '../../../shared/utils/formatRelativeTime';
 import { CalendarFilters, EMPTY_FILTERS, isComplete, matchesFilters, type FilterState } from './components/CalendarFilters';
 import { SampleDataNotice } from './components/SampleDataNotice';
 import { useCalendarList } from './useCalendars';
+import { CalendarListSkeleton } from './components/CalendarSkeletons';
 
 const COPY: Record<CalendarKind, { title: string; subject: string; empty: string }> = {
   crop: {
     title: 'Crop Calendars',
     subject: 'Crop',
     empty:
-      'Nothing has been published for this crop, district and season. Try another season, or check back — district officers add calendars as they are prepared.',
+      'Nothing has been published for this crop, district and season. Try another season, or check back later. District officers add calendars as they are prepared.',
   },
   poultry: {
     title: 'Poultry Calendars',
     subject: 'Bird',
-    empty: 'Nothing has been published for this bird and district yet. Check back — district officers add calendars as they are prepared.',
+    empty: 'Nothing has been published for this bird and district yet. Check back later. District officers add calendars as they are prepared.',
   },
 };
 
@@ -94,11 +95,11 @@ export function CalendarListScreen({ kind }: Props) {
 
       {usingCachedFallback ? (
         <Text variant="caption" muted>
-          Showing the copy saved {formatRelativeTime(cachedAt!)} — the server could not be reached.
+          Showing the copy saved {formatRelativeTime(cachedAt!)}. The server could not be reached.
         </Text>
       ) : null}
 
-      <AsyncStateView status={status} error={error} onRetry={refetch}>
+      <AsyncStateView status={status} error={error} onRetry={refetch} skeleton={<CalendarListSkeleton />}>
         <View style={{ gap: theme.spacing.lg }}>
           <CalendarFilters
             kind={kind}

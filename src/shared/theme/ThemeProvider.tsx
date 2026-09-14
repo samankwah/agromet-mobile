@@ -2,15 +2,19 @@ import React, { createContext, useContext, useMemo } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { useSettingsStore } from '../state/settingsStore';
-import { colors, elevation, fontFamily, minTouchTarget, radii, scaleTypeScale, severityColors, spacing, typeScale } from './tokens';
+import { cardShape, colors, drawerShape, elevation, fontFamily, minTouchTarget, radii, scaleTypeScale, severityColors, spacing, typeScale } from './tokens';
 import type { ColorScheme } from './tokens';
 
-type Theme = {
+/** Exported so helpers outside a component (e.g. the market's timing-tone
+ * colour lookup) can take the resolved theme as an argument. */
+export type Theme = {
   scheme: ColorScheme;
   colors: (typeof colors)['light'];
   severityColors: (typeof severityColors)['light'];
   spacing: typeof spacing;
   radii: typeof radii;
+  cardShape: typeof cardShape;
+  drawerShape: typeof drawerShape;
   elevation: typeof elevation;
   fontFamily: typeof fontFamily;
   typeScale: typeof typeScale;
@@ -57,6 +61,8 @@ export function ThemeProvider({ children, forceScheme }: ThemeProviderProps) {
       severityColors: severityColors[scheme],
       spacing,
       radii,
+      cardShape,
+      drawerShape,
       elevation,
       fontFamily,
       typeScale: scaleTypeScale(typeScale, textSize),

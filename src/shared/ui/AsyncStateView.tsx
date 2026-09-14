@@ -16,6 +16,12 @@ type Props = {
   isEmpty?: boolean;
   emptyTitle?: string;
   emptyMessage?: string;
+  /**
+   * Rendered instead of the spinner while pending. Pass one shaped like the
+   * screen it stands in for; omit it and the spinner is still the default,
+   * so no existing caller changes behaviour.
+   */
+  skeleton?: React.ReactNode;
   children: React.ReactNode;
 };
 
@@ -25,10 +31,21 @@ type Props = {
  * and error branch, so those four states look and behave the same
  * everywhere.
  */
-export function AsyncStateView({ status, error, onRetry, isEmpty, emptyTitle = 'Nothing here yet', emptyMessage, children }: Props) {
+export function AsyncStateView({
+  status,
+  error,
+  onRetry,
+  isEmpty,
+  emptyTitle = 'Nothing here yet',
+  emptyMessage,
+  skeleton,
+  children,
+}: Props) {
   const theme = useTheme();
 
   if (status === 'pending') {
+    if (skeleton) return <>{skeleton}</>;
+
     return (
       <View
         accessibilityRole="progressbar"

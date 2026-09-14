@@ -6,7 +6,7 @@ import { Text } from './Text';
 /**
  * The small, bold, letter-spaced uppercase label above a filter control
  * (e.g. "FORECAST VIEW", "VARIABLE") — reusable anywhere a labeled filter/
- * form field pattern shows up next (Advisories/Library filters are likely
+ * form field pattern shows up next (Advisories filters are likely
  * future consumers), not a one-off for the spatial outlook drawer.
  */
 export function FieldLabel({ children }: { children: string }) {

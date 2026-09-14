@@ -6,7 +6,7 @@ import { formatConfidenceRange } from './formatConfidenceRange';
  * omits the disclaimer, even in a short share message. */
 export function buildWhatsAppShareText(result: DiagnosisResult, request: DiagnosisRequest): string {
   const lines = [
-    'AgroMet Ghana — Crop Diagnosis',
+    'AgroMet Ghana: Crop Diagnosis',
     `Crop: ${request.crop} (${request.growthStage})`,
     `Likely issue: ${result.likelyIssue}`,
     formatConfidenceRange(result.confidenceBand, result.confidenceRangePct),

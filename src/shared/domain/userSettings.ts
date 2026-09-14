@@ -14,6 +14,12 @@ export type NotificationPrefs = {
   alertsEnabled: boolean;
   advisoriesEnabled: boolean;
   bulletinsEnabled: boolean;
+  /**
+   * The only one of these that is wired to anything today: it gates whether
+   * farm reminders schedule an OS notification. Turning it off cancels every
+   * scheduled reminder; turning it on reschedules them.
+   */
+  remindersEnabled: boolean;
 };
 
 export type UserSettings = {
@@ -24,5 +30,16 @@ export type UserSettings = {
   favouriteDistrictIds: string[];
   favouriteCrops: string[];
   livestockType: 'poultry' | 'none';
+  /**
+   * Force crop diagnosis through the on-device cassava model even when there
+   * is a working connection.
+   *
+   * Off by default, because the online provider covers more crops and returns
+   * better advice, so routing around it is a downgrade for an ordinary farmer.
+   * It is exposed anyway for two reasons: a farmer on a metered connection may
+   * genuinely prefer the answer that costs no data, and running both engines
+   * over the same photographs is how the two get compared at all.
+   */
+  preferOfflineDiagnosis: boolean;
   notificationPrefs: NotificationPrefs;
 };
