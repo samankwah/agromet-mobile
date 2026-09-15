@@ -67,6 +67,9 @@ export function NotificationNotice({ blocker, onEnable, onRequestPermission }: P
         borderRadius: theme.radii.md,
         borderWidth: 1,
         borderColor: theme.colors.warning + '55',
+        // A notice is something to read, not something to press, so it rests
+        // shallow on the page rather than standing off it like a card.
+        boxShadow: theme.raised('sm'),
         padding: theme.spacing.md,
       }}
     >

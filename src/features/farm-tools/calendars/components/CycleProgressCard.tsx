@@ -81,7 +81,7 @@ export function CycleProgressCard({ cycle, activities, totalWeeks, onSetStatus, 
           accessible
           accessibilityRole="progressbar"
           accessibilityLabel={`Week ${cycle.currentWeek} of ${cycle.totalDurationWeeks}, ${Math.round(percent)} percent through the cycle.`}
-          style={{ height: 6, borderRadius: 3, backgroundColor: theme.colors.border, overflow: 'hidden' }}
+          style={{ height: 8, borderRadius: theme.radii.pill, backgroundColor: theme.colors.bg, boxShadow: theme.sunken('sm'), overflow: 'hidden' }}
         >
           <View style={{ width: `${percent}%`, height: 6, borderRadius: 3, backgroundColor: theme.colors.accent }} />
         </View>

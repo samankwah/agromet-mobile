@@ -64,11 +64,14 @@ export function SuggestionChips({ onSelect, disabled }: Props) {
                 paddingLeft: theme.spacing.lg,
                 paddingRight: theme.spacing.md,
                 paddingVertical: theme.spacing.sm,
-                borderRadius: 999,
+                borderRadius: theme.radii.pill,
                 borderWidth: 1,
                 borderColor: theme.colors.border,
                 backgroundColor: theme.colors.surface,
-                opacity: disabled ? 0.6 : pressed ? 0.85 : 1,
+                // A chip you can tap is a key: it lifts off the transcript
+                // and presses in, rather than dimming.
+                opacity: disabled ? 0.6 : 1,
+                boxShadow: pressed ? theme.sunken('sm') : theme.raised('sm'),
               }}
             >
               <Text variant="body" style={{ flexShrink: 1 }}>

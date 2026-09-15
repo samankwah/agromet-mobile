@@ -147,8 +147,11 @@ export function MarketScreen() {
             flexDirection: 'row',
             alignItems: 'center',
             gap: theme.spacing.sm,
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.radii.sm,
+            // A well, matching ui/SearchField — this row is a hand-rolled
+            // copy of it, so it has to read the same way.
+            backgroundColor: theme.colors.bg,
+            boxShadow: theme.sunken('sm'),
+            borderRadius: theme.radii.md,
             borderWidth: 1,
             borderColor: theme.colors.border,
             paddingHorizontal: theme.spacing.md,

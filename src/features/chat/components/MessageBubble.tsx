@@ -107,6 +107,10 @@ export function MessageBubble({
             borderRadius: RADIUS,
             ...corners,
             backgroundColor: fill,
+            // A shallow lift only. A bubble is small and there are dozens on
+            // screen, so anything deeper turns the transcript into noise, and
+            // the tail below is a separate Svg that casts nothing.
+            boxShadow: theme.raised('sm'),
             opacity: state === 'failed' ? 0.75 : 1,
             // The text and the time share the last line when it fits, and the
             // time drops to its own line when it does not — which is what

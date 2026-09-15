@@ -143,7 +143,10 @@ function ChipGrid({
                       borderWidth: 1,
                       borderColor: isSelected ? theme.colors.accent : theme.colors.border,
                       backgroundColor: isSelected ? theme.colors.accent + '1a' : theme.colors.surface,
-                      opacity: pressed ? 0.7 : 1,
+                      // The chosen option stays pressed in, and keeps its
+                      // accent fill and border, so the state is never carried
+                      // by the shadow alone.
+                      boxShadow: isSelected || pressed ? theme.sunken('sm') : theme.raised('sm'),
                     }}
                   >
                     <Text

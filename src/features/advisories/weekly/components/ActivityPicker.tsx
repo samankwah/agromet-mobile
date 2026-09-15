@@ -57,11 +57,13 @@ export function ActivityPicker({ activities, selectedIndex, onSelect }: Props) {
                     minHeight: theme.minTouchTarget,
                     justifyContent: 'center',
                     paddingHorizontal: theme.spacing.md,
-                    borderRadius: theme.radii.md,
+                    borderRadius: theme.radii.pill,
                     borderWidth: 1,
                     borderColor: isSelected ? theme.colors.accent : theme.colors.border,
                     backgroundColor: isSelected ? theme.colors.accent : theme.colors.surface,
-                    opacity: pressed ? 0.7 : 1,
+                    // The chosen activity stays pressed in and keeps its
+                    // accent fill, so the state never rests on the shadow.
+                    boxShadow: isSelected || pressed ? theme.sunken('sm') : theme.raised('sm'),
                   }}
                 >
                   <Text

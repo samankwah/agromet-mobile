@@ -47,6 +47,10 @@ export function DayStrip({ days, selectedDate, onSelect }: Props) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 backgroundColor: isSelected ? theme.colors.accent : 'transparent',
+                // The day you are reading is set into the strip, the way the
+                // reference designs mark the selected day. The accent fill
+                // still carries the state on its own.
+                ...(isSelected ? { boxShadow: theme.sunken('sm') } : null),
               }}
             >
               <Text variant="bodyStrong" color={isSelected ? theme.colors.onAccent : theme.colors.text}>

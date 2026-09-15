@@ -288,7 +288,9 @@ function ChartAndDetail({
             flexDirection: 'row',
             gap: theme.spacing.sm,
             backgroundColor: tone + '1a',
-            borderRadius: theme.radii.sm,
+            borderRadius: theme.radii.md,
+            // A tinted block nested in a card is inlaid into it, not laid on it.
+            boxShadow: theme.sunken('sm'),
             padding: theme.spacing.md,
           }}
         >
@@ -311,7 +313,9 @@ function ChartAndDetail({
                 style={{
                   flex: 1,
                   backgroundColor: theme.colors.accent + '1a',
-                  borderRadius: theme.radii.sm,
+                  borderRadius: theme.radii.md,
+                  // A tinted block nested in a card is inlaid into it, not laid on it.
+                  boxShadow: theme.sunken('sm'),
                   padding: theme.spacing.md,
                 }}
               >
@@ -324,7 +328,9 @@ function ChartAndDetail({
                 style={{
                   flex: 1,
                   backgroundColor: theme.colors.warning + '1a',
-                  borderRadius: theme.radii.sm,
+                  borderRadius: theme.radii.md,
+                  // A tinted block nested in a card is inlaid into it, not laid on it.
+                  boxShadow: theme.sunken('sm'),
                   padding: theme.spacing.md,
                 }}
               >
@@ -362,11 +368,14 @@ function ChartAndDetail({
                 {({ pressed }) => (
                   <View
                     style={{
-                      opacity: pressed ? 0.7 : 1,
                       backgroundColor: selected ? theme.colors.accent + '1a' : theme.colors.bg,
-                      borderRadius: theme.radii.sm,
+                      borderRadius: theme.radii.md,
                       borderWidth: 1,
                       borderColor: selected ? theme.colors.accent : 'transparent',
+                      // The chosen region stays pressed in, and keeps its
+                      // accent fill and border so the state never rests on
+                      // the shadow alone.
+                      boxShadow: selected || pressed ? theme.sunken('sm') : theme.raised('sm'),
                       padding: theme.spacing.md,
                       gap: 2,
                       minHeight: theme.minTouchTarget,

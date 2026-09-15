@@ -120,8 +120,10 @@ export function ReminderForm({ visible, seed, onSubmit, onDelete, onClose }: Pro
           onPress={(event) => event.stopPropagation()}
           style={{
             backgroundColor: theme.colors.bg,
-            borderTopLeftRadius: theme.radii.lg,
-            borderTopRightRadius: theme.radii.lg,
+            borderTopLeftRadius: theme.radii.xl,
+            borderTopRightRadius: theme.radii.xl,
+            // Slides up over the whole screen, so it takes the deepest lift.
+            boxShadow: theme.raised('lg'),
             paddingTop: theme.spacing.lg,
             paddingHorizontal: theme.spacing.lg,
             // The sheet is a sibling of the screen, so it inherits no safe-area
@@ -132,7 +134,7 @@ export function ReminderForm({ visible, seed, onSubmit, onDelete, onClose }: Pro
           }}
         >
           <View
-            style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.border, alignSelf: 'center' }}
+            style={{ width: 40, height: 5, borderRadius: theme.radii.pill, backgroundColor: theme.colors.bg, boxShadow: theme.sunken('sm'), alignSelf: 'center' }}
           />
 
           <Text variant="h3">{isEditing ? 'Edit reminder' : 'New reminder'}</Text>

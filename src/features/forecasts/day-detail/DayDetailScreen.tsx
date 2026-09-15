@@ -198,7 +198,10 @@ function ConditionsHeader({ onClose }: { onClose: () => void }) {
           backgroundColor: theme.colors.surfaceStrong,
           borderWidth: 1,
           borderColor: theme.colors.border,
-          opacity: pressed ? 0.6 : 1,
+          // A round key on the header, pressing in when held. Small square
+          // and round icon buttons are exactly what the reference designs
+          // lift off the page.
+          boxShadow: pressed ? theme.sunken('sm') : theme.raised('sm'),
         })}
       >
         <Ionicons name="close" size={18} color={theme.colors.muted} />
@@ -276,11 +279,14 @@ function MetricPill({ metric, onSelect }: { metric: MetricId; onSelect: (id: Met
           gap: theme.spacing.xs,
           paddingHorizontal: theme.spacing.md,
           minHeight: 36,
-          borderRadius: 999,
+          borderRadius: theme.radii.pill,
           backgroundColor: theme.colors.surfaceStrong,
           borderWidth: 1,
           borderColor: theme.colors.border,
-          opacity: pressed ? 0.6 : 1,
+          // Stays pressed in while its menu is open, so the control reads as
+          // "the thing you are editing" for as long as the menu is up — the
+          // same rule ui/Dropdown follows.
+          boxShadow: pressed || open ? theme.sunken('sm') : theme.raised('sm'),
         })}
       >
         {/* The selected measure's own icon, at full text contrast — this is

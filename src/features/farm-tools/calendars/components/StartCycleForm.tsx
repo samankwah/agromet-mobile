@@ -52,13 +52,15 @@ export function StartCycleForm({ visible, subject, isCycle, isSubmitting, error,
           onPress={(event) => event.stopPropagation()}
           style={{
             backgroundColor: theme.colors.bg,
-            borderTopLeftRadius: theme.radii.lg,
-            borderTopRightRadius: theme.radii.lg,
+            borderTopLeftRadius: theme.radii.xl,
+            borderTopRightRadius: theme.radii.xl,
+            // Slides up over the whole screen, so it takes the deepest lift.
+            boxShadow: theme.raised('lg'),
             padding: theme.spacing.lg,
             gap: theme.spacing.lg,
           }}
         >
-          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.border, alignSelf: 'center' }} />
+          <View style={{ width: 40, height: 5, borderRadius: theme.radii.pill, backgroundColor: theme.colors.bg, boxShadow: theme.sunken('sm'), alignSelf: 'center' }} />
 
           <View style={{ gap: 2 }}>
             <Text variant="h3">Start a cycle</Text>

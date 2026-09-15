@@ -39,10 +39,13 @@ export function AboutScreen() {
           style={{
             width: 48,
             height: 48,
-            borderRadius: theme.radii.sm,
+            borderRadius: theme.radii.md,
             backgroundColor: theme.colors.accent,
             alignItems: 'center',
             justifyContent: 'center',
+            // The app mark sits on the page, so it lifts off it like the
+            // small square icon tiles in the reference designs.
+            boxShadow: theme.raised('md'),
           }}
         >
           <Ionicons name="leaf" size={26} color={theme.colors.onAccent} />

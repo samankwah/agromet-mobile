@@ -120,7 +120,6 @@ export function ArchiveFilters({ entries, value, onChange, onClear }: Props) {
           {({ pressed }) => (
             <View
               style={{
-                opacity: pressed ? 0.6 : 1,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: theme.spacing.xs,
@@ -130,6 +129,9 @@ export function ArchiveFilters({ entries, value, onChange, onClear }: Props) {
                 borderWidth: 1,
                 borderColor: theme.colors.border,
                 backgroundColor: theme.colors.surface,
+                // Stays pressed in while the filters are open, so the button
+                // shows what it is holding open.
+                boxShadow: expanded || pressed ? theme.sunken('sm') : theme.raised('sm'),
               }}
             >
               <Ionicons name="options-outline" size={16} color={theme.colors.muted} />

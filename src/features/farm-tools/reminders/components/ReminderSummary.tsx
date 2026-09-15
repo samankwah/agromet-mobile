@@ -84,7 +84,7 @@ export function ReminderSummary({ groups, progress }: Props) {
             accessible
             accessibilityRole="progressbar"
             accessibilityLabel={`${progress.completed} of ${progress.total} reminders done this week.`}
-            style={{ height: 6, borderRadius: 3, backgroundColor: theme.colors.border, overflow: 'hidden' }}
+            style={{ height: 8, borderRadius: theme.radii.pill, backgroundColor: theme.colors.bg, boxShadow: theme.sunken('sm'), overflow: 'hidden' }}
           >
             <View
               style={{

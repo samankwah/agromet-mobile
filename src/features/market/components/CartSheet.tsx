@@ -39,8 +39,10 @@ export function CartSheet({ region, onClose }: Props) {
           onPress={(event) => event.stopPropagation()}
           style={{
             backgroundColor: theme.colors.bg,
-            borderTopLeftRadius: theme.radii.lg,
-            borderTopRightRadius: theme.radii.lg,
+            borderTopLeftRadius: theme.radii.xl,
+            borderTopRightRadius: theme.radii.xl,
+            // Slides up over the whole screen, so it takes the deepest lift.
+            boxShadow: theme.raised('lg'),
             padding: theme.spacing.lg,
             // The sheet is a sibling of the screen, not a child, so it does
             // not inherit SafeAreaView's insets — without this the action row
@@ -50,7 +52,7 @@ export function CartSheet({ region, onClose }: Props) {
             maxHeight: '80%',
           }}
         >
-          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.border, alignSelf: 'center' }} />
+          <View style={{ width: 40, height: 5, borderRadius: theme.radii.pill, backgroundColor: theme.colors.bg, boxShadow: theme.sunken('sm'), alignSelf: 'center' }} />
 
           <Text variant="h2">Cart</Text>
 

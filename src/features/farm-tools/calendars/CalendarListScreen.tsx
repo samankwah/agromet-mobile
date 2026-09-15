@@ -146,9 +146,9 @@ function CalendarRow({ calendar }: { calendar: Calendar }) {
       onPress={() => router.push(`/calendar/${calendar.id}`)}
       accessibilityRole="button"
       accessibilityLabel={`${calendar.title}. ${weeks} weeks. ${place}. Opens the full calendar.`}
-      style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
     >
-      <Card style={{ gap: theme.spacing.sm }}>
+      {({ pressed }) => (
+      <Card pressed={pressed} style={{ gap: theme.spacing.sm }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md }}>
           <View style={{ flex: 1, gap: 2 }}>
             <Text variant="h3">{calendar.title}</Text>
@@ -173,6 +173,7 @@ function CalendarRow({ calendar }: { calendar: Calendar }) {
           </Text>
         ) : null}
       </Card>
+      )}
     </Pressable>
   );
 }
