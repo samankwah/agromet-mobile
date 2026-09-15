@@ -31,6 +31,9 @@ import {
 
 const AnimatedG = Animated.createAnimatedComponent(G);
 
+/** How far down the moon is scaled when it shares the frame with a cloud. */
+const MOON_INSET_SCALE = 0.62;
+
 type Props = {
   /** The WMO code, where the caller has one. Preferred: it separates drizzle
    * from downpour and fog from overcast, which the condition string cannot. */
@@ -79,9 +82,13 @@ export function LiveWeatherIcon({ weatherCode, condition, isDay = true, size = 2
   const night = !isDay && hasNightForm(glyph);
   const moving = animated && !reduceMotion;
 
-  // A stroke scaled to the box. At 17dp (the week strip) a 1.6 stroke is a
-  // smudge, and at 60 (the hero) it is a hairline, so it is a ratio.
-  const stroke = Math.max(1.1, size * 0.072);
+  // Stroke width is in viewBox units, so it is already scaled by the `size`
+  // the Svg is rendered at. Multiplying by `size` as well scaled it twice: at
+  // 60dp the hero came out with a ~11px stroke, which closed the cloud into a
+  // solid white blob. It stays near-constant instead, easing up a little at
+  // small sizes so a 17dp glyph in the week strip does not turn into a
+  // hairline.
+  const stroke = size < 24 ? 1.9 : 1.6;
   const ink = color ?? theme.colors.text;
 
   return (
@@ -125,7 +132,14 @@ function Glyph({ glyph, night, moving, stroke, ink, accent }: GlyphProps) {
       return (
         <>
           {night ? (
-            <Path d={MOON} {...common} transform="translate(4.5 -3.5) scale(0.62)" />
+            // Scaling a stroked path thins its line with it, so the width is
+            // divided back out to keep every glyph on the same weight.
+            <Path
+              d={MOON}
+              {...common}
+              strokeWidth={stroke / MOON_INSET_SCALE}
+              transform={`translate(9.6 -1.2) scale(${MOON_INSET_SCALE})`}
+            />
           ) : (
             <Sun moving={moving} stroke={stroke} ink={accent} disc={SUN_DISC_OFFSET} rayInner={4.9} rayOuter={7.1} />
           )}
@@ -139,17 +153,21 @@ function Glyph({ glyph, night, moving, stroke, ink, accent }: GlyphProps) {
     case 'overcast':
       return (
         <Drift moving={moving}>
-          <Path d={CLOUD} {...common} />
           {/* Overcast gets a second cloud behind the first, which is the one
-              visual difference between "some cloud" and "all cloud". */}
-          {glyph === 'overcast' ? <Path d={CLOUD} {...common} opacity={0.45} transform="translate(2.5 -4) scale(0.78)" /> : null}
+              visual difference between "some cloud" and "all cloud". Drawn
+              first so the front cloud overlaps it, and faint so the pair does
+              not read as a tangle of lines at 17dp. */}
+          {glyph === 'overcast' ? <Path d={CLOUD_SMALL} {...common} opacity={0.45} transform="translate(2.2 -7.4)" /> : null}
+          <Path d={CLOUD} {...common} />
         </Drift>
       );
 
     case 'fog':
       return (
         <>
-          <Path d={CLOUD} {...common} opacity={0.5} transform="translate(2.4 -3.2) scale(0.8)" />
+          {/* Lifted clear of the bands below it, and quiet, because in fog the
+              bands are the subject and the cloud is only context. */}
+          <Path d={CLOUD_SMALL} {...common} opacity={0.5} transform="translate(0 -8.4)" />
           {FOG_BANDS.map((band, index) => (
             <FogBand key={band.y} band={band} index={index} moving={moving} stroke={stroke} ink={ink} />
           ))}

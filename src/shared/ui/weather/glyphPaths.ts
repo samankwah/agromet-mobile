@@ -14,11 +14,29 @@
  * logic stays readable. Plain strings, no React.
  */
 
-/** A cloud with its flat base on y=17, spanning most of the width. */
-export const CLOUD = 'M7.2 17.2a3.6 3.6 0 0 1-.3-7.18 5 5 0 0 1 9.6-1.1 3.9 3.9 0 0 1 .4 7.78Z';
+/**
+ * A cloud with its flat base on y=17.
+ *
+ * Cubic curves, not elliptical arcs. An earlier version used `a` commands and
+ * came out as a comma-shaped blob on device: the sweep and large-arc flags are
+ * easy to get subtly wrong by hand and impossible to eyeball from the string.
+ * Every control point below is a coordinate you can read straight off the
+ * shape, which is worth the extra characters.
+ *
+ * Left lobe, big top lobe, right lobe, then `Z` closes the flat base.
+ */
+export const CLOUD =
+  'M5.5 17C3.6 17 2 15.4 2 13.5C2 11.7 3.4 10.2 5.2 10C5.8 7.7 7.9 6 10.4 6' +
+  'C12.9 6 15 7.7 15.6 10C15.9 9.9 16.2 9.9 16.5 9.9C18.4 9.9 20 11.5 20 13.45' +
+  'C20 15.4 18.4 17 16.5 17Z';
 
-/** The smaller cloud used where a sun or moon shares the frame. */
-export const CLOUD_SMALL = 'M8.4 18.4a3.1 3.1 0 0 1-.26-6.18 4.3 4.3 0 0 1 8.26-.95 3.35 3.35 0 0 1 .34 6.69Z';
+/** The same cloud, smaller and shifted down-left, for the frames where a sun
+ * or moon sits behind it. Drawn as its own path rather than a transform so the
+ * stroke keeps its weight; scaling a stroked path thins the line with it. */
+export const CLOUD_SMALL =
+  'M7.2 18.4C5.7 18.4 4.5 17.2 4.5 15.7C4.5 14.3 5.6 13.1 7 13' +
+  'C7.5 11.2 9.1 9.9 11 9.9C12.9 9.9 14.5 11.2 15 13C15.2 12.9 15.4 12.9 15.7 12.9' +
+  'C17.2 12.9 18.4 14.1 18.4 15.65C18.4 17.2 17.2 18.4 15.7 18.4Z';
 
 /** The sun's disc, centred so it can rotate its rays about the same point. */
 export const SUN_DISC = { cx: 12, cy: 12, r: 4.2 };
@@ -48,9 +66,13 @@ export function sunRays(cx: number, cy: number, inner: number, outer: number): {
   });
 }
 
-/** The crescent, as one closed path: an outer arc and a tighter inner one
- * sweeping back, which is what cuts the bite out of the disc. */
-export const MOON = 'M20 15.2A8.6 8.6 0 0 1 9.2 4.2a7.4 7.4 0 1 0 10.8 11Z';
+/**
+ * The crescent: a small arc cutting the bite, then a large one sweeping the
+ * outer edge. The two arc flags are the whole trick — the inner arc takes the
+ * short way round and the outer one the long way, which is what leaves a
+ * crescent rather than a lens or a full disc.
+ */
+export const MOON = 'M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z';
 
 /** Three fog bands, each a horizontal rule at a different width so the stack
  * reads as haze rather than as a hamburger menu. */
@@ -87,8 +109,10 @@ export const DROPS_HEAVY: Drop[] = [
   { x: 17.5, y: 19, delay: 450 },
 ];
 
-/** The lightning bolt, hanging where the middle drop would be. */
-export const BOLT = 'M13.2 17.4h-3l2.4-5.2-4.2 5.2h3l-2.4 5.2Z';
+/** The lightning bolt, hanging below the cloud where the middle drop would be.
+ * Filled rather than stroked, so it reads at 17dp where an outlined zigzag
+ * this small closes up into a smudge. */
+export const BOLT = 'M12.8 17.2 L9.6 21.2 L11.8 21.2 L11 23.8 L14.4 19.6 L12.2 19.6 Z';
 
 function round(value: number): number {
   return Math.round(value * 100) / 100;
