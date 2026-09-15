@@ -1,57 +1,54 @@
-import React, { useId, useState } from 'react';
-import { StyleSheet, View, type LayoutChangeEvent, type ViewProps, type ViewStyle } from 'react-native';
-import Svg, { ClipPath, Defs, Path, Rect } from 'react-native-svg';
+import React from 'react';
+import { StyleSheet, View, type ViewProps, type ViewStyle } from 'react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
-import { chamferedRectPath } from './cardShape';
+import { Surface } from './Surface';
 
 type Props = ViewProps & {
-  /** Stronger outline — for cards the user is meant to notice first, like
-   * the alert banner. Resting cards (default) use the plain hairline so the
-   * screen doesn't look like a wall of equally-loud boxes. This used to be a
-   * heavier shadow; in the flat system emphasis is carried by the border
-   * colour instead (see theme/tokens.ts's `elevation`). */
+  /** Stands the card further forward, for one the user is meant to notice
+   * first — an alert banner, a "what to do" block. Resting cards use the
+   * plain depth so a screen doesn't look like a wall of equally-loud boxes. */
   raised?: boolean;
   /** Semi-transparent surface, for cards sitting on the Daily view's
    * photographic backdrop — the photo reads through, but the card still
    * darkens what's behind its own text so contrast never depends on
-   * whatever happens to be in the picture. */
+   * whatever happens to be in the picture.
+   *
+   * Casts no shadow: a soft dual shadow needs a flat ground to fall on, and
+   * over a photograph it reads as smudged glass. Depth there comes from the
+   * fill darkening the image instead. */
   translucent?: boolean;
+  /** Set by a card that is itself a button, while it is held. The card
+   * presses into the page instead of dimming, which is the whole point of
+   * the depth language — a tappable card should feel like a physical one. */
+  pressed?: boolean;
 };
 
 /**
- * The one card surface in the app — outline-first and never shadowed (see
- * theme/tokens.ts's `elevation`), themed surface color, consistent
- * padding/silhouette across every screen.
+ * The one card surface in the app — a raised neumorphic panel with a themed
+ * fill, a hairline edge and consistent padding across every screen.
  *
- * The silhouette is an SVG path, not a `borderRadius`: the design cuts all four
- * corners at 45 degrees, deeply on the top-left and bottom-right and about half
- * as far on the other two. No border radius can express that. See
- * ui/cardShape.ts.
+ * This used to paint an SVG chamfered path, because the design cut all four
+ * corners at 45 degrees and no `borderRadius` can express that. The design is
+ * now soft-UI and rounded, so the path, the `onLayout` measure it needed and
+ * the one-frame fallback for the first render are all gone — which also means
+ * a card no longer mounts an `<Svg>` each.
  *
- * Because the background is painted rather than set with `backgroundColor`,
- * the fill/border style keys a caller passes would otherwise draw a *square*
- * rectangle over the shape. So they are intercepted from `style` and fed into
- * the path instead — `backgroundColor` becomes the fill, `borderColor` the
- * stroke, and `borderLeftWidth`/`borderLeftColor` become the severity accent
- * stripe several screens put down the left edge. Callers therefore need no
- * changes, and a future caller reaching for those keys still gets a card that
- * looks right.
+ * The style keys a caller passes still behave the way they did under the SVG
+ * version: `backgroundColor` sets the fill, `borderColor` the edge, and
+ * `borderLeftWidth`/`borderLeftColor` the severity accent stripe several
+ * screens put down the left edge. That stripe is intercepted rather than
+ * passed through, because a plain left border would square off the two left
+ * corners and break the silhouette.
  */
-export function Card({ raised, translucent, style, children, onLayout, ...rest }: Props) {
+export function Card({ raised, translucent, pressed, style, children, ...rest }: Props) {
   const theme = useTheme();
-  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
-  // Every card renders its own <Svg>, but ids have bitten react-native-svg
-  // before when two documents share one — so scope the clip path per instance.
-  // React's useId contains colons, which are not safe inside url(#...).
-  const clipId = `cardClip${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
 
-  // Pull the keys that must become path paint rather than View chrome.
   const {
     backgroundColor,
     borderColor,
     borderWidth: _borderWidth,
-    borderRadius: _borderRadius,
+    borderRadius,
     borderLeftWidth,
     borderLeftColor,
     ...passthrough
@@ -66,75 +63,37 @@ export function Card({ raised, translucent, style, children, onLayout, ...rest }
         ? theme.colors.borderStrong
         : theme.colors.border);
 
-  const handleLayout = (event: LayoutChangeEvent) => {
-    const { width, height } = event.nativeEvent.layout;
-    // Re-render only on a real size change; a rounding wobble between layout
-    // passes would otherwise loop this component.
-    setSize((prev) =>
-      prev && Math.abs(prev.width - width) < 0.5 && Math.abs(prev.height - height) < 0.5
-        ? prev
-        : { width, height },
-    );
-    onLayout?.(event);
-  };
-
+  const radius = typeof borderRadius === 'number' ? borderRadius : theme.radii.xl;
   const accentWidth = typeof borderLeftWidth === 'number' ? borderLeftWidth : 0;
-  const path = size
-    ? chamferedRectPath({
-        width: size.width,
-        height: size.height,
-        chamfer: theme.cardShape.chamfer,
-        minorChamfer: theme.cardShape.minorChamfer,
-      })
-    : null;
 
   return (
-    <View
-      onLayout={handleLayout}
-      style={[
-        {
-          padding: theme.spacing.lg,
-          // Until the first layout gives us a size to draw against, fall back
-          // to a plain rounded surface. That is one frame at most, and it
-          // keeps a card from flashing as a transparent hole.
-          ...(size
-            ? null
-            : { backgroundColor: fill, borderRadius: theme.radii.lg, borderWidth: 1, borderColor: stroke }),
-        },
-        passthrough,
-      ]}
+    <Surface
+      depth={translucent ? 'flat' : pressed ? 'sunken' : 'raised'}
+      level={raised ? 'lg' : 'md'}
+      radius={radius}
+      background={fill}
+      borderColor={stroke}
+      // `overflow: 'hidden'` only when there is a stripe to clip to the
+      // rounded corners. It would otherwise cut the shadow off any raised
+      // child that came near the edge — a button inside a card clears it by
+      // the padding today, but that is luck, not design.
+      style={[{ padding: theme.spacing.lg }, accentWidth > 0 ? { overflow: 'hidden' } : null, passthrough]}
       {...rest}
     >
-      {size && path ? (
-        <Svg
+      {accentWidth > 0 ? (
+        <View
           pointerEvents="none"
-          style={StyleSheet.absoluteFill}
-          width={size.width}
-          height={size.height}
-          // The shape is drawn in real pixels, so no viewBox: scaling one
-          // would skew the 45-degree cuts on any non-default aspect ratio.
-        >
-          {accentWidth > 0 ? (
-            <Defs>
-              <ClipPath id={clipId}>
-                <Path d={path} />
-              </ClipPath>
-            </Defs>
-          ) : null}
-          <Path d={path} fill={fill} stroke={stroke} strokeWidth={1} />
-          {accentWidth > 0 ? (
-            <Rect
-              x={0}
-              y={0}
-              width={accentWidth}
-              height={size.height}
-              fill={(borderLeftColor as string) ?? stroke}
-              clipPath={`url(#${clipId})`}
-            />
-          ) : null}
-        </Svg>
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: accentWidth,
+            backgroundColor: (borderLeftColor as string) ?? stroke,
+          }}
+        />
       ) : null}
       {children}
-    </View>
+    </Surface>
   );
 }

@@ -137,10 +137,13 @@ export function Drawer({ expanded, onExpandedChange, children, persistentContent
       // rather than a sheet sitting over it.
       backgroundStyle={{
         backgroundColor: theme.colors.bg,
-        borderTopLeftRadius: theme.radii.lg + 6,
-        borderTopRightRadius: theme.radii.lg + 6,
+        borderTopLeftRadius: theme.radii.xl,
+        borderTopRightRadius: theme.radii.xl,
         borderTopWidth: 1,
         borderColor: theme.colors.border,
+        // Restrained on purpose: this sheet sits over a map, and a large soft
+        // shadow there smears the imagery it is supposed to let you read.
+        boxShadow: theme.raised('md'),
       }}
       // The search field inside `children` needs the sheet to ride up with
       // the keyboard rather than sit behind it — gorhom's own handling here
@@ -190,7 +193,16 @@ function Handle({
       accessibilityState={{ expanded }}
       style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: theme.spacing.md }}
     >
-      <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.border }} />
+      {/* A groove cut into the sheet, matching OptionSheet's handle. */}
+      <View
+        style={{
+          width: 40,
+          height: 5,
+          borderRadius: theme.radii.pill,
+          backgroundColor: theme.colors.bg,
+          boxShadow: theme.sunken('sm'),
+        }}
+      />
     </Pressable>
   );
 }

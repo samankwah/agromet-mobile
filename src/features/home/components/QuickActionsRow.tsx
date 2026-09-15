@@ -5,6 +5,7 @@ import { Camera, CloudSun, Megaphone, Tag, type Icon } from 'phosphor-react-nati
 
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { DuotoneIcon } from '../../../shared/ui/DuotoneIcon';
+import { Surface } from '../../../shared/ui/Surface';
 import { Text } from '../../../shared/ui/Text';
 
 type Action = {
@@ -44,7 +45,10 @@ export function QuickActionsRow() {
   const theme = useTheme();
 
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+    // A wider gap than the `sm` this used when the tiles were flat outlines:
+    // each one now casts a soft shadow into the gutter, and at 8dp two
+    // neighbours' shadows met in the middle and read as a seam.
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.md }}>
       {ACTIONS.map((action) => (
         <Pressable
           key={action.label}
@@ -60,26 +64,24 @@ export function QuickActionsRow() {
             // Pressable's own background and border while still drawing its
             // children, and a pressed state makes the style a function, which
             // is the case that breaks. Button.tsx documents it.
-            <View
+            <Surface
+              depth={pressed ? 'sunken' : 'raised'}
+              level="md"
+              radius={theme.radii.md}
               style={{
                 width: '100%',
                 minHeight: theme.minTouchTarget + 12,
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: theme.spacing.xs,
-                borderRadius: theme.radii.md,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                backgroundColor: theme.colors.surface,
                 paddingVertical: theme.spacing.md,
-                opacity: pressed ? 0.7 : 1,
               }}
             >
               <DuotoneIcon icon={action.icon} size={26} />
               <Text variant="caption" style={{ textAlign: 'center' }} numberOfLines={1}>
                 {action.label}
               </Text>
-            </View>
+            </Surface>
           )}
         </Pressable>
       ))}

@@ -102,6 +102,7 @@ export function HubTile({
         // height fills a tile stretched to match a taller neighbour, without
         // depending on that stretch to have a height at all.
         <Card
+          pressed={pressed}
           style={{
             flexGrow: 1,
             // Sized for the end user: these are read at arm's length, outdoors,
@@ -112,7 +113,6 @@ export function HubTile({
             minHeight: 200,
             padding: theme.spacing.lg,
             gap: theme.spacing.sm,
-            opacity: pressed ? 0.75 : 1,
           }}
         >
           {/* Title at the top of the tile, with the badge beside it. */}
@@ -131,9 +131,11 @@ export function HubTile({
                     minWidth: 28,
                     paddingHorizontal: 8,
                     paddingVertical: 3,
-                    borderRadius: 14,
+                    borderRadius: theme.radii.pill,
                     backgroundColor: theme.colors.danger,
                     alignItems: 'center',
+                    // A count badge sits on the tile, so it lifts off it.
+                    boxShadow: theme.raised('sm'),
                   }}
                 >
                   <Text variant="bodyStrong" color={theme.colors.onDanger}>

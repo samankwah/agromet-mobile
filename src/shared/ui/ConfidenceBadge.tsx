@@ -31,9 +31,11 @@ export function ConfidenceBadge({ level }: { level: ConfidenceLevel }) {
         alignSelf: 'flex-start',
         gap: theme.spacing.xs,
         paddingVertical: theme.spacing.xs,
-        paddingHorizontal: theme.spacing.sm,
-        borderRadius: theme.radii.sm,
+        paddingHorizontal: theme.spacing.md,
+        // Pill + shallow lift, matching SeverityBadge — see the note there.
+        borderRadius: theme.radii.pill,
         backgroundColor: color + '22',
+        boxShadow: theme.raised('sm'),
       }}
     >
       <Ionicons name={meta.icon} size={14} color={color} />

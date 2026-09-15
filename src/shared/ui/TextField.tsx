@@ -58,6 +58,11 @@ export const TextField = forwardRef<TextInput, Props>(function TextField(
         placeholderTextColor={theme.colors.muted}
         multiline={multiline}
         textAlignVertical={multiline ? 'top' : 'center'}
+        // An input is a well: the depth pair is thrown inward and the fill
+        // steps back to `bg`, so the field reads as cut into whatever it sits
+        // on rather than laid on top of it. Applied to the TextInput itself
+        // rather than to a wrapping Surface — wrapping one changes how it
+        // measures and where focus lands.
         style={{
           minHeight: multiline ? theme.minTouchTarget * 2 : theme.minTouchTarget,
           paddingHorizontal: theme.spacing.md,
@@ -65,7 +70,8 @@ export const TextField = forwardRef<TextInput, Props>(function TextField(
           borderRadius: theme.radii.md,
           borderWidth: 1,
           borderColor: error ? theme.colors.danger : theme.colors.border,
-          backgroundColor: theme.colors.surface,
+          backgroundColor: theme.colors.bg,
+          boxShadow: theme.sunken('sm'),
           color: theme.colors.text,
           fontFamily: theme.fontFamily.body,
           fontSize: theme.typeScale.body.fontSize,

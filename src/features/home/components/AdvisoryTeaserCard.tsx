@@ -73,9 +73,12 @@ function CropChips({ crops }: { crops: string[] }) {
           key={crop}
           style={{
             paddingVertical: 3,
-            paddingHorizontal: theme.spacing.sm,
-            borderRadius: theme.radii.sm,
+            paddingHorizontal: theme.spacing.md,
+            // Pill and a shallow lift, matching SeverityBadge — a chip sits on
+            // its card rather than in it.
+            borderRadius: theme.radii.pill,
             backgroundColor: theme.colors.teal + '1A', // ~10% tint, matching SeverityBadge's treatment
+            boxShadow: theme.raised('sm'),
           }}
         >
           <Text variant="caption" color={theme.colors.teal}>

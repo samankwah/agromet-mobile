@@ -2,8 +2,21 @@ import React, { createContext, useContext, useMemo } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { useSettingsStore } from '../state/settingsStore';
-import { cardShape, colors, drawerShape, elevation, fontFamily, minTouchTarget, radii, scaleTypeScale, severityColors, spacing, typeScale } from './tokens';
-import type { ColorScheme } from './tokens';
+import {
+  colors,
+  drawerShape,
+  fontFamily,
+  minTouchTarget,
+  neu,
+  radii,
+  raised,
+  scaleTypeScale,
+  severityColors,
+  spacing,
+  sunken,
+  typeScale,
+} from './tokens';
+import type { ColorScheme, DepthLevel, NeuTokens, ShadowPair } from './tokens';
 
 /** Exported so helpers outside a component (e.g. the market's timing-tone
  * colour lookup) can take the resolved theme as an argument. */
@@ -13,12 +26,17 @@ export type Theme = {
   severityColors: (typeof severityColors)['light'];
   spacing: typeof spacing;
   radii: typeof radii;
-  cardShape: typeof cardShape;
   drawerShape: typeof drawerShape;
-  elevation: typeof elevation;
   fontFamily: typeof fontFamily;
   typeScale: typeof typeScale;
   minTouchTarget: number;
+  /** The resolved scheme's light/dark shadow pair. Most callers want
+   * `raised`/`sunken` below rather than these raw colours. */
+  neu: NeuTokens;
+  /** Pre-bound to the active scheme, so a caller writes
+   * `boxShadow: theme.raised('lg')` and never has to pass the tokens in. */
+  raised: (level?: DepthLevel) => ShadowPair;
+  sunken: (level?: DepthLevel) => ShadowPair;
 };
 
 const ThemeContext = createContext<Theme | null>(null);
@@ -54,22 +72,23 @@ export function ThemeProvider({ children, forceScheme }: ThemeProviderProps) {
   const preferred: ColorScheme = themeOverride === 'system' ? systemScheme : themeOverride;
   const scheme: ColorScheme = forceScheme ?? preferred;
 
-  const theme = useMemo<Theme>(
-    () => ({
+  const theme = useMemo<Theme>(() => {
+    const tokens = neu[scheme];
+    return {
       scheme,
       colors: colors[scheme],
       severityColors: severityColors[scheme],
       spacing,
       radii,
-      cardShape,
       drawerShape,
-      elevation,
       fontFamily,
       typeScale: scaleTypeScale(typeScale, textSize),
       minTouchTarget,
-    }),
-    [scheme, textSize],
-  );
+      neu: tokens,
+      raised: (level) => raised(tokens, level),
+      sunken: (level) => sunken(tokens, level),
+    };
+  }, [scheme, textSize]);
 
   return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
 }

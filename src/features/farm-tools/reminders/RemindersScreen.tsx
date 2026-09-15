@@ -225,10 +225,12 @@ export function RemindersScreen({ focusId }: Props) {
               gap: theme.spacing.sm,
               minHeight: theme.minTouchTarget + 8,
               paddingHorizontal: theme.spacing.lg,
-              borderRadius: 999,
+              borderRadius: theme.radii.pill,
               backgroundColor: theme.colors.accent,
-              opacity: pressed ? 0.85 : 1,
-              ...theme.elevation.raised,
+              // A floating action button is the one control that should read
+              // as furthest off the page, so it takes the deepest step — and
+              // presses in rather than dimming.
+              boxShadow: pressed ? theme.sunken('md') : theme.raised('lg'),
             }}
           >
             <Ionicons name="add" size={20} color={theme.colors.onAccent} />

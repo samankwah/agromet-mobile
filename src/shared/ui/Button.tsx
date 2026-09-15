@@ -1,8 +1,9 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, View, type PressableProps } from 'react-native';
+import { ActivityIndicator, Pressable, type PressableProps } from 'react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
 import { ON_BACKDROP_COLOR } from './PhotoBackdrop';
+import { Surface } from './Surface';
 import { Text } from './Text';
 
 /**
@@ -61,15 +62,22 @@ export function Button({ label, variant = 'primary', loading, disabled, icon, ..
         // itself. Styling the Pressable directly left the background,
         // border and padding unrendered on Android while the label still
         // drew — an invisible button. A plain View has no such ambiguity.
-        <View
+        //
+        // A button is the clearest place for the depth language to do real
+        // work: it stands off the page at rest and is genuinely pushed into
+        // it while held, instead of just dimming. `onBackdrop` sits on a
+        // photograph and stays flat — see Card's `translucent` note.
+        <Surface
+          depth={variant === 'onBackdrop' ? 'flat' : pressed && !isDisabled ? 'sunken' : 'raised'}
+          level="md"
+          radius={theme.radii.md}
+          background={backgroundColor}
+          bordered={variant === 'outline' || variant === 'onBackdrop'}
+          borderColor={borderColor}
           style={{
             minHeight: theme.minTouchTarget,
             paddingHorizontal: theme.spacing.lg,
-            borderRadius: theme.radii.md,
-            borderWidth: variant === 'outline' || variant === 'onBackdrop' ? 1 : 0,
-            borderColor,
-            backgroundColor,
-            opacity: isDisabled ? 0.6 : pressed ? 0.85 : 1,
+            opacity: isDisabled ? 0.6 : 1,
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
@@ -86,7 +94,7 @@ export function Button({ label, variant = 'primary', loading, disabled, icon, ..
               </Text>
             </>
           )}
-        </View>
+        </Surface>
       )}
     </Pressable>
   );

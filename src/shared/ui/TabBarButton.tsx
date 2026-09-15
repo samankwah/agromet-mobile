@@ -1,24 +1,25 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
 import type { BottomTabBarButtonProps } from 'expo-router/js-tabs';
 import { PlatformPressable } from 'expo-router/react-navigation';
-import Svg, { Path } from 'react-native-svg';
 
 import { useTheme } from '../theme/ThemeProvider';
-import { chamferedRectPath } from './cardShape';
+import { Surface } from './Surface';
 
 /**
- * One tab's button, carrying the selected tab's filled highlight.
+ * One tab's button, carrying the selected tab's highlight.
  *
  * The navigator's default button only recolours the icon and label, which left
  * the selected tab reading as "slightly greener text" rather than a selected
  * thing. This paints a filled block behind the focused tab's icon and label,
  * the way a selected chip works elsewhere in the app.
  *
- * Chamfered, not rounded: `borderRadius` cannot cut a corner straight, and a
- * pill inside this bar would be the only rounded shape on the screen. It takes
- * `nestedChamfer` with square minor corners, which is the treatment tokens.ts
- * documents for a block sitting *inside* a card — the bar being the card here.
+ * The block is *sunken*, not raised. The bar itself is the raised thing; a tab
+ * is selected by being pressed into it, which is the one place in the app
+ * where the depth language carries a state rather than a hierarchy. The
+ * `focus` fill still carries it on its own, so the state is never
+ * shadow-only — which matters in sunlight, and for anyone who cannot see the
+ * bevel at all.
  *
  * `colors.focus`/`onFocus` rather than `accent`/`onAccent`: those are the
  * palette's designated selected-chip pair, already used by SegmentedControl's
@@ -30,9 +31,11 @@ import { chamferedRectPath } from './cardShape';
  * rhythm wherever it moves — which the labels alone do not do, ranging from
  * "Home" to "Advisories".
  *
- * That inset is applied to the *painted path only*, never to the layout box:
+ * That inset is applied to the *painted fill only*, never to the layout box:
  * taking it as a margin instead cost the widest label ("Farm Tools") the room
- * it needs and truncated it to an ellipsis.
+ * it needs and truncated it to an ellipsis. It is now an absolutely-positioned
+ * sibling, which is also why the `onLayout` measure the old SVG path needed is
+ * gone — a View can stretch to its own edges without being told the size.
  *
  * Built on PlatformPressable, the same component the navigator's own button
  * uses, so press feedback and the tab's accessibility wiring are unchanged.
@@ -49,46 +52,28 @@ const NAV_TAB_PADDING = 5;
 
 export function TabBarButton({ children, style, ...props }: BottomTabBarButtonProps) {
   const theme = useTheme();
-  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
 
   // v7 of bottom-tabs marks the focused tab with `aria-selected`, not
   // `accessibilityState.selected` (see its BottomTabItem). Reading the latter
   // silently never matches, and the highlight never paints.
   const focused = props['aria-selected'] === true;
 
-  const handleLayout = (event: LayoutChangeEvent) => {
-    const { width, height } = event.nativeEvent.layout;
-    setSize((prev) => (prev && Math.abs(prev.width - width) < 0.5 && Math.abs(prev.height - height) < 0.5 ? prev : { width, height }));
-  };
-
-  const fillWidth = size ? Math.max(0, size.width - HIGHLIGHT_INSET * 2) : 0;
-
-  // Only the focused tab paints one, so the path is built for that tab alone
-  // rather than memoised across all five.
-  const path =
-    focused && size
-      ? chamferedRectPath({
-          width: fillWidth,
-          height: size.height,
-          chamfer: theme.cardShape.nestedChamfer,
-          // Square minor corners, per tokens.ts: a nested block pairs its cut
-          // with genuinely square corners, unlike the bar's symmetrical octagon.
-          minorChamfer: 0,
-          // No stroke to keep inside, so the fill runs to the path's own edge.
-          inset: 0,
-        })
-      : null;
-
   return (
     <PlatformPressable {...props} style={[style, styles.pressable]}>
       {/* Chrome on a nested View, never on the Pressable: Android drops a
           Pressable's own background while still drawing its children.
           Card.tsx and CityCarousel document the same constraint. */}
-      <View onLayout={handleLayout} style={styles.item}>
-        {path && size ? (
-          <Svg pointerEvents="none" style={[styles.fill, { left: HIGHLIGHT_INSET }]} width={fillWidth} height={size.height}>
-            <Path d={path} fill={theme.colors.focus} />
-          </Svg>
+      <View style={styles.item}>
+        {focused ? (
+          <Surface
+            pointerEvents="none"
+            depth="sunken"
+            level="sm"
+            radius={theme.radii.md}
+            background={theme.colors.focus}
+            bordered={false}
+            style={styles.fill}
+          />
         ) : null}
         {children}
       </View>
@@ -108,7 +93,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Positioned rather than absoluteFill: the fill is narrower than its slot, so
-  // it needs an explicit left edge to sit on.
-  fill: { position: 'absolute', top: 0 },
+  // Inset rather than absoluteFill: the fill is narrower than its slot, leaving
+  // a gutter between neighbours.
+  fill: { position: 'absolute', top: 0, bottom: 0, left: HIGHLIGHT_INSET, right: HIGHLIGHT_INSET },
 });

@@ -129,7 +129,7 @@ export function MapPreviewCard({ center, locationName, temperatureC }: Props) {
                   center={center}
                   spanDeg={SPAN_DEG}
                   interactive={false}
-                  chamfer={theme.cardShape.nestedChamfer}
+                  radius={theme.radii.md}
                 />
               </View>
 

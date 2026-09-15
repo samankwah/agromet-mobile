@@ -56,8 +56,19 @@ export function TemperatureRangeBar({ minC, maxC, weekMinC, weekMaxC }: Props) {
   // range), so the gradient's cool-to-warm sweep reads the bar the same way
   // it's already laid out: low on the left, high on the right.
 
+  // The track is a groove with the coloured segment lying in it — the same
+  // relationship as a slider, which is what the reference designs make of any
+  // track like this.
   return (
-    <View style={{ height: 4, borderRadius: 2, backgroundColor: theme.colors.border, overflow: 'hidden' }}>
+    <View
+      style={{
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: theme.colors.bg,
+        boxShadow: theme.sunken('sm'),
+        overflow: 'hidden',
+      }}
+    >
       <LinearGradient
         colors={TEMPERATURE_SCALE}
         start={{ x: 0, y: 0 }}
@@ -66,8 +77,8 @@ export function TemperatureRangeBar({ minC, maxC, weekMinC, weekMaxC }: Props) {
           position: 'absolute',
           left: `${startPct}%`,
           width: `${widthPct}%`,
-          height: 4,
-          borderRadius: 2,
+          height: 6,
+          borderRadius: 3,
         }}
       />
     </View>

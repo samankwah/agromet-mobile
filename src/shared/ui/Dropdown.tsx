@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
 import { FieldLabel } from './FieldLabel';
 import { OptionSheet, type SheetOption } from './OptionSheet';
+import { Surface } from './Surface';
 import { Text } from './Text';
 
 type Props = {
@@ -32,19 +33,27 @@ export function Dropdown({ label, options, selectedId, onSelect }: Props) {
         onPress={() => setOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${selected?.label ?? 'Select'}`}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          minHeight: theme.minTouchTarget + 8,
-          paddingHorizontal: theme.spacing.lg,
-          borderRadius: theme.radii.lg,
-          backgroundColor: theme.colors.surface,
-          ...theme.elevation.card,
-        }}
       >
-        <Text variant="bodyStrong">{selected?.label ?? 'Select'}</Text>
-        <Ionicons name="chevron-down" size={18} color={theme.colors.teal} />
+        {({ pressed }) => (
+          // Held down, or with its sheet open, the trigger stays pushed in —
+          // so the control visibly remains "the thing you are editing" for as
+          // long as the sheet is up. Chrome on a nested View; see Button.tsx.
+          <Surface
+            depth={pressed || open ? 'sunken' : 'raised'}
+            level="md"
+            radius={theme.radii.lg}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              minHeight: theme.minTouchTarget + 8,
+              paddingHorizontal: theme.spacing.lg,
+            }}
+          >
+            <Text variant="bodyStrong">{selected?.label ?? 'Select'}</Text>
+            <Ionicons name="chevron-down" size={18} color={theme.colors.teal} />
+          </Surface>
+        )}
       </Pressable>
 
       <OptionSheet

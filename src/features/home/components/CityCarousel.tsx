@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
-import Svg, { Path } from 'react-native-svg';
 
 import { useReduceMotion } from '../../../shared/a11y/useReduceMotion';
 import { getCarouselConditions } from '../../../shared/api/weatherService';
@@ -10,7 +9,7 @@ import { HOME_LOCATIONS } from '../../../shared/data/mockWeather';
 import { useLocationStore } from '../../../shared/state/locationStore';
 import { useSettingsStore } from '../../../shared/state/settingsStore';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { chamferedRectPath } from '../../../shared/ui/cardShape';
+import { Surface } from '../../../shared/ui/Surface';
 import { Text } from '../../../shared/ui/Text';
 import { formatTemperature } from '../../../shared/utils/formatTemperature';
 import {
@@ -107,20 +106,6 @@ export function CityCarousel() {
     theme.spacing.xs,
     theme.minTouchTarget + 16,
   );
-  /* One path for all sixty-four cards. Every card is the same size, so the
-     silhouette is identical — building it once here rather than per card keeps
-     the flowing row cheap to mount, and keeps these chips on exactly the same
-     chamfered edge as every Card in the app. */
-  const cardPath = useMemo(
-    () =>
-      chamferedRectPath({
-        width: cardWidth,
-        height: cardHeight,
-        chamfer: theme.cardShape.chamfer,
-        minorChamfer: theme.cardShape.minorChamfer,
-      }),
-    [cardWidth, cardHeight, theme.cardShape.chamfer, theme.cardShape.minorChamfer],
-  );
   const cycleWidth = marqueeCycleWidth(HOME_LOCATIONS.length, cardWidth, gap);
   const snapOffsets = useMemo(
     () => citySnapOffsets(HOME_LOCATIONS.length, cardWidth, gap),
@@ -205,42 +190,32 @@ export function CityCarousel() {
           // directly and got away with it only because the style was a static
           // object; a pressed state makes it a function, which is the case that
           // breaks.
-          <View
+          // The selected town presses into the strip and keeps its accent
+          // fill, so the state never rests on the shadow alone.
+          <Surface
+            depth={isSelected || pressed ? 'sunken' : 'raised'}
+            level="sm"
+            radius={theme.radii.lg}
+            background={isSelected ? theme.colors.accent : theme.colors.surface}
+            borderColor={isSelected ? theme.colors.accent : theme.colors.border}
             style={{
               width: cardWidth,
-              // An exact height, not a minimum: the painted path below is drawn
-              // to this size, and a card that grew past it would show its fill
-              // stopping short of its own text.
+              // An exact height, not a minimum: the row's layout maths is built
+              // on every card being this tall, so one that grew would break the
+              // marquee's cycle width.
               height: cardHeight,
               paddingHorizontal: theme.spacing.md,
               justifyContent: 'center',
               gap: theme.spacing.xs,
-              opacity: pressed ? 0.7 : 1,
             }}
           >
-            {/* The chamfered silhouette, as on every card in the app. Painted
-                rather than set with borderRadius, because no radius cuts a
-                corner straight — see ui/cardShape.ts. */}
-            <Svg
-              pointerEvents="none"
-              style={StyleSheet.absoluteFill}
-              width={cardWidth}
-              height={cardHeight}
-            >
-              <Path
-                d={cardPath}
-                fill={isSelected ? theme.colors.accent : theme.colors.surface}
-                stroke={isSelected ? theme.colors.accent : theme.colors.border}
-                strokeWidth={1}
-              />
-            </Svg>
             <Text variant="bodyStrong" color={fg} numberOfLines={1}>
               {location.name}
             </Text>
             <Text variant="body" color={fg}>
               {conditions ? formatTemperature(conditions.temperatureC) : '…'}
             </Text>
-          </View>
+          </Surface>
         )}
       </Pressable>
     );

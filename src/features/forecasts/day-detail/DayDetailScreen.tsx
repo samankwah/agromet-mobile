@@ -303,7 +303,9 @@ function MetricPill({ metric, onSelect }: { metric: MetricId; onSelect: (id: Met
               backgroundColor: theme.colors.surfaceStrong,
               borderWidth: 1,
               borderColor: theme.colors.border,
-              ...theme.elevation.raised,
+              // A menu floating clear of the page it covers — the deepest
+              // step, so it reads as detached rather than inlaid.
+              boxShadow: theme.raised('lg'),
             }}
           >
             {METRICS.map((entry) => {

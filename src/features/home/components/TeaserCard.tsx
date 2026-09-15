@@ -5,6 +5,7 @@ import { router, type Href } from 'expo-router';
 
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Card } from '../../../shared/ui/Card';
+import { Divider } from '../../../shared/ui/Divider';
 import { SampleContentNotice } from '../../../shared/ui/SampleContentNotice';
 import { Text } from '../../../shared/ui/Text';
 
@@ -44,7 +45,7 @@ export function TeaserCard({ label, trailing, href, action, accessibilityLabel, 
   return (
     <Pressable onPress={() => router.push(href)} accessibilityRole="button" accessibilityLabel={accessibilityLabel}>
       {({ pressed }) => (
-        <Card style={{ gap: theme.spacing.sm, opacity: pressed ? 0.75 : 1 }}>
+        <Card pressed={pressed} style={{ gap: theme.spacing.sm }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: theme.spacing.sm }}>
             <Text variant="caption" muted style={{ flexShrink: 1 }} numberOfLines={1}>
               {label}
@@ -54,9 +55,13 @@ export function TeaserCard({ label, trailing, href, action, accessibilityLabel, 
 
           {children}
 
-          {/* Hairline above the footer: it separates the promise from the
-              content without adding a second card edge. */}
-          <View style={{ height: 1, backgroundColor: theme.colors.border, marginTop: theme.spacing.xs }} />
+          {/* A seam above the footer: it separates the promise from the
+              content without adding a second card edge. The shared Divider
+              draws it as a two-tone groove, so it reads as a fold in the card
+              rather than a line laid on top of it. */}
+          <View style={{ marginTop: theme.spacing.xs }}>
+            <Divider />
+          </View>
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: theme.spacing.sm }}>
             {notice ? <SampleContentNotice text={notice} /> : <View />}

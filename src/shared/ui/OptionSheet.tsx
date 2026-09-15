@@ -44,8 +44,12 @@ export function OptionSheet({ visible, options, selectedId, onSelect, onClose, t
         <View
           style={{
             backgroundColor: theme.colors.bg,
-            borderTopLeftRadius: theme.radii.lg,
-            borderTopRightRadius: theme.radii.lg,
+            borderTopLeftRadius: theme.radii.xl,
+            borderTopRightRadius: theme.radii.xl,
+            // The sheet slides up over the whole screen, so it takes the
+            // deepest lift — the one surface that is unambiguously in front
+            // of everything else.
+            boxShadow: theme.raised('lg'),
             paddingVertical: theme.spacing.sm,
             /* A sheet is a sibling of the screen, so it inherits no safe-area
                inset of its own. Clearing the inset is not enough either: a
@@ -60,9 +64,12 @@ export function OptionSheet({ visible, options, selectedId, onSelect, onClose, t
           <View
             style={{
               width: 40,
-              height: 4,
-              borderRadius: 2,
-              backgroundColor: theme.colors.border,
+              height: 5,
+              borderRadius: theme.radii.pill,
+              // A grab handle is a groove cut into the sheet, not a bar laid
+              // on it. This is the canonical soft-UI handle.
+              backgroundColor: theme.colors.bg,
+              boxShadow: theme.sunken('sm'),
               alignSelf: 'center',
               marginVertical: theme.spacing.sm,
             }}

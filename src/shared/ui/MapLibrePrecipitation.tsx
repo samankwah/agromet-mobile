@@ -46,10 +46,11 @@ type Props = {
   /** Off for the preview card: a thumbnail is a picture, and the card around
    * it owns the tap. */
   interactive?: boolean;
-  /** Corner cut in CSS pixels, so the map can sit inside a chamfered Card.
-   * Done in the document rather than in React Native styles because
-   * `overflow: 'hidden'` clips to the rectangle and squares the cuts off. */
-  chamfer?: number;
+  /** Corner radius in CSS pixels, so the map can sit inside a rounded Card.
+   * Applied in the document rather than in React Native styles: an Android
+   * WebView does not reliably clip to its parent's `borderRadius`, so the
+   * corners come out square unless the page rounds itself. */
+  radius?: number;
 };
 
 /** The parts of the document that are a function of where and how the map is
@@ -58,7 +59,7 @@ type ViewOptions = {
   center?: { lat: number; lng: number };
   spanDeg: number;
   interactive: boolean;
-  chamfer: number;
+  radius: number;
 };
 
 /**
@@ -116,14 +117,13 @@ function buildHtml(scheme: 'light' | 'dark', view: ViewOptions): string {
     : country;
 
   // Ghana-wide needs a margin off the screen edges; a thumbnail cannot spare
-  // any, and its own corner cut is the visual inset.
+  // any, and its own rounded corner is the visual inset.
   const fitPadding = view.center ? 0 : 16;
 
-  const c = view.chamfer;
-  const clipPath = c
-    ? `clip-path: polygon(${c}px 0, calc(100% - ${c}px) 0, 100% ${c}px, 100% calc(100% - ${c}px),` +
-      ` calc(100% - ${c}px) 100%, ${c}px 100%, 0 calc(100% - ${c}px), 0 ${c}px);`
-    : '';
+  const r = view.radius;
+  // `overflow: hidden` alongside it: the radius alone rounds the box but the
+  // canvas inside still paints square into the corners.
+  const rounding = r ? `border-radius: ${r}px; overflow: hidden;` : '';
 
   return `<!DOCTYPE html>
 <html>
@@ -133,7 +133,7 @@ function buildHtml(scheme: 'light' | 'dark', view: ViewOptions): string {
 ${mapLibreHeadTags()}
 <style>
   html, body, #map { margin:0; padding:0; height:100%; width:100%; background:transparent; }
-  #map { ${clipPath} }
+  #map { ${rounding} }
   .maplibregl-ctrl-attrib { font-size: 9px; }
   /* The compact control's own collapsed styling is fine; what is not is that
      MapLibre opens it on load, which puts a band of credits across a map meant
@@ -432,7 +432,7 @@ export function MapLibrePrecipitation({
   center,
   spanDeg = 2.5,
   interactive = true,
-  chamfer = 0,
+  radius = 0,
 }: Props) {
   const theme = useTheme();
   const webViewRef = useRef<WebView>(null);
@@ -450,9 +450,9 @@ export function MapLibrePrecipitation({
   // changes. Depending on the `center` object rather than its two numbers would
   // remount on every render that passed a fresh literal, so it is destructured.
   const html = useMemo(
-    () => buildHtml(theme.scheme, { center, spanDeg, interactive, chamfer }),
+    () => buildHtml(theme.scheme, { center, spanDeg, interactive, radius }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [theme.scheme, center?.lat, center?.lng, spanDeg, interactive, chamfer],
+    [theme.scheme, center?.lat, center?.lng, spanDeg, interactive, radius],
   );
 
   /** The one way anything reaches the running map, mirroring the

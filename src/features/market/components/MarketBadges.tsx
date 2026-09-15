@@ -57,11 +57,13 @@ export function TrendBadge({
         gap: theme.spacing.xs,
         paddingVertical: size === 'sm' ? 2 : theme.spacing.xs,
         paddingHorizontal: theme.spacing.sm,
-        borderRadius: theme.radii.sm,
+        borderRadius: theme.radii.pill,
         backgroundColor: onImage ? theme.colors.surface : color + '22',
         borderWidth: onImage ? 1 : 0,
         borderColor: color + '55',
-        ...(onImage ? theme.elevation.card : null),
+        // Only the on-image variant lifts. The tinted one sits flush inside a
+        // panel, where a shadow on something this small just reads as blur.
+        ...(onImage ? { boxShadow: theme.raised('sm') } : null),
       }}
     >
       <Ionicons name={meta.icon} size={size === 'sm' ? 12 : 16} color={color} />

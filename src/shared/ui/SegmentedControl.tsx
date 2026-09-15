@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, View } from 'react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
+import { Surface } from './Surface';
 import { Text } from './Text';
 
 type Variant = 'tab' | 'pill';
@@ -40,19 +41,26 @@ export function SegmentedControl({ segments, selectedIndex, onChange, accessibil
   const theme = useTheme();
   const isPill = variant === 'pill';
 
+  const trackRadius = isPill ? theme.radii.pill : theme.radii.md;
+  const segmentRadius = isPill ? theme.radii.pill : theme.radii.sm;
+
   return (
-    <View
+    // The track is a well and the selected segment is a tile lifted out of
+    // it — the clearest statement of the depth language anywhere in the app.
+    // The track fills with `bg` rather than `surface` so it reads as a groove
+    // cut into the card it sits on, not as one more panel laid on top.
+    <Surface
+      depth="sunken"
+      level="sm"
+      radius={trackRadius}
+      background={theme.colors.bg}
+      bordered={!isPill}
       accessibilityRole="tablist"
       accessibilityLabel={accessibilityLabel}
       style={{
         flexDirection: 'row',
-        backgroundColor: theme.colors.surface,
-        borderRadius: isPill ? 999 : theme.radii.md,
-        borderWidth: isPill ? 0 : 1,
-        borderColor: theme.colors.border,
         padding: isPill ? 4 : 3,
         gap: isPill ? 6 : 3,
-        ...(isPill ? theme.elevation.card : null),
       }}
     >
       {segments.map((segment, index) => {
@@ -76,32 +84,42 @@ export function SegmentedControl({ segments, selectedIndex, onChange, accessibil
               flexGrow: 1,
               flexShrink: 1,
               flexBasis: equalWidth ? 0 : 'auto',
-              minHeight: isPill ? theme.minTouchTarget + 8 : theme.minTouchTarget - 6,
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingHorizontal: theme.spacing.sm,
-              borderRadius: isPill ? 999 : theme.radii.sm,
-              backgroundColor: isSelected ? (isPill ? theme.colors.focus : theme.colors.accent) : 'transparent',
-              ...(isPill && isSelected ? theme.elevation.card : null),
             }}
           >
-            <Text
-              variant="bodyStrong"
-              color={isSelected ? (isPill ? theme.colors.onFocus : theme.colors.onAccent) : theme.colors.muted}
-              numberOfLines={1}
-              // Safety net only — with content-based sizing the labels
-              // normally render at full size; this keeps a very long label
-              // or an extra-large text-size setting from clipping, and the
-              // floor stops it shrinking to something unreadable.
-              adjustsFontSizeToFit
-              minimumFontScale={0.9}
-              style={{ textAlign: 'center' }}
+            {/* Chrome on a nested View, never on the Pressable — Android
+                drops a Pressable's own background while still drawing its
+                children, which leaves the selected segment unstyled. */}
+            <Surface
+              depth={isSelected ? 'raised' : 'flat'}
+              level="sm"
+              radius={segmentRadius}
+              bordered={false}
+              background={isSelected ? (isPill ? theme.colors.focus : theme.colors.accent) : 'transparent'}
+              style={{
+                minHeight: isPill ? theme.minTouchTarget + 8 : theme.minTouchTarget - 6,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: theme.spacing.sm,
+              }}
             >
-              {segment}
-            </Text>
+              <Text
+                variant="bodyStrong"
+                color={isSelected ? (isPill ? theme.colors.onFocus : theme.colors.onAccent) : theme.colors.muted}
+                numberOfLines={1}
+                // Safety net only — with content-based sizing the labels
+                // normally render at full size; this keeps a very long label
+                // or an extra-large text-size setting from clipping, and the
+                // floor stops it shrinking to something unreadable.
+                adjustsFontSizeToFit
+                minimumFontScale={0.9}
+                style={{ textAlign: 'center' }}
+              >
+                {segment}
+              </Text>
+            </Surface>
           </Pressable>
         );
       })}
-    </View>
+    </Surface>
   );
 }

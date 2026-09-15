@@ -60,13 +60,14 @@ export function CommodityCard({ resolved, width, onQuickView }: Props) {
         {({ pressed }) => (
         <View
           style={{
-            opacity: pressed ? 0.7 : 1,
             backgroundColor: theme.colors.surface,
-            borderRadius: theme.radii.md,
+            borderRadius: theme.radii.lg,
             borderWidth: 1,
             borderColor: theme.colors.border,
+            // Clips the photo to the rounded corner, which also means this
+            // card cannot cast from a child — the shadow has to live here.
             overflow: 'hidden',
-            ...theme.elevation.card,
+            boxShadow: pressed ? theme.sunken('sm') : theme.raised('md'),
           }}
         >
         {image ? <Image source={image} style={{ width, height: imageHeight }} resizeMode="cover" /> : null}
@@ -131,8 +132,9 @@ export function CommodityCard({ resolved, width, onQuickView }: Props) {
                 backgroundColor: theme.colors.surface,
                 borderWidth: 1,
                 borderColor: theme.colors.border,
-                opacity: pressed ? 0.6 : 1,
-                ...theme.elevation.card,
+                // Sits on the photograph, so it needs its own lift to stay
+                // legible against whatever is behind it.
+                boxShadow: pressed ? theme.sunken('sm') : theme.raised('sm'),
               }}
             >
               <Ionicons name="eye-outline" size={17} color={theme.colors.text} />
