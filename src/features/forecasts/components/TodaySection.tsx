@@ -13,7 +13,7 @@ import { Text } from '../../../shared/ui/Text';
 import { ON_BACKDROP_COLOR, ON_BACKDROP_MUTED } from '../../../shared/ui/WeatherBackdrop';
 import { formatTemperature } from '../../../shared/utils/formatTemperature';
 import { formatWind } from '../../../shared/utils/formatWind';
-import { getConditionIcon } from '../../../shared/utils/getConditionIcon';
+import { LiveWeatherIcon } from '../../../shared/ui/weather/LiveWeatherIcon';
 import { dayHeadline } from '../../../shared/utils/weatherNarrative';
 import { HourlyStripItem } from './HourlyStripItem';
 import { MapPreviewCard } from './MapPreviewCard';
@@ -51,7 +51,15 @@ export function TodaySection({ conditions, today, hourly }: Props) {
               {formatTemperature(today.tempMinC)}
             </Text>
           </View>
-          <Ionicons name={getConditionIcon(conditions.condition)} size={60} color={ON_BACKDROP_COLOR} />
+          {/* The hero animates: this is the one icon on the screen whose whole
+              job is to say what the sky is doing right now. */}
+          <LiveWeatherIcon
+            weatherCode={conditions.weatherCode}
+            isDay={conditions.isDay}
+            size={60}
+            color={ON_BACKDROP_COLOR}
+            animated
+          />
         </View>
       </View>
 

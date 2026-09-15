@@ -21,6 +21,12 @@ export type CurrentWeather = {
   maxC: number;
   feelsLikeC: number;
   condition: string; // short human label, e.g. "Partly cloudy"
+  /** The raw WMO code behind that label. Carried alongside the words because
+   * `conditionFromWmo` collapses 28 codes into five strings — right for a
+   * label, too coarse for a picture. See domain/weatherGlyph.ts. */
+  weatherCode: number;
+  /** False after dark, so an icon can show the night form. */
+  isDay: boolean;
   rainfallMm: number;
   humidityPct: number;
   windKph: number;

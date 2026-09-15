@@ -23,7 +23,7 @@ import { StatTile } from '../../../shared/ui/StatTile';
 import { Text } from '../../../shared/ui/Text';
 import { formatTemperature } from '../../../shared/utils/formatTemperature';
 import { formatWind } from '../../../shared/utils/formatWind';
-import { getConditionIcon } from '../../../shared/utils/getConditionIcon';
+import { LiveWeatherIcon } from '../../../shared/ui/weather/LiveWeatherIcon';
 import { HOT_DAY_C } from '../../../shared/utils/weatherNarrative';
 import { DayStrip } from './DayStrip';
 import { HourlyConditionStrip, hasVaryingConditions } from './HourlyConditionStrip';
@@ -523,7 +523,7 @@ function DayDetail({
             <Text variant="h1" style={{ fontSize: 38, lineHeight: 44 }}>
               {Math.round(headlineTempC)}°
             </Text>
-            <Ionicons name={getConditionIcon(day.condition)} size={32} color={theme.colors.muted} />
+            <LiveWeatherIcon weatherCode={day.weatherCode} isDay={day.isDay} size={32} color={theme.colors.muted} animated />
           </View>
           {/* One headline figure with the range beneath it, as the reference
               has it — not two large numbers competing side by side. */}

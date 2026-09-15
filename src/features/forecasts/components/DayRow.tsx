@@ -7,7 +7,7 @@ import type { DailyForecast } from '../../../shared/domain/forecast';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Text } from '../../../shared/ui/Text';
 import { TemperatureRangeBar } from '../../../shared/ui/TemperatureRangeBar';
-import { getConditionIcon } from '../../../shared/utils/getConditionIcon';
+import { LiveWeatherIcon } from '../../../shared/ui/weather/LiveWeatherIcon';
 
 type Props = {
   label: string;
@@ -47,7 +47,7 @@ export function DayRow({ label, day, weekMinC, weekMaxC, isFirst }: Props) {
         {label}
       </Text>
 
-      <Ionicons name={getConditionIcon(day.condition)} size={20} color={theme.colors.accent} />
+      <LiveWeatherIcon weatherCode={day.weatherCode} isDay={day.isDay} size={20} color={theme.colors.accent} />
 
       <View style={{ width: 34 }}>
         {day.rainfallProbabilityPct >= 30 ? (

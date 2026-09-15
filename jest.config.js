@@ -3,6 +3,18 @@ module.exports = {
   preset: 'jest-expo',
   testMatch: ['<rootDir>/src/tests/**/*.test.ts', '<rootDir>/src/tests/**/*.test.tsx'],
   setupFiles: ['<rootDir>/jest.setup.js'],
+  /**
+   * Reanimated 4 keeps its worklets runtime in `react-native-worklets`, whose
+   * `.native.ts` entry points reach for a native module that does not exist
+   * under Jest — importing anything from Reanimated dies on
+   * `Cannot read properties of undefined (reading 'loadUnpackers')`.
+   *
+   * The resolver the package ships for this strips the `native` extensions for
+   * its own files, so the plain implementations load instead. Note this is not
+   * the self-mocking jest.setup.js describes: that was true of Reanimated 3,
+   * which detected Jest itself, and stopped being true at 4.
+   */
+  resolver: '<rootDir>/node_modules/react-native-worklets/jest/resolver.js',
   moduleNameMapper: {
     /**
      * `.tflite` is an asset extension metro was taught about in

@@ -1,4 +1,5 @@
 import type { CurrentWeather } from '../domain/currentWeather';
+import { classifyCondition, isDaytime } from '../utils/classifyCondition';
 
 /**
  * The towns the Home carousel offers, in the order they appear.
@@ -69,9 +70,15 @@ function minutesAgo(minutes: number): string {
   return new Date(Date.now() - minutes * 60_000).toISOString();
 }
 
+/**
+ * `weatherCode` and `isDay` are derived rather than written out, so a mock
+ * entry stays a short list of the numbers that actually differ between towns.
+ * Deriving them from `condition` also means they cannot drift out of step with
+ * the words the way nine hand-maintained copies would.
+ */
 function forLocation(
   id: string,
-  overrides: Omit<CurrentWeather, 'locationId' | 'locationName' | 'lat' | 'lng' | 'region'>,
+  overrides: Omit<CurrentWeather, 'locationId' | 'locationName' | 'lat' | 'lng' | 'region' | 'weatherCode' | 'isDay'>,
 ): CurrentWeather {
   const location = HOME_LOCATIONS.find((entry) => entry.id === id);
   if (!location) {
@@ -83,8 +90,29 @@ function forLocation(
     lat: location.lat,
     lng: location.lng,
     region: location.region,
+    weatherCode: wmoForCondition(overrides.condition),
+    isDay: isDaytime(overrides.observedAt),
     ...overrides,
   };
+}
+
+/** The reverse of `api/openMeteo.ts`'s `conditionFromWmo`, for mock data that
+ * was written as words. One representative code per kind is enough: nothing
+ * reads a mock code for its exact value, only for which picture it selects. */
+function wmoForCondition(condition: string): number {
+  switch (classifyCondition(condition)) {
+    case 'thunderstorm':
+      return 95;
+    case 'rain':
+      return 61;
+    case 'overcast':
+      return 3;
+    case 'cloudy':
+    case 'cloudy-night':
+      return 2;
+    default:
+      return 0;
+  }
 }
 
 export const MOCK_CURRENT_CONDITIONS: Record<string, CurrentWeather> = {

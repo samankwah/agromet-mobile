@@ -8,8 +8,8 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../../shared/ui/AsyncStateView';
 import { Surface } from '../../../shared/ui/Surface';
 import { Text } from '../../../shared/ui/Text';
+import { LiveWeatherIcon } from '../../../shared/ui/weather/LiveWeatherIcon';
 import { formatDegrees } from '../../../shared/utils/formatTemperature';
-import { getConditionIcon } from '../../../shared/utils/getConditionIcon';
 import { FeaturedForecastSkeleton } from './HomeSkeletons';
 import { TeaserCard } from './TeaserCard';
 
@@ -96,7 +96,7 @@ function WeekStrip({ days }: { days: DailyForecast[] }) {
                 <Text variant="caption" muted numberOfLines={1}>
                   {label}
                 </Text>
-                <Ionicons name={getConditionIcon(day.condition)} size={17} color={theme.colors.muted} />
+                <LiveWeatherIcon weatherCode={day.weatherCode} isDay={day.isDay} size={17} color={theme.colors.muted} />
                 <Text variant="bodyStrong" numberOfLines={1}>
                   {formatDegrees(day.tempMaxC)}
                 </Text>
