@@ -21,16 +21,7 @@ import { classifyCondition, type ConditionKind } from '../utils/classifyConditio
  *   80-82 rain showers · 85,86 snow showers · 95-99 thunderstorm
  */
 export type WeatherGlyph =
-  | 'clear'
-  | 'partly-cloudy'
-  | 'cloudy'
-  | 'overcast'
-  | 'fog'
-  | 'drizzle'
-  | 'rain'
-  | 'heavy-rain'
-  | 'showers'
-  | 'thunderstorm';
+  'clear' | 'partly-cloudy' | 'cloudy' | 'overcast' | 'fog' | 'drizzle' | 'rain' | 'heavy-rain' | 'showers' | 'thunderstorm';
 
 /**
  * Snow has no separate glyph. Ghana does not get any, so a snowflake here

@@ -11,12 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, G, Line, Path } from 'react-native-svg';
 
-import {
-  glyphFromCondition,
-  glyphFromWmo,
-  hasNightForm,
-  type WeatherGlyph,
-} from '../../domain/weatherGlyph';
+import { glyphFromCondition, glyphFromWmo, hasNightForm, type WeatherGlyph } from '../../domain/weatherGlyph';
 import { useReduceMotion } from '../../a11y/useReduceMotion';
 import { useTheme } from '../../theme/ThemeProvider';
 import {
@@ -31,7 +26,6 @@ import {
   SUN_DISC,
   SUN_DISC_OFFSET,
   sunRays,
-  WIND_STROKES,
   type Drop,
 } from './glyphPaths';
 
@@ -80,8 +74,7 @@ export function LiveWeatherIcon({ weatherCode, condition, isDay = true, size = 2
   const theme = useTheme();
   const reduceMotion = useReduceMotion();
 
-  const glyph: WeatherGlyph =
-    weatherCode !== undefined ? glyphFromWmo(weatherCode) : condition ? glyphFromCondition(condition) : 'clear';
+  const glyph: WeatherGlyph = weatherCode !== undefined ? glyphFromWmo(weatherCode) : condition ? glyphFromCondition(condition) : 'clear';
 
   const night = !isDay && hasNightForm(glyph);
   const moving = animated && !reduceMotion;
@@ -287,10 +280,7 @@ function Raindrop({ drop, moving, stroke, ink }: { drop: Drop; moving: boolean; 
       progress.value = 0;
       return;
     }
-    progress.value = withDelay(
-      drop.delay,
-      withRepeat(withTiming(1, { duration: 900, easing: Easing.in(Easing.quad) }), -1, false),
-    );
+    progress.value = withDelay(drop.delay, withRepeat(withTiming(1, { duration: 900, easing: Easing.in(Easing.quad) }), -1, false));
   }, [moving, drop.delay, progress]);
 
   const props = useAnimatedProps(() => ({
@@ -302,15 +292,7 @@ function Raindrop({ drop, moving, stroke, ink }: { drop: Drop; moving: boolean; 
 
   return (
     <AnimatedG animatedProps={props}>
-      <Line
-        x1={drop.x}
-        y1={drop.y}
-        x2={drop.x - 0.7}
-        y2={drop.y + 2.4}
-        stroke={ink}
-        strokeWidth={stroke}
-        strokeLinecap="round"
-      />
+      <Line x1={drop.x} y1={drop.y} x2={drop.x - 0.7} y2={drop.y + 2.4} stroke={ink} strokeWidth={stroke} strokeLinecap="round" />
     </AnimatedG>
   );
 }

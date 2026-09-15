@@ -57,11 +57,7 @@ export function Card({ raised, translucent, pressed, style, children, ...rest }:
   const fill = (backgroundColor as string) ?? (translucent ? 'rgba(10,22,34,0.55)' : theme.colors.surface);
   const stroke =
     (borderColor as string) ??
-    (translucent
-      ? `rgba(255,255,255,${raised ? 0.28 : 0.16})`
-      : raised
-        ? theme.colors.borderStrong
-        : theme.colors.border);
+    (translucent ? `rgba(255,255,255,${raised ? 0.28 : 0.16})` : raised ? theme.colors.borderStrong : theme.colors.border);
 
   const radius = typeof borderRadius === 'number' ? borderRadius : theme.radii.xl;
   const accentWidth = typeof borderLeftWidth === 'number' ? borderLeftWidth : 0;

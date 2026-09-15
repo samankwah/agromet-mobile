@@ -15,12 +15,10 @@
  */
 
 /** A cloud with its flat base on y=17, spanning most of the width. */
-export const CLOUD =
-  'M7.2 17.2a3.6 3.6 0 0 1-.3-7.18 5 5 0 0 1 9.6-1.1 3.9 3.9 0 0 1 .4 7.78Z';
+export const CLOUD = 'M7.2 17.2a3.6 3.6 0 0 1-.3-7.18 5 5 0 0 1 9.6-1.1 3.9 3.9 0 0 1 .4 7.78Z';
 
 /** The smaller cloud used where a sun or moon shares the frame. */
-export const CLOUD_SMALL =
-  'M8.4 18.4a3.1 3.1 0 0 1-.26-6.18 4.3 4.3 0 0 1 8.26-.95 3.35 3.35 0 0 1 .34 6.69Z';
+export const CLOUD_SMALL = 'M8.4 18.4a3.1 3.1 0 0 1-.26-6.18 4.3 4.3 0 0 1 8.26-.95 3.35 3.35 0 0 1 .34 6.69Z';
 
 /** The sun's disc, centred so it can rotate its rays about the same point. */
 export const SUN_DISC = { cx: 12, cy: 12, r: 4.2 };
@@ -62,12 +60,10 @@ export const FOG_BANDS = [
   { x1: 4.5, x2: 15.5, y: 20 },
 ];
 
-/** Two wind strokes, each a line with a hooked end — the swirl in the
- * reference set. */
-export const WIND_STROKES = [
-  'M3.5 10h11a2.6 2.6 0 1 0-2.6-2.6',
-  'M3.5 15h7.5a2.4 2.4 0 1 1-2.4 2.4',
-];
+/* No wind glyph. The reference set has a lovely one, but WMO 4677 has no wind
+   code — wind is a separate measurement, not a sky condition — so nothing in
+   this app could ever select it. StatTile already shows wind speed as a
+   number, which is what a farmer needs from it. */
 
 /** Where each drop hangs under the cloud. `delay` staggers the fall so the
  * rain does not pulse as one block. */
