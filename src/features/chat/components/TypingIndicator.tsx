@@ -48,6 +48,9 @@ export function TypingIndicator() {
         // a message being written rather than as a widget on the wallpaper.
         borderRadius: 10,
         backgroundColor: theme.colors.bubbleIn,
+        // Matches MessageBubble's lift, for the same reason as its fill: this
+        // has to read as a message being written, not a widget.
+        boxShadow: theme.raised('sm'),
       }}
     >
       {reduceMotion ? (

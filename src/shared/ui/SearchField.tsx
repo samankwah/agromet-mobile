@@ -3,6 +3,7 @@ import { Pressable, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '../theme/ThemeProvider';
+import { Surface } from './Surface';
 
 type Props = {
   value: string;
@@ -29,15 +30,16 @@ export function SearchField({ value, onChange, placeholder, accessibilityLabel }
   const theme = useTheme();
 
   return (
-    <View
+    // A search box is a well, like every other input — see TextField.
+    <Surface
+      depth="sunken"
+      level="sm"
+      radius={theme.radii.md}
+      background={theme.colors.bg}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
         gap: theme.spacing.sm,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.radii.md,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
         paddingHorizontal: theme.spacing.md,
         minHeight: theme.minTouchTarget,
       }}
@@ -81,6 +83,6 @@ export function SearchField({ value, onChange, placeholder, accessibilityLabel }
           )}
         </Pressable>
       ) : null}
-    </View>
+    </Surface>
   );
 }

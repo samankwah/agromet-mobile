@@ -15,18 +15,12 @@ import { Dropdown } from '../../shared/ui/Dropdown';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { LineAreaChart } from '../../shared/ui/LineAreaChart';
 import { Screen } from '../../shared/ui/Screen';
-import { ArrowDown, ArrowUp, Tag, TrendDown, TrendUp } from 'phosphor-react-native';
+import { ArrowDown, ArrowUp, TrendDown, TrendUp } from 'phosphor-react-native';
 
 import { StatTile } from '../../shared/ui/StatTile';
 import { Text } from '../../shared/ui/Text';
 import { buildMarketOrderUrl, canPlaceOrder } from '../../shared/utils/buildMarketOrderText';
-import {
-  MONTH_NAMES,
-  formatCedi,
-  formatMonths,
-  getRegionalPrices,
-  getTimingSignal,
-} from '../../shared/utils/marketInsights';
+import { MONTH_NAMES, formatCedi, formatMonths, getRegionalPrices, getTimingSignal } from '../../shared/utils/marketInsights';
 import { DemandRow, TrendBadge, timingColor, timingIcon } from './components/MarketBadges';
 import { CommodityDetailSkeleton } from './components/MarketSkeletons';
 import { useResolvedCommodity } from './useMarket';
@@ -54,11 +48,7 @@ export function CommodityDetailScreen({ slug }: Props) {
   if (!entry) {
     return (
       <Screen>
-        <EmptyState
-          icon="help-circle-outline"
-          title="Unknown commodity"
-          message="This commodity is not in the market catalogue."
-        >
+        <EmptyState icon="help-circle-outline" title="Unknown commodity" message="This commodity is not in the market catalogue.">
           <Button label="Back to market" variant="outline" onPress={() => router.push('/market')} />
         </EmptyState>
       </Screen>
@@ -73,12 +63,7 @@ export function CommodityDetailScreen({ slug }: Props) {
 
   return (
     <Screen>
-      <AsyncStateView
-        status={status}
-        error={error}
-        onRetry={refetch}
-        skeleton={<CommodityDetailSkeleton chartWidth={chartWidth} />}
-      >
+      <AsyncStateView status={status} error={error} onRetry={refetch} skeleton={<CommodityDetailSkeleton chartWidth={chartWidth} />}>
         {resolved ? (
           <ChartAndDetail
             resolved={resolved}
@@ -143,9 +128,7 @@ function ChartAndDetail({
     at: index,
     label: MONTH_NAMES[(currentMonth - (series?.length ?? 0) + index + 12) % 12],
   }));
-  const yTicks = series
-    ? [Math.min(...series), (Math.min(...series) + Math.max(...series)) / 2, Math.max(...series)]
-    : [];
+  const yTicks = series ? [Math.min(...series), (Math.min(...series) + Math.max(...series)) / 2, Math.max(...series)] : [];
 
   const orderUrl = buildMarketOrderUrl(
     [{ slug: entry.slug, name: entry.name, price: price ?? 0, unit: market?.unit ?? 'per bag', qty: quantity }],
@@ -176,10 +159,7 @@ function ChartAndDetail({
       <Card style={{ gap: theme.spacing.md }}>
         <Dropdown
           label="Prices for"
-          options={[
-            { id: '', label: 'National average' },
-            ...centers.map((center) => ({ id: center.region, label: center.region })),
-          ]}
+          options={[{ id: '', label: 'National average' }, ...centers.map((center) => ({ id: center.region, label: center.region }))]}
           selectedId={region}
           onSelect={setRegion}
         />
@@ -224,12 +204,7 @@ function ChartAndDetail({
 
             <Button
               label="Add to cart"
-              onPress={() =>
-                onAdd(
-                  { slug: entry.slug, name: entry.name, price, unit: market?.unit ?? 'per bag' },
-                  quantity,
-                )
-              }
+              onPress={() => onAdd({ slug: entry.slug, name: entry.name, price, unit: market?.unit ?? 'per bag' }, quantity)}
               icon={<Ionicons name="cart-outline" size={16} color={theme.colors.onAccent} />}
             />
             {canPlaceOrder() && orderUrl ? (
@@ -263,7 +238,7 @@ function ChartAndDetail({
           />
           {change ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
-              <StatTile icon={Tag} label="Current" value={formatCedi(change.last)} />
+              <StatTile icon="market" label="Current" value={formatCedi(change.last)} />
               <StatTile
                 icon={change.direction === 'down' ? TrendDown : TrendUp}
                 label="6-month change"
@@ -274,8 +249,8 @@ function ChartAndDetail({
             </View>
           ) : null}
           <Text variant="caption" muted>
-            National average price per {market?.unit?.replace('per ', '') ?? 'bag'}, over the six months ending this
-            month. Regional prices apply each market centre&apos;s premium to this line.
+            National average price per {market?.unit?.replace('per ', '') ?? 'bag'}, over the six months ending this month. Regional prices
+            apply each market centre&apos;s premium to this line.
           </Text>
         </Card>
       ) : null}
@@ -288,7 +263,9 @@ function ChartAndDetail({
             flexDirection: 'row',
             gap: theme.spacing.sm,
             backgroundColor: tone + '1a',
-            borderRadius: theme.radii.sm,
+            borderRadius: theme.radii.md,
+            // A tinted block nested in a card is inlaid into it, not laid on it.
+            boxShadow: theme.sunken('sm'),
             padding: theme.spacing.md,
           }}
         >
@@ -311,7 +288,9 @@ function ChartAndDetail({
                 style={{
                   flex: 1,
                   backgroundColor: theme.colors.accent + '1a',
-                  borderRadius: theme.radii.sm,
+                  borderRadius: theme.radii.md,
+                  // A tinted block nested in a card is inlaid into it, not laid on it.
+                  boxShadow: theme.sunken('sm'),
                   padding: theme.spacing.md,
                 }}
               >
@@ -324,7 +303,9 @@ function ChartAndDetail({
                 style={{
                   flex: 1,
                   backgroundColor: theme.colors.warning + '1a',
-                  borderRadius: theme.radii.sm,
+                  borderRadius: theme.radii.md,
+                  // A tinted block nested in a card is inlaid into it, not laid on it.
+                  boxShadow: theme.sunken('sm'),
                   padding: theme.spacing.md,
                 }}
               >
@@ -362,11 +343,14 @@ function ChartAndDetail({
                 {({ pressed }) => (
                   <View
                     style={{
-                      opacity: pressed ? 0.7 : 1,
-                      backgroundColor: selected ? theme.colors.accent + '1a' : theme.colors.bg,
-                      borderRadius: theme.radii.sm,
+                      backgroundColor: selected ? theme.colors.focus : theme.colors.bg,
+                      borderRadius: theme.radii.md,
                       borderWidth: 1,
-                      borderColor: selected ? theme.colors.accent : 'transparent',
+                      borderColor: selected ? theme.colors.focusRim : 'transparent',
+                      // The chosen region stays pressed in, and keeps its
+                      // highlight fill and rim so the state never rests on
+                      // the shadow alone.
+                      boxShadow: selected || pressed ? theme.sunken('sm') : theme.raised('sm'),
                       padding: theme.spacing.md,
                       gap: 2,
                       minHeight: theme.minTouchTarget,

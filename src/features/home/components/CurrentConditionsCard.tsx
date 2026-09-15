@@ -5,14 +5,19 @@ import type { CurrentWeather } from '../../../shared/domain/currentWeather';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../../shared/ui/AsyncStateView';
 import { Card } from '../../../shared/ui/Card';
-import { ArrowsVertical, CloudRain, Drop, NavigationArrow, Thermometer } from 'phosphor-react-native';
 
 import { StatTile } from '../../../shared/ui/StatTile';
 import { Text } from '../../../shared/ui/Text';
+import { LiveWeatherIcon } from '../../../shared/ui/weather/LiveWeatherIcon';
 import { formatRelativeTime } from '../../../shared/utils/formatRelativeTime';
-import { formatTemperature } from '../../../shared/utils/formatTemperature';
+import { formatDegrees, formatTemperature } from '../../../shared/utils/formatTemperature';
 import { formatWind } from '../../../shared/utils/formatWind';
 import { CurrentConditionsSkeleton } from './HomeSkeletons';
+
+/** The disc behind the condition icon. Fixed rather than derived from the type
+ * scale: it has to stay a circle, and the text-size preference growing it would
+ * push the temperature off the card on a narrow screen. */
+const MEDALLION = 64;
 
 type Props = {
   conditions: CurrentWeather | undefined;
@@ -29,11 +34,39 @@ export function CurrentConditionsCard({ conditions, status, error, onRetry }: Pr
       {conditions ? (
         <Card style={{ gap: theme.spacing.md }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <View>
-              <Text variant="h1">{formatTemperature(conditions.temperatureC)}</Text>
-              <Text variant="body" muted>
-                {conditions.condition}
-              </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, flexShrink: 1 }}>
+              {/* A raised disc carrying the condition, which is the shape the
+                  reference designs give the headline reading. Home had no
+                  condition icon at all before, only the words. */}
+              <View
+                style={{
+                  width: MEDALLION,
+                  height: MEDALLION,
+                  borderRadius: MEDALLION / 2,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: theme.colors.surface,
+                  boxShadow: theme.raised('lg'),
+                }}
+              >
+                <LiveWeatherIcon
+                  weatherCode={conditions.weatherCode}
+                  isDay={conditions.isDay}
+                  // 0.56 was right for a drawn glyph, which used its whole box.
+                  // The 3D renders carry their own margin inside the PNG, so at
+                  // the same nominal size the art lands visibly smaller and the
+                  // medallion reads as mostly empty circle. This buys that
+                  // padding back.
+                  size={MEDALLION * 0.78}
+                  animated
+                />
+              </View>
+              <View style={{ flexShrink: 1 }}>
+                <Text variant="h1">{formatTemperature(conditions.temperatureC)}</Text>
+                <Text variant="body" muted>
+                  {conditions.condition}
+                </Text>
+              </View>
             </View>
             <Text variant="caption" muted>
               Updated {formatRelativeTime(conditions.observedAt)}
@@ -41,15 +74,20 @@ export function CurrentConditionsCard({ conditions, status, error, onRetry }: Pr
           </View>
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: theme.spacing.md, columnGap: theme.spacing.lg }}>
-            <StatTile icon={Thermometer} label="Feels like" value={formatTemperature(conditions.feelsLikeC)} />
+            {/* The day's range rides under the feels-like figure rather than
+                taking a tile of its own. Two thermometer tiles side by side
+                were saying one thing about temperature, and the odd tile count
+                left Wind stranded on a full-width row by itself. Four tiles
+                make the 2x2 the rest of the card is built for. */}
             <StatTile
-              icon={ArrowsVertical}
-              label="Min / Max"
-              value={`${formatTemperature(conditions.minC)} / ${formatTemperature(conditions.maxC)}`}
+              icon="temperature"
+              label="Feels like"
+              value={formatTemperature(conditions.feelsLikeC)}
+              hint={`H ${formatDegrees(conditions.maxC)} · L ${formatDegrees(conditions.minC)}`}
             />
-            <StatTile icon={CloudRain} label="Rainfall" value={`${conditions.rainfallMm} mm`} />
-            <StatTile icon={Drop} label="Humidity" value={`${conditions.humidityPct}%`} />
-            <StatTile icon={NavigationArrow} label="Wind" value={formatWind(conditions.windKph)} />
+            <StatTile icon="wind" label="Wind" value={formatWind(conditions.windKph)} />
+            <StatTile icon="rainfall" label="Rainfall" value={`${conditions.rainfallMm} mm`} />
+            <StatTile icon="humidity" label="Humidity" value={`${conditions.humidityPct}%`} />
           </View>
         </Card>
       ) : null}

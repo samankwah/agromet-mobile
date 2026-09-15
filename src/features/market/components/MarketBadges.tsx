@@ -57,11 +57,17 @@ export function TrendBadge({
         gap: theme.spacing.xs,
         paddingVertical: size === 'sm' ? 2 : theme.spacing.xs,
         paddingHorizontal: theme.spacing.sm,
-        borderRadius: theme.radii.sm,
+        borderRadius: theme.radii.pill,
         backgroundColor: onImage ? theme.colors.surface : color + '22',
         borderWidth: onImage ? 1 : 0,
         borderColor: color + '55',
-        ...(onImage ? theme.elevation.card : null),
+        // Only the on-image variant lifts. The tinted one sits flush inside a
+        // panel, where a shadow on something this small just reads as blur.
+        //
+        // `lifted`, not `raised`, and the prop name says why: this variant sits
+        // on a photograph, so the pair's white half has no page background to
+        // bevel against and would fog the image behind the badge.
+        ...(onImage ? { boxShadow: theme.lifted('sm') } : null),
       }}
     >
       <Ionicons name={meta.icon} size={size === 'sm' ? 12 : 16} color={color} />

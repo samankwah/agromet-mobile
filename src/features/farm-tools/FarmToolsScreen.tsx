@@ -1,5 +1,4 @@
 import React from 'react';
-import { CalendarBlank, Camera, CheckSquare, Egg, Tag } from 'phosphor-react-native';
 
 import { HubGrid, HubTile } from '../../shared/ui/HubGrid';
 import { AppHeader } from '../../shared/ui/AppHeader';
@@ -27,24 +26,18 @@ export function FarmToolsScreen() {
     <Screen wallpaper>
       <AppHeader title="Farm Tools" />
       <HubGrid>
-        <HubTile icon={Camera} title="Diagnose a crop" linkLabel="Take a photo" actionLabel="Open diagnose" route="/diagnose" />
+        <HubTile icon="diagnose" title="Diagnose a crop" linkLabel="Take a photo" actionLabel="Open diagnose" route="/diagnose" />
+        <HubTile icon="calendar" title="Crop calendars" linkLabel="Browse" actionLabel="Browse crop calendars" route="/calendars/crop" />
         <HubTile
-          icon={CalendarBlank}
-          title="Crop calendars"
-          linkLabel="Browse"
-          actionLabel="Browse crop calendars"
-          route="/calendars/crop"
-        />
-        <HubTile
-          icon={Egg}
+          icon="poultry-calendar"
           title="Poultry calendars"
           linkLabel="Browse"
           actionLabel="Browse poultry calendars"
           route="/calendars/poultry"
         />
-        <HubTile icon={Tag} title="Market prices" linkLabel="See prices" actionLabel="Browse market prices" route="/market" />
+        <HubTile icon="market" title="Market prices" linkLabel="See prices" actionLabel="Browse market prices" route="/market" />
         <HubTile
-          icon={CheckSquare}
+          icon="reminders"
           title="Farm reminders"
           linkLabel="See reminders"
           actionLabel="Open reminders"

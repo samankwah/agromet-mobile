@@ -2,11 +2,11 @@ import React from 'react';
 import { Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
-import type { Icon } from 'phosphor-react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
 import { Card } from './Card';
-import { DuotoneIcon } from './DuotoneIcon';
+import { ClayIcon } from './clay/ClayIcon';
+import type { ClayIconName } from './clay/clayIcons';
 import { Text } from './Text';
 
 /**
@@ -59,7 +59,7 @@ export function HubTile({
   badge,
   linkLabel = 'Take a look',
 }: {
-  icon: Icon;
+  icon: ClayIconName;
   title: string;
   /** The full phrase, e.g. "Open crop advisory". The tile shows "Open" — all
    * a half-width tile has room for — and speaks this instead, so a screen
@@ -102,6 +102,7 @@ export function HubTile({
         // height fills a tile stretched to match a taller neighbour, without
         // depending on that stretch to have a height at all.
         <Card
+          pressed={pressed}
           style={{
             flexGrow: 1,
             // Sized for the end user: these are read at arm's length, outdoors,
@@ -112,7 +113,6 @@ export function HubTile({
             minHeight: 200,
             padding: theme.spacing.lg,
             gap: theme.spacing.sm,
-            opacity: pressed ? 0.75 : 1,
           }}
         >
           {/* Title at the top of the tile, with the badge beside it. */}
@@ -131,9 +131,11 @@ export function HubTile({
                     minWidth: 28,
                     paddingHorizontal: 8,
                     paddingVertical: 3,
-                    borderRadius: 14,
+                    borderRadius: theme.radii.pill,
                     backgroundColor: theme.colors.danger,
                     alignItems: 'center',
+                    // A count badge sits on the tile, so it lifts off it.
+                    boxShadow: theme.raised('sm'),
                   }}
                 >
                   <Text variant="bodyStrong" color={theme.colors.onDanger}>
@@ -155,7 +157,7 @@ export function HubTile({
               level with that space's centre — growing to fill it is what keeps
               the mark level as titles wrap to one line or two. */}
           <View style={{ flexGrow: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
-            <DuotoneIcon icon={icon} size={56} />
+            <ClayIcon name={icon} size={56} />
           </View>
 
           {/* The same affordance Home's teaser cards use (home/components/

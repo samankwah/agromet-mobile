@@ -42,7 +42,10 @@ export function RecordingBar({ elapsedSeconds, maxSeconds, onCancel }: Props) {
         minHeight: theme.minTouchTarget,
         paddingHorizontal: theme.spacing.md,
         borderRadius: theme.minTouchTarget / 2,
-        backgroundColor: theme.colors.surface,
+        // Takes the composer pill's place while recording, so it takes its
+        // well treatment too — otherwise the band visibly pops out and back.
+        backgroundColor: theme.colors.bg,
+        boxShadow: theme.sunken('sm'),
         borderWidth: 1,
         borderColor: theme.colors.border,
       }}

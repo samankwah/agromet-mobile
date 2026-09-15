@@ -1,10 +1,16 @@
 import { Tabs } from 'expo-router/js-tabs';
-// Two icon families, uniquely in this file: Ionicons dresses the four content
-// tabs, and MaterialCommunityIcons is imported for one glyph Ionicons does not
-// have — a robot, for the assistant.
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+// The five tabs take the 3D set rather than a vector family.
+//
+// A tab icon normally has to tint — that is how a bar shows which tab is
+// current, and it is why this file used to pass `color` through from the
+// navigator. This bar does not work that way: `ui/TabBarButton.tsx` marks the
+// active tab with a filled accent pill behind the icon, so selection is already
+// carried by the background and nothing was relying on the glyph changing
+// colour. That is the one condition under which untintable art is safe in a tab
+// bar, and it is why `color` is now deliberately ignored below.
+import { ClayIcon } from '../../src/shared/ui/clay/ClayIcon';
 import { useTheme } from '../../src/shared/theme/ThemeProvider';
 import { MenuProvider } from '../../src/features/menu/MenuProvider';
 import { TabBarBackground } from '../../src/shared/ui/TabBarBackground';
@@ -84,7 +90,7 @@ export default function TabsLayout() {
             name="index"
             options={{
               title: 'Home',
-              tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
+              tabBarIcon: ({ size }) => <ClayIcon name="home" size={size + 4} />,
               tabBarAccessibilityLabel: 'Home',
             }}
           />
@@ -92,7 +98,7 @@ export default function TabsLayout() {
             name="forecasts"
             options={{
               title: 'Forecasts',
-              tabBarIcon: ({ color, size }) => <Ionicons name="cloud" size={size} color={color} />,
+              tabBarIcon: ({ size }) => <ClayIcon name="forecasts" size={size + 4} />,
               tabBarAccessibilityLabel: 'Forecasts',
             }}
           />
@@ -100,7 +106,7 @@ export default function TabsLayout() {
             name="advisories"
             options={{
               title: 'Advisories',
-              tabBarIcon: ({ color, size }) => <Ionicons name="megaphone" size={size} color={color} />,
+              tabBarIcon: ({ size }) => <ClayIcon name="advisories" size={size + 4} />,
               tabBarAccessibilityLabel: 'Advisories',
             }}
           />
@@ -108,7 +114,7 @@ export default function TabsLayout() {
             name="farm-tools"
             options={{
               title: 'Farm Tools',
-              tabBarIcon: ({ color, size }) => <Ionicons name="construct" size={size} color={color} />,
+              tabBarIcon: ({ size }) => <ClayIcon name="farm-tools" size={size + 4} />,
               tabBarAccessibilityLabel: 'Farm Tools',
             }}
           />
@@ -120,9 +126,10 @@ export default function TabsLayout() {
               // assistant itself is still called AgroMet AI everywhere it
               // speaks — its chat header, its errors, its bubble labels.
               title: 'Consult',
-              tabBarIcon: ({ color, size, focused }) => (
-                <MaterialCommunityIcons name={focused ? 'robot' : 'robot-outline'} size={size} color={color} />
-              ),
+              // The filled/outline pair this used to swap on `focused` is gone
+              // with the vector: one render serves both states, and the accent
+              // pill behind it is what says the tab is current.
+              tabBarIcon: ({ size }) => <ClayIcon name="consult" size={size + 4} />,
               // Spoken with the assistant's name, following the same rule
               // QuickActionsRow states: a label that is ambiguous without its
               // icon beside it gets a fuller one for screen readers.

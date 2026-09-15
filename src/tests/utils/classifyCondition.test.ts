@@ -1,5 +1,5 @@
-import { classifyCondition, isDaytime } from '../../shared/utils/classifyCondition';
-import { getConditionIcon } from '../../shared/utils/getConditionIcon';
+import { classifyCondition, isDaytime, type ConditionKind } from '../../shared/utils/classifyCondition';
+import { glyphFromCondition, glyphFromWmo } from '../../shared/domain/weatherGlyph';
 import { ALL_BACKDROPS, getWeatherBackdrop } from '../../shared/data/weatherBackdrops';
 
 describe('classifyCondition', () => {
@@ -76,12 +76,31 @@ describe('getWeatherBackdrop', () => {
   });
 });
 
-describe('getConditionIcon', () => {
-  it('stays consistent with the shared classifier', () => {
-    expect(getConditionIcon('Thunderstorms likely')).toBe('thunderstorm-outline');
-    expect(getConditionIcon('Scattered showers')).toBe('rainy-outline');
-    expect(getConditionIcon('Overcast')).toBe('cloud-outline');
-    expect(getConditionIcon('Partly cloudy')).toBe('partly-sunny-outline');
-    expect(getConditionIcon('Sunny')).toBe('sunny-outline');
+/**
+ * The reason `classifyCondition` exists is that the icon and the photographic
+ * backdrop must never disagree about what the weather is. The icon now reads a
+ * WMO code where it has one, so this pins the two paths together: a code and
+ * the string that code produces have to select the same picture, or the strip
+ * can show a sun over a thunderstorm photograph.
+ */
+describe('the icon and the backdrop agree', () => {
+  const cases: { code: number; condition: string; kind: ConditionKind }[] = [
+    { code: 95, condition: 'Thunderstorms likely', kind: 'thunderstorm' },
+    { code: 61, condition: 'Scattered showers', kind: 'rain' },
+    { code: 3, condition: 'Overcast', kind: 'overcast' },
+    { code: 1, condition: 'Partly cloudy', kind: 'cloudy' },
+    { code: 0, condition: 'Sunny', kind: 'clear' },
+  ];
+
+  it('resolves the same glyph from the code and from its own condition string', () => {
+    for (const { code, condition } of cases) {
+      expect(glyphFromWmo(code)).toBe(glyphFromCondition(condition));
+    }
+  });
+
+  it('classifies those same strings the way the backdrops expect', () => {
+    for (const { condition, kind } of cases) {
+      expect(classifyCondition(condition)).toBe(kind);
+    }
   });
 });

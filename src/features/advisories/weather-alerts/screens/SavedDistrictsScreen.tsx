@@ -67,9 +67,7 @@ export function SavedDistrictsScreen() {
           </Text>
           <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
             <Button label="Use my location" variant="secondary" loading={locating} onPress={useMyLocation} />
-            {locationPermission === 'denied' ? (
-              <Button label="Open settings" variant="outline" onPress={openLocationSettings} />
-            ) : null}
+            {locationPermission === 'denied' ? <Button label="Open settings" variant="outline" onPress={openLocationSettings} /> : null}
           </View>
         </Card>
       ) : null}
@@ -98,7 +96,7 @@ export function SavedDistrictsScreen() {
               <Ionicons
                 name={selected ? 'checkbox' : 'square-outline'}
                 size={22}
-                color={selected ? theme.colors.accent : theme.colors.muted}
+                color={selected ? theme.colors.focusRim : theme.colors.muted}
               />
               <View style={{ flex: 1 }}>
                 <Text variant="body">{district.name}</Text>

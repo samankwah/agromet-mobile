@@ -56,17 +56,21 @@ export function HazardDrivers({ drivers, note }: { drivers: HazardDriver[]; note
             {driver.percentile !== null && driver.percentile !== undefined ? (
               <View
                 style={{
-                  height: 3,
-                  borderRadius: 2,
-                  backgroundColor: theme.colors.border,
+                  // Was 3dp. A groove needs enough height for the inset pair
+                  // to land inside it; below about 5dp the two shadows meet in
+                  // the middle and the track just reads as a darker line.
+                  height: 5,
+                  borderRadius: theme.radii.pill,
+                  backgroundColor: theme.colors.bg,
+                  boxShadow: theme.sunken('sm'),
                   overflow: 'hidden',
                 }}
               >
                 <View
                   style={{
-                    height: 3,
+                    height: 5,
                     width: `${Math.max(2, Math.min(100, driver.percentile))}%`,
-                    borderRadius: 2,
+                    borderRadius: theme.radii.pill,
                     backgroundColor: theme.colors.muted,
                   }}
                 />

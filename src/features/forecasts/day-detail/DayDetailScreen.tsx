@@ -17,13 +17,12 @@ import { LineAreaChart } from '../../../shared/ui/LineAreaChart';
 import { Screen } from '../../../shared/ui/Screen';
 import { SectionHeading } from '../../../shared/ui/SectionHeading';
 import { SegmentedControl } from '../../../shared/ui/SegmentedControl';
-import { Drop, NavigationArrow } from 'phosphor-react-native';
 
 import { StatTile } from '../../../shared/ui/StatTile';
 import { Text } from '../../../shared/ui/Text';
 import { formatTemperature } from '../../../shared/utils/formatTemperature';
 import { formatWind } from '../../../shared/utils/formatWind';
-import { getConditionIcon } from '../../../shared/utils/getConditionIcon';
+import { LiveWeatherIcon } from '../../../shared/ui/weather/LiveWeatherIcon';
 import { HOT_DAY_C } from '../../../shared/utils/weatherNarrative';
 import { DayStrip } from './DayStrip';
 import { HourlyConditionStrip, hasVaryingConditions } from './HourlyConditionStrip';
@@ -198,7 +197,10 @@ function ConditionsHeader({ onClose }: { onClose: () => void }) {
           backgroundColor: theme.colors.surfaceStrong,
           borderWidth: 1,
           borderColor: theme.colors.border,
-          opacity: pressed ? 0.6 : 1,
+          // A round key on the header, pressing in when held. Small square
+          // and round icon buttons are exactly what the reference designs
+          // lift off the page.
+          boxShadow: pressed ? theme.sunken('sm') : theme.raised('sm'),
         })}
       >
         <Ionicons name="close" size={18} color={theme.colors.muted} />
@@ -276,11 +278,14 @@ function MetricPill({ metric, onSelect }: { metric: MetricId; onSelect: (id: Met
           gap: theme.spacing.xs,
           paddingHorizontal: theme.spacing.md,
           minHeight: 36,
-          borderRadius: 999,
+          borderRadius: theme.radii.pill,
           backgroundColor: theme.colors.surfaceStrong,
           borderWidth: 1,
           borderColor: theme.colors.border,
-          opacity: pressed ? 0.6 : 1,
+          // Stays pressed in while its menu is open, so the control reads as
+          // "the thing you are editing" for as long as the menu is up — the
+          // same rule ui/Dropdown follows.
+          boxShadow: pressed || open ? theme.sunken('sm') : theme.raised('sm'),
         })}
       >
         {/* The selected measure's own icon, at full text contrast — this is
@@ -303,7 +308,9 @@ function MetricPill({ metric, onSelect }: { metric: MetricId; onSelect: (id: Met
               backgroundColor: theme.colors.surfaceStrong,
               borderWidth: 1,
               borderColor: theme.colors.border,
-              ...theme.elevation.raised,
+              // A menu floating clear of the page it covers — the deepest
+              // step, so it reads as detached rather than inlaid.
+              boxShadow: theme.raised('lg'),
             }}
           >
             {METRICS.map((entry) => {
@@ -329,7 +336,7 @@ function MetricPill({ metric, onSelect }: { metric: MetricId; onSelect: (id: Met
                       doesn't honour a transparent colour on Android, which
                       made every row look selected. */}
                   <View style={{ width: 18, alignItems: 'center' }}>
-                    {isSelected ? <Ionicons name="checkmark" size={18} color={theme.colors.accent} /> : null}
+                    {isSelected ? <Ionicons name="checkmark" size={18} color={theme.colors.focusRim} /> : null}
                   </View>
                   <Ionicons name={entry.icon} size={20} color={theme.colors.muted} />
                   <View style={{ flexShrink: 1 }}>
@@ -515,7 +522,7 @@ function DayDetail({
             <Text variant="h1" style={{ fontSize: 38, lineHeight: 44 }}>
               {Math.round(headlineTempC)}°
             </Text>
-            <Ionicons name={getConditionIcon(day.condition)} size={32} color={theme.colors.muted} />
+            <LiveWeatherIcon weatherCode={day.weatherCode} isDay={day.isDay} size={38} animated />
           </View>
           {/* One headline figure with the range beneath it, as the reference
               has it — not two large numbers competing side by side. */}
@@ -585,8 +592,8 @@ function DayDetail({
           to support, and neither appears anywhere else on it. */}
       <SectionHeading title="Wind & Humidity" />
       <Card style={{ flexDirection: 'row', gap: theme.spacing.md }}>
-        <StatTile icon={NavigationArrow} label="Wind" value={formatWind(day.windKph)} />
-        <StatTile icon={Drop} label="Humidity" value={`${day.humidityPct}%`} />
+        <StatTile icon="wind" label="Wind" value={formatWind(day.windKph)} />
+        <StatTile icon="humidity" label="Humidity" value={`${day.humidityPct}%`} />
       </Card>
 
       <SectionHeading title="Daily Summary" />

@@ -167,6 +167,9 @@ export function DiagnoseScreen() {
             backgroundColor: theme.colors.bg,
             borderTopWidth: 1,
             borderTopColor: theme.colors.border,
+            // Pinned over the scrolling form, so it lifts off it rather than
+            // relying on the hairline alone to say it is a separate plane.
+            boxShadow: theme.raised('md'),
           }}
         >
           {step === 'photo' ? (
@@ -221,9 +224,13 @@ function StepProgress({ current }: { current: 1 | 2 }) {
           key={index}
           style={{
             flex: 1,
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: index <= current ? theme.colors.accent : theme.colors.border,
+            // A step you have not reached is an empty groove; a step you have
+            // is that groove filled in. Tall enough for the inset pair to
+            // land inside it, which 4dp was not.
+            height: 6,
+            borderRadius: theme.radii.pill,
+            backgroundColor: index <= current ? theme.colors.accent : theme.colors.bg,
+            boxShadow: theme.sunken('sm'),
           }}
         />
       ))}

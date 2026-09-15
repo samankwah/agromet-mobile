@@ -223,7 +223,8 @@ export function toCurrentWeather(bundle: OpenMeteoBundle, place: Place): Current
   const daily = bundle.daily ?? {};
 
   const observedAt = toUtcIso(String(current.time ?? new Date().toISOString()));
-  const condition = conditionFromWmo(num(current.weather_code));
+  const weatherCode = num(current.weather_code);
+  const condition = conditionFromWmo(weatherCode);
   const night = isNightHour(new Date(observedAt).getUTCHours());
 
   return {
@@ -240,6 +241,11 @@ export function toCurrentWeather(bundle: OpenMeteoBundle, place: Place): Current
     maxC: round1(num(daily.temperature_2m_max?.[0])),
     feelsLikeC: round1(num(current.apparent_temperature)),
     condition: night ? afterDark(condition) : condition,
+    // The raw code alongside the words. `conditionFromWmo` collapses 28 codes
+    // into five strings, which is right for a label and lossy for a picture —
+    // see domain/weatherGlyph.ts.
+    weatherCode,
+    isDay: !night,
     rainfallMm: round1(num(current.precipitation)),
     humidityPct: Math.round(num(current.relative_humidity_2m)),
     windKph: Math.round(num(current.wind_speed_10m)),
@@ -251,13 +257,18 @@ export function toDailyForecasts(bundle: OpenMeteoBundle, locationId: string): D
   const dates = (daily.time ?? []) as string[];
 
   return dates.map((date, index) => {
-    const condition = conditionFromWmo(num(daily.weather_code?.[index]));
+    const weatherCode = num(daily.weather_code?.[index]);
+    const condition = conditionFromWmo(weatherCode);
     const day: DailyForecast = {
       locationId,
       date,
       tempMinC: round1(num(daily.temperature_2m_min?.[index])),
       tempMaxC: round1(num(daily.temperature_2m_max?.[index])),
       condition,
+      weatherCode,
+      // Always the day form. A whole-day summary has no night reading, which
+      // is why this mapper alone never calls `afterDark`.
+      isDay: true,
       rainfallProbabilityPct: Math.round(num(daily.precipitation_probability_max?.[index])),
       rainfallMm: round1(num(daily.precipitation_sum?.[index])),
       windKph: Math.round(num(daily.wind_speed_10m_max?.[index])),
@@ -310,7 +321,8 @@ export function toHourlyForecasts(bundle: OpenMeteoBundle, locationId: string): 
 
   return times.map((time, index) => {
     const hour = toUtcIso(time);
-    const condition = conditionFromWmo(num(hourly.weather_code?.[index]));
+    const weatherCode = num(hourly.weather_code?.[index]);
+    const condition = conditionFromWmo(weatherCode);
     const night = isNightHour(new Date(hour).getUTCHours());
 
     return {
@@ -319,6 +331,8 @@ export function toHourlyForecasts(bundle: OpenMeteoBundle, locationId: string): 
       tempC: round1(num(hourly.temperature_2m?.[index])),
       feelsLikeC: round1(num(hourly.apparent_temperature?.[index])),
       condition: night ? afterDark(condition) : condition,
+      weatherCode,
+      isDay: !night,
       rainfallProbabilityPct: Math.round(num(hourly.precipitation_probability?.[index])),
       rainfallMm: round1(num(hourly.precipitation?.[index])),
       humidityPct: Math.round(num(hourly.relative_humidity_2m?.[index])),

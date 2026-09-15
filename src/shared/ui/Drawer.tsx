@@ -76,10 +76,7 @@ export function Drawer({ expanded, onExpandedChange, children, persistentContent
     sheetRef.current?.snapToIndex(expanded ? 1 : 0);
   }, [expanded, collapsedHeight]);
 
-  const handleSheetChange = useCallback(
-    (index: number) => onExpandedChange(index >= 1),
-    [onExpandedChange],
-  );
+  const handleSheetChange = useCallback((index: number) => onExpandedChange(index >= 1), [onExpandedChange]);
 
   // Read from a ref rather than closed over directly, so `handleComponent`
   // below can be created once and never remounted — see its own comment.
@@ -137,10 +134,16 @@ export function Drawer({ expanded, onExpandedChange, children, persistentContent
       // rather than a sheet sitting over it.
       backgroundStyle={{
         backgroundColor: theme.colors.bg,
-        borderTopLeftRadius: theme.radii.lg + 6,
-        borderTopRightRadius: theme.radii.lg + 6,
+        borderTopLeftRadius: theme.radii.xl,
+        borderTopRightRadius: theme.radii.xl,
         borderTopWidth: 1,
         borderColor: theme.colors.border,
+        // Cast upward, not `raised`: the sheet is pinned to the bottom of the
+        // screen, so `raised`'s white half was the only one of its pair still
+        // on screen and it sat along the top edge as a glow over the map.
+        // Restrained on purpose at `md` — a large soft shadow here smears the
+        // imagery the sheet exists to let you read.
+        boxShadow: theme.cast('bottom', 'md'),
       }}
       // The search field inside `children` needs the sheet to ride up with
       // the keyboard rather than sit behind it — gorhom's own handling here
@@ -190,7 +193,16 @@ function Handle({
       accessibilityState={{ expanded }}
       style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: theme.spacing.md }}
     >
-      <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.border }} />
+      {/* A groove cut into the sheet, matching OptionSheet's handle. */}
+      <View
+        style={{
+          width: 40,
+          height: 5,
+          borderRadius: theme.radii.pill,
+          backgroundColor: theme.colors.bg,
+          boxShadow: theme.sunken('sm'),
+        }}
+      />
     </Pressable>
   );
 }

@@ -6,9 +6,10 @@ import { router } from 'expo-router';
 import type { DailyForecast, WeeklyForecast } from '../../../shared/domain/forecast';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../../shared/ui/AsyncStateView';
+import { Surface } from '../../../shared/ui/Surface';
 import { Text } from '../../../shared/ui/Text';
+import { LiveWeatherIcon } from '../../../shared/ui/weather/LiveWeatherIcon';
 import { formatDegrees } from '../../../shared/utils/formatTemperature';
-import { getConditionIcon } from '../../../shared/utils/getConditionIcon';
 import { FeaturedForecastSkeleton } from './HomeSkeletons';
 import { TeaserCard } from './TeaserCard';
 
@@ -77,18 +78,33 @@ function WeekStrip({ days }: { days: DailyForecast[] }) {
             onPress={() => router.push(`/forecast-day/${day.date}`)}
             accessibilityRole="button"
             accessibilityLabel={`${label}, ${day.condition}, high ${formatDegrees(day.tempMaxC)}, low ${formatDegrees(day.tempMinC)}. Open full forecast.`}
-            style={({ pressed }) => ({ flex: 1, alignItems: 'center', gap: 3, opacity: pressed ? 0.6 : 1 })}
+            style={{ flex: 1 }}
           >
-            <Text variant="caption" muted numberOfLines={1}>
-              {label}
-            </Text>
-            <Ionicons name={getConditionIcon(day.condition)} size={17} color={theme.colors.muted} />
-            <Text variant="bodyStrong" numberOfLines={1}>
-              {formatDegrees(day.tempMaxC)}
-            </Text>
-            <Text variant="caption" muted numberOfLines={1}>
-              {formatDegrees(day.tempMinC)}
-            </Text>
+            {({ pressed }) => (
+              // Today is a column standing in a well, which is how the
+              // reference designs mark the day you are looking at. Held, any
+              // column presses in the same way. Chrome on a nested View; see
+              // Button.tsx for why it can never go on the Pressable.
+              <Surface
+                depth={index === 0 || pressed ? 'sunken' : 'flat'}
+                level="sm"
+                radius={theme.radii.md}
+                background={index === 0 ? theme.colors.bg : 'transparent'}
+                bordered={false}
+                style={{ alignItems: 'center', gap: 3, paddingVertical: theme.spacing.xs }}
+              >
+                <Text variant="caption" muted numberOfLines={1}>
+                  {label}
+                </Text>
+                <LiveWeatherIcon weatherCode={day.weatherCode} isDay={day.isDay} size={27} />
+                <Text variant="bodyStrong" numberOfLines={1}>
+                  {formatDegrees(day.tempMaxC)}
+                </Text>
+                <Text variant="caption" muted numberOfLines={1}>
+                  {formatDegrees(day.tempMinC)}
+                </Text>
+              </Surface>
+            )}
           </Pressable>
         );
       })}

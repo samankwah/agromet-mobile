@@ -36,9 +36,16 @@ export function SeverityBadge({ severity, size = 'md' }: Props) {
         alignSelf: 'flex-start',
         gap: theme.spacing.xs,
         paddingVertical: size === 'sm' ? 2 : theme.spacing.xs,
-        paddingHorizontal: theme.spacing.sm,
-        borderRadius: theme.radii.sm,
+        paddingHorizontal: theme.spacing.md,
+        // Pill, not a soft rectangle. A badge is the one element the reference
+        // designs always round fully, which is what separates a status chip
+        // from a small panel at a glance.
+        borderRadius: theme.radii.pill,
         backgroundColor: color + '22', // ~13% opacity tint of the severity color
+        // The tint is translucent, so an inset pair would darken unevenly over
+        // whatever it sits on. A shallow lift is the honest reading anyway: a
+        // badge sits on its card rather than in it.
+        boxShadow: theme.raised('sm'),
       }}
     >
       <Ionicons name={meta.icon} size={iconSize} color={color} />

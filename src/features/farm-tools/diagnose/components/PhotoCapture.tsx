@@ -216,7 +216,11 @@ export function PhotoCapture({ imageUri, onChange }: Props) {
             // Dashed says "nothing here yet" without spending a word on it.
             borderStyle: 'dashed',
             borderColor: theme.colors.border,
-            backgroundColor: theme.colors.surface,
+            // Sunken, not raised: this is a space waiting to be filled, and a
+            // well says that far better than a lift. It also keeps the dashed
+            // edge legible, which an outer shadow would have muddled.
+            backgroundColor: theme.colors.bg,
+            boxShadow: theme.sunken('md'),
           }}
         >
           <Ionicons name="leaf-outline" size={28} color={theme.colors.accent} />

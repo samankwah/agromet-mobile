@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useReduceMotion } from '../a11y/useReduceMotion';
 import { useTheme } from '../theme/ThemeProvider';
-import { drawerPanelPath } from './cardShape';
+import { drawerPanelPath } from './drawerShape';
 import { Text } from './Text';
 
 export type MenuRow = {
@@ -58,26 +58,15 @@ const ROW_FADE = 1 - STAGGER_SPAN;
 const ROW_SHIFT = 16;
 
 /**
- * Hover feedback for the rows.
+ * The fill under a row being hovered or held. The depth itself comes from the
+ * theme now — this used to carry its own `shadowColor`/`elevation` block as a
+ * documented local exception to the flat rule, and that rule is gone, so the
+ * exception is too.
  *
- * A deliberate, local exception to the flat rule in `theme/tokens.ts`, which
- * zeroes every elevation preset and says to strengthen the border instead. That
- * rule is about *resting* surfaces: a card should not float. A row under the
- * cursor is not resting, and the shadow is the thing that says so. It is scoped
- * to this one transient state and never applies to the panel itself.
- *
- * `shadowColor` drives iOS and web, `elevation` drives Android. Hover only fires
- * on web and desktop; touch devices get the press state below instead, since
- * there is no cursor to hover with.
+ * Hover only fires on web and desktop; touch devices get the press state
+ * instead, since there is no cursor to hover with.
  */
-const HOVER_LIFT = {
-  backgroundColor: 'rgba(255,255,255,0.06)',
-  shadowColor: '#000000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.35,
-  shadowRadius: 8,
-  elevation: 6,
-} as const;
+const HOVER_FILL = 'rgba(255,255,255,0.06)';
 
 /**
  * The app menu: a panel that slides in from the right, its two left corners cut
@@ -86,10 +75,16 @@ const HOVER_LIFT = {
  * Named `MenuDrawer`, not `Drawer` — `ui/Drawer.tsx` is already the map's
  * bottom panel and has nothing to do with this.
  *
- * The silhouette is an SVG path (`drawerPanelPath`), for the same reason `Card`
- * paints its own background: no `borderRadius` cuts a corner straight, let alone
- * at 35 degrees. Measured with `onLayout` and repainted only on a real size
- * change.
+ * The silhouette is an SVG path whose two left corners are cut on a shallow
+ * diagonal, because no `borderRadius` cuts a corner straight, let alone at ~35
+ * degrees. It is measured with `onLayout` and repainted only on a real size
+ * change; see `ui/drawerShape.ts` for the geometry.
+ *
+ * This shape was dropped during the soft-UI rebuild in favour of a rounded
+ * corner and is back by request, matched to the design reference. The one thing
+ * that did not come back with it is the panel's cast shadow: a box shadow
+ * follows the view's rectangle, so beside a diagonal edge it drew a straight
+ * one. The scrim and the accent rim on the path do the separating instead.
  *
  * Animated with React Native's own `Animated`, not Framer Motion — that is a DOM
  * library and does not run on native. The native equivalent would be Moti or
@@ -110,10 +105,11 @@ export function MenuDrawer({ visible, onClose, rows, title }: Props) {
   const { width: screenWidth } = useWindowDimensions();
 
   const panelWidth = Math.min(screenWidth * theme.drawerShape.widthRatio, theme.drawerShape.maxWidth);
-  const cut = panelWidth * theme.drawerShape.cutRatio;
 
   // The Modal has to outlive `visible` so the panel can slide back out before it
   // unmounts; closing it on the same tick would make the drawer vanish.
+  const cut = panelWidth * theme.drawerShape.cutRatio;
+
   const [mounted, setMounted] = useState(visible);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -151,8 +147,11 @@ export function MenuDrawer({ visible, onClose, rows, title }: Props) {
 
   if (!mounted) return null;
 
+  // Built from the measured box, so it is null for the first frame. The panel
+  // is off-screen then anyway — it starts translated fully right — so nothing
+  // ever shows unpainted.
   const path = size
-    ? drawerPanelPath({ width: size.width, height: size.height, topCut: cut, bottomCut: cut })
+    ? drawerPanelPath({ width: size.width, height: size.height, topCut: cut, bottomCut: cut, radius: theme.radii.lg })
     : null;
 
   /** The slice of the cascade belonging to row `index`. */
@@ -187,21 +186,15 @@ export function MenuDrawer({ visible, onClose, rows, title }: Props) {
           // with the menu for attention.
           style={[StyleSheet.absoluteFill, { backgroundColor: '#000000A6', opacity: progress }]}
         />
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel="Close menu"
-        />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close menu" />
 
         <Animated.View
           onLayout={(event) => {
             const { width, height } = event.nativeEvent.layout;
-            setSize((prev) =>
-              prev && Math.abs(prev.width - width) < 0.5 && Math.abs(prev.height - height) < 0.5
-                ? prev
-                : { width, height },
-            );
+            // Repaint only on a real size change. `onLayout` fires on every
+            // slide frame otherwise, and rebuilding the path string each frame
+            // is what makes a drawer stutter on a cheap phone.
+            setSize((current) => (current && current.width === width && current.height === height ? current : { width, height }));
           }}
           style={{
             position: 'absolute',
@@ -209,28 +202,35 @@ export function MenuDrawer({ visible, onClose, rows, title }: Props) {
             bottom: 0,
             right: 0,
             width: panelWidth,
-            transform: [
-              { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [panelWidth, 0] }) },
-            ],
+            /*
+             * Transparent, and no border, radius or shadow: the panel is an SVG
+             * path now, and paints its own fill and rim below.
+             *
+             * Its two left corners are cut on a shallow diagonal, which no
+             * `borderRadius` can do. That also rules out the `cast('right')`
+             * shadow this carried until now — a box shadow follows the *view's*
+             * rectangle, so it would have drawn a straight-edged shadow beside
+             * a diagonal panel, which is worse than none. Separation comes from
+             * the scrim behind and the accent rim on the path, which is how the
+             * reference does it too.
+             */
+            transform: [{ translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [panelWidth, 0] }) }],
           }}
         >
           {size && path ? (
             <Svg pointerEvents="none" style={StyleSheet.absoluteFill} width={size.width} height={size.height}>
-              <Path d={path} fill={theme.colors.chrome} stroke={theme.colors.border} strokeWidth={1} />
+              <Path d={path} fill={theme.colors.chrome} stroke={theme.colors.accentStrong} strokeWidth={1} />
             </Svg>
           ) : null}
-
           <View
             accessibilityRole="menu"
             style={{
               flex: 1,
-              /* Clear of the top diagonal, not merely clear of the status bar.
-                 The cut runs `cut` dp down the panel's left edge, so anything
-                 above that line is sliding underneath it — which is exactly how
-                 the first version came out misaligned. `max` because on a short
-                 panel the status bar is the taller of the two. */
+              /* Clear of the top diagonal, not merely of the status bar. The
+                 cut runs `cut` dp down the panel's left edge, so a title that
+                 only cleared the inset would sit in the sliced-off corner. */
               paddingTop: Math.max(insets.top, cut) + theme.spacing.lg,
-              paddingBottom: insets.bottom + theme.spacing.lg,
+              paddingBottom: Math.max(insets.bottom, cut * 0.35) + theme.spacing.lg,
             }}
           >
             <Text variant="h2" style={{ textAlign: 'center' }}>
@@ -293,7 +293,9 @@ export function MenuDrawer({ visible, onClose, rows, title }: Props) {
                           borderBottomColor: theme.colors.border,
                           marginLeft: ROW_LEFT,
                           marginRight: DIVIDER_RIGHT,
-                          ...(hovered === row.id || pressed ? HOVER_LIFT : null),
+                          // A row being touched presses into the panel, the
+                          // same way every other control in the app does.
+                          ...(hovered === row.id || pressed ? { backgroundColor: HOVER_FILL, boxShadow: theme.sunken('sm') } : null),
                         }}
                       >
                         <View style={{ width: ICON_SLOT, alignItems: 'center' }}>

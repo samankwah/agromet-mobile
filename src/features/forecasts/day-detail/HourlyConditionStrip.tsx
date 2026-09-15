@@ -1,11 +1,11 @@
 import React from 'react';
 import { View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
+import { glyphFromWmo } from '../../../shared/domain/weatherGlyph';
 import type { HourlyForecast } from '../../../shared/domain/forecast';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { chartPlotWidth } from '../../../shared/ui/LineAreaChart';
-import { getConditionIcon } from '../../../shared/utils/getConditionIcon';
+import { LiveWeatherIcon } from '../../../shared/ui/weather/LiveWeatherIcon';
 
 /**
  * Every third hour, offset by one. Offsetting off hour 0 keeps the first
@@ -19,15 +19,19 @@ const CELL = 24;
 const LAST_HOUR = 23;
 
 /**
- * Whether the strip has anything to say. Compared on the resolved *icon*
- * rather than the condition string, because classifyCondition collapses
- * several strings onto one glyph — so distinct strings can still produce an
- * identical row, which is exactly the redundancy this guard exists to stop.
+ * Whether the strip has anything to say. Compared on the resolved *glyph*
+ * rather than the condition string, because several codes collapse onto one
+ * picture — so distinct readings can still produce an identical row, which is
+ * exactly the redundancy this guard exists to stop.
+ *
+ * A glyph name, not the icon component: comparing components would compare
+ * function references, which happen to work only for as long as the mapping
+ * stays memoised, and silently stop meaning anything if it ever does not.
  */
 export function hasVaryingConditions(hours: HourlyForecast[]): boolean {
   if (hours.length < 2) return false;
-  const first = getConditionIcon(hours[0].condition);
-  return hours.some((hour) => getConditionIcon(hour.condition) !== first);
+  const first = glyphFromWmo(hours[0].weatherCode);
+  return hours.some((hour) => glyphFromWmo(hour.weatherCode) !== first);
 }
 
 type Props = {
@@ -50,14 +54,14 @@ export function HourlyConditionStrip({ hours, chartWidth }: Props) {
   const toX = (hour: number) => (hour / LAST_HOUR) * plotW;
 
   return (
-    <View style={{ width: plotW, height: 22 }}>
+    <View style={{ width: plotW, height: 26 }}>
       {STRIP_HOURS.map((hour) => {
         const match = hours.find((entry) => new Date(entry.hour).getUTCHours() === hour);
         if (!match) return null;
 
         return (
           <View key={hour} style={{ position: 'absolute', left: toX(hour) - CELL / 2, width: CELL, alignItems: 'center' }}>
-            <Ionicons name={getConditionIcon(match.condition)} size={18} color={theme.colors.muted} />
+            <LiveWeatherIcon weatherCode={match.weatherCode} isDay={match.isDay} size={25} />
           </View>
         );
       })}

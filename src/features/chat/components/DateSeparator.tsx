@@ -20,8 +20,11 @@ export function DateSeparator({ label }: { label: string }) {
         style={{
           paddingHorizontal: theme.spacing.md,
           paddingVertical: theme.spacing.xs,
-          borderRadius: 999,
+          borderRadius: theme.radii.pill,
           backgroundColor: theme.colors.bubbleIn,
+          // Floats above the transcript the way the bubbles do, at the same
+          // shallow depth so it does not outrank them.
+          boxShadow: theme.raised('sm'),
         }}
       >
         <Text variant="caption" muted>

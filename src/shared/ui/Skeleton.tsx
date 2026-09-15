@@ -63,12 +63,17 @@ export function Skeleton({ width = '100%', height = 16, aspectRatio, radius, sty
       // meaningless placeholders.
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
+      // A placeholder is an empty well: the shape of the content that is
+      // coming, pressed into the page. That reads as "nothing here yet" far
+      // better than the solid `border`-coloured block this replaced, which on
+      // a card looked like a filled-in value.
       style={[
         {
           width,
           ...(aspectRatio ? { aspectRatio } : { height }),
           borderRadius: radius ?? theme.radii.sm,
-          backgroundColor: theme.colors.border,
+          backgroundColor: theme.colors.bg,
+          boxShadow: theme.sunken('sm'),
           opacity,
         },
         style,

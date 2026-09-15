@@ -168,7 +168,11 @@ describe('MapPreviewCard', () => {
     // 2.5 degrees wide, so 1.25 either side of Accra.
     expect(html).toContain('bounds: [[-1.437, 4.3537], [1.063, 6.8537]]');
     expect(html).toContain('interactive: false');
-    expect(html).toContain('clip-path: polygon(');
+    // The thumbnail rounds its own corners inside the document. An Android
+    // WebView does not reliably clip to its parent's borderRadius, so without
+    // this the map paints square corners inside a rounded card.
+    expect(html).toContain('border-radius:');
+    expect(html).toContain('overflow: hidden;');
   });
 
   /* A credits line at this size is unreadable, and the card cannot be tapped

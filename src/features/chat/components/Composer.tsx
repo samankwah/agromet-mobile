@@ -190,7 +190,11 @@ export function Composer({ onSend, isSending, isOnline, region, town, onOpenDiag
               borderRadius: theme.minTouchTarget / 2,
               borderWidth: 1,
               borderColor: theme.colors.border,
-              backgroundColor: theme.colors.surface,
+              // A well, like every other input in the app. The composer band
+              // behind it is `chrome`, so the pill steps back to `bg` to read
+              // as cut into it.
+              backgroundColor: theme.colors.bg,
+              boxShadow: theme.sunken('sm'),
               paddingHorizontal: theme.spacing.lg,
               paddingVertical: Platform.OS === 'ios' ? theme.spacing.sm : 0,
             }}
@@ -311,7 +315,12 @@ function RoundButton({ icon, family = 'ionicons', label, onPress, disabled, busy
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: isQuiet ? 'transparent' : theme.colors.accent,
-            opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
+            // The filled button is a physical key: it stands off the band and
+            // presses in. The quiet variant has no surface to lift, so it
+            // keeps the opacity dip it always had.
+            ...(isQuiet
+              ? { opacity: disabled ? 0.5 : pressed ? 0.85 : 1 }
+              : { opacity: disabled ? 0.5 : 1, boxShadow: pressed ? theme.sunken('sm') : theme.raised('sm') }),
           }}
         >
           <Glyph name={icon as never} size={isQuiet ? 23 : 19} color={isQuiet ? theme.colors.muted : theme.colors.onAccent} />

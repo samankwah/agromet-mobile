@@ -57,16 +57,20 @@ export function ActivityPicker({ activities, selectedIndex, onSelect }: Props) {
                     minHeight: theme.minTouchTarget,
                     justifyContent: 'center',
                     paddingHorizontal: theme.spacing.md,
-                    borderRadius: theme.radii.md,
+                    borderRadius: theme.radii.pill,
                     borderWidth: 1,
-                    borderColor: isSelected ? theme.colors.accent : theme.colors.border,
-                    backgroundColor: isSelected ? theme.colors.accent : theme.colors.surface,
-                    opacity: pressed ? 0.7 : 1,
+                    borderColor: isSelected ? theme.colors.focusRim : theme.colors.border,
+                    backgroundColor: isSelected ? theme.colors.focus : theme.colors.surface,
+                    // The chosen activity stays pressed in and keeps its
+                    // highlight fill and rim, so the state never rests on the
+                    // shadow. The rim does the real work here: the fill is a
+                    // pale ice blue that barely separates from `surface`.
+                    boxShadow: isSelected || pressed ? theme.sunken('sm') : theme.raised('sm'),
                   }}
                 >
                   <Text
                     variant={isSelected ? 'bodyStrong' : 'body'}
-                    color={isSelected ? theme.colors.onAccent : theme.colors.text}
+                    color={isSelected ? theme.colors.onFocus : theme.colors.text}
                     numberOfLines={1}
                   >
                     {activity.activity}

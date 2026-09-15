@@ -134,7 +134,7 @@ export function AttachmentPanel({ onSelect }: Props) {
                 style={{
                   alignItems: 'center',
                   gap: theme.spacing.sm,
-                  opacity: tile.disabled ? 0.45 : pressed ? 0.8 : 1,
+                  opacity: tile.disabled ? 0.45 : 1,
                 }}
               >
                 <View
@@ -148,6 +148,8 @@ export function AttachmentPanel({ onSelect }: Props) {
                     // suffix — see theme/blend.ts for why the app never leaves
                     // a translucent background on a filled surface.
                     backgroundColor: tint(color, theme.colors.chrome, 0.2),
+                    // Round keys on the panel, pressing in when held.
+                    boxShadow: pressed ? theme.sunken('sm') : theme.raised('sm'),
                   }}
                 >
                   <Ionicons name={tile.icon} size={26} color={color} />

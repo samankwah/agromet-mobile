@@ -11,6 +11,12 @@ export type DailyForecast = {
   tempMinC: number;
   tempMaxC: number;
   condition: string;
+  /** The raw WMO code behind `condition`. See domain/weatherGlyph.ts for why
+   * the icons read this rather than the five-word label. */
+  weatherCode: number;
+  /** Always true on a daily row: a whole-day summary has no night form. Kept
+   * on the type so every forecast shape answers the icon the same way. */
+  isDay: boolean;
   rainfallProbabilityPct: number;
   rainfallMm: number;
   windKph: number;
@@ -27,6 +33,10 @@ export type HourlyForecast = {
   /** Drives the day-detail chart's Actual / Feels Like toggle. */
   feelsLikeC: number;
   condition: string;
+  /** As on DailyForecast. */
+  weatherCode: number;
+  /** False for the hours after dark, so an icon can show the night form. */
+  isDay: boolean;
   rainfallProbabilityPct: number;
   rainfallMm: number;
   /** Hour-by-hour values behind the day-detail chart's measure selector.

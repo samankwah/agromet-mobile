@@ -46,6 +46,10 @@ export function PlaceSearch({ onSelect }: Props) {
             borderWidth: 1,
             borderColor: theme.colors.border,
             backgroundColor: theme.colors.surface,
+            // Results drop in front of the panel below them, so they lift off
+            // it. The clip keeps the rows inside the rounded corner, which
+            // also means the shadow has to live here rather than on a row.
+            boxShadow: theme.raised('md'),
             overflow: 'hidden',
           }}
         >

@@ -1,13 +1,11 @@
 /**
  * Design tokens — the single source of truth for color, spacing, radius,
- * elevation, and typography across the app.
+ * depth, and typography across the app.
  *
  * Colors are a direct port of the AgroMet web app's palette
  * (frontend/src/index.css, `--neo-*` custom properties) so the mobile app
- * keeps the same brand identity. The web app layers these colors under a
- * neumorphic dual-shadow system; that doesn't render well (or cheaply) on
- * low-end Android, so `elevation` below replaces it with flat, standard
- * shadow/elevation presets instead of porting the neumorphism.
+ * keeps the same brand identity — including, now, the neumorphic dual-shadow
+ * system those variables were named for. See `neu` below.
  *
  * Styling is plain inline style objects plus `useTheme()`; this file is
  * their single source. It stays plain TypeScript so it can also be imported
@@ -67,6 +65,18 @@ export type ColorTokens = {
   focus: string;
   onFocus: string;
   /**
+   * The edge and the ink of a selection.
+   *
+   * `focus` is a pale ice blue, which is the point of it — but a pale fill
+   * cannot carry a state on its own against this palette's pale light surfaces
+   * (it lands at ~1.08:1 on `surface`). So a selected thing is marked by its
+   * rim as well as its fill, and this is the rim. Both schemes clear 4.5:1
+   * against `surface`, `bg` and `chrome`, which also makes it safe as *text* —
+   * `ui/OptionSheet.tsx` uses it that way, where a row is chosen without any
+   * fill behind it.
+   */
+  focusRim: string;
+  /**
    * The chat transcript's three surfaces.
    *
    * A conversation needs a colour language the rest of the app does not have:
@@ -115,12 +125,19 @@ const light: ColorTokens = {
   onWarning: '#20303b',
   danger: '#be4141',
   onDanger: '#ffffff',
-  focus: '#52b788',
-  // Both light.focus and dark.focus are light/bright greens (a mint-toned
-  // "selected chip" color, distinct from the deeper `accent`), so the same
-  // dark, near-black text reads correctly against either — not scheme-
-  // dependent the way onAccent/onTeal are.
+  // The selected-chip fill, and the one highlight in the palette that is not
+  // green. A selection is not the brand speaking: `accent` is what the app
+  // *is*, so when a selected chip wore it too, "this is AgroMet" and "this is
+  // the one you picked" were the same colour and the second had to be inferred
+  // from position. A pale ice blue has no other job in this palette, which is
+  // what lets it mean "chosen" on sight.
+  focus: '#cbf1f5',
+  // Deliberately shared by both schemes. `focus` is a pale, high-luminance
+  // fill in each, so one near-black ink reads on either (~15:1 on #cbf1f5) —
+  // unlike onAccent/onTeal, which have to invert. Anything approaching white
+  // here would fail: this fill is far too light to carry it.
   onFocus: '#0c1f18',
+  focusRim: '#0e6d7c',
   bubbleIn: '#ffffff',
   bubbleOut: '#d3ecdf',
   wallpaperInk: '#c2d1db',
@@ -146,8 +163,15 @@ const dark: ColorTokens = {
   onWarning: '#0c1f18',
   danger: '#ff8585',
   onDanger: '#2b0d0d',
-  focus: '#6fd8a8',
+  // Same ice blue as light. It reads as a bright chip against the near-black
+  // `bg` rather than glaring, because a chip is small — the warning above
+  // chartTemp/chartRain is about large fills, not this.
+  focus: '#cbf1f5',
   onFocus: '#0c1f18',
+  // Lighter than the light scheme's rim, not darker: on a near-black ground
+  // the edge has to be the bright half of the pair, the same inversion
+  // `border`/`borderStrong` already document above.
+  focusRim: '#5fc8da',
   bubbleIn: '#1b2925',
   // Deep, not bright: `accent` pulled down towards `bg` until a bubble-sized
   // fill sits quiet behind light text. Roughly tint(accent, bg, 0.3), nudged
@@ -192,80 +216,182 @@ export const spacing = {
   '3xl': 32,
 } as const;
 
-/** Two card tiers, matching the reference design: `lg` is the outer card
- * edge, `md` the blocks nested inside one (and the controls, which share the
- * nested radius so an input lines up optically with the block beside it).
- * `sm` stays for chips and small inline marks. */
+/** Card tiers: `xl` is the outer card edge, `lg` a large nested block, `md`
+ * the blocks nested inside one (and the controls, which share the nested
+ * radius so an input lines up optically with the block beside it). `sm` stays
+ * for chips and small inline marks, and `pill` is the fully-rounded end used
+ * by toggles, chips and icon buttons.
+ *
+ * Soft UI leans on a generous outer radius — a shallow corner reads as a flat
+ * rectangle wearing a shadow rather than as a moulded surface — so `xl` was
+ * added above the old `lg` when the chamfer was retired. */
 export const radii = {
   sm: 8,
   md: 12,
   lg: 20,
+  xl: 28,
+  pill: 999,
 } as const;
 
 /**
- * The card silhouette, measured off the reference design. Every corner is a
- * straight 45-degree cut, none is rounded: `chamfer` on the top-left and
- * bottom-right, the smaller `minorChamfer` on the top-right and bottom-left.
- * Rendered as an SVG path (see ui/cardShape.ts) because `borderRadius` cannot
- * cut a corner straight.
+ * The menu drawer panel. A ratio, not a fixed dp width, so the panel keeps its
+ * proportion of the screen rather than swallowing a narrow one; `maxWidth`
+ * stops it taking most of a tablet, where 71% is far more than a menu needs.
  *
- * `nestedChamfer` is the smaller cut for blocks sitting inside a card; in the
- * reference those pair their chamfer with genuinely *square* corners, so pass
- * `minorChamfer: 0` for them.
- *
- * Values are dp, converted from a 591x1280 screenshot of the reference. The
- * scale (~1.45 px/dp) is not guessed: the reference's floating tab bar is
- * inset 23px from each screen edge, which at 1.45 is exactly 16dp — the
- * standard margin, and the same one `spacing.lg` uses. Raw 1x measurements,
- * least-squares fitted over the corner profiles, were 16.5/18.3px for the
- * major pair and 7.0/8.2px for the minor — a 2:1 ratio.
- */
-export const cardShape = {
-  chamfer: 10,
-  minorChamfer: 5,
-  nestedChamfer: 8,
-} as const;
-
-/**
- * The menu drawer panel, measured off the reference (see ui/cardShape.ts's
- * `drawerPanelPath`). Ratios, not fixed dp: the reference's panel is 70.7% of a
- * 408dp-wide screen with its corner cuts running ~0.7 of the panel width, which
- * is a ~35 degree diagonal. Pinning the cuts in dp instead would flatten that
- * angle on a wide screen and steepen it on a narrow one.
- *
- * `maxWidth` stops the panel swallowing most of a tablet, where 71% of the
- * screen is far more than a menu needs.
+ * This used to carry a `cutRatio` as well, for a silhouette whose two left
+ * corners were cut on a ~35 degree diagonal. The drawer is rounded now, so the
+ * angle and the SVG path that drew it are gone.
  */
 export const drawerShape = {
   widthRatio: 0.71,
   maxWidth: 340,
+  /**
+   * How far down the panel's left edge each corner cut runs, as a fraction of
+   * the panel's own width.
+   *
+   * A ratio of the width, not of the height, because the horizontal run of the
+   * diagonal *is* the width: at 0.7 the cut is ~35 degrees, which is what the
+   * reference draws, and it stays that angle on any screen. Tie it to height
+   * instead and the angle would change with the phone.
+   *
+   * `ui/drawerShape.ts` clamps the pair against the real height, so a short
+   * panel narrows its cuts rather than turning inside out.
+   */
   cutRatio: 0.7,
 } as const;
 
 /**
- * No elevation. Surfaces are outline-first: a 1px `border` plus the
- * `surface`/`bg` fill difference does all the separating, at two radii
- * (see `radii`). Emphasis and state are carried by colour — a stronger
- * border, or an `accent` fill — never by a shadow or a lift.
+ * Neumorphic depth — a surface is lit from the top-left, so it carries a
+ * *pair* of shadows: a dark one down-right and a light one up-left. Raised
+ * casts them outward; sunken casts the same pair inward (`inset`), which is
+ * how a well, a track or a pressed control reads.
  *
- * These presets are kept (rather than deleted) because ~9 call sites spread
- * them into styles; zeroing them here flattens every one at once. Do not
- * reintroduce shadow values: if a surface reads flat against its
- * background, strengthen `colors.border` instead. As a bonus this removes
- * the Android elevation-bleed that `theme/blend.ts`, `AdvisoryPanels` and
- * `ForecastTable` all work around — those opaque-fill comments describe a
- * problem that no longer has a cause.
+ * This restores the dual-shadow system the palette was ported from. The
+ * earlier note here said it "doesn't render well (or cheaply) on low-end
+ * Android" and hard-zeroed both presets. That was true of the old approach,
+ * where a paired shadow meant stacking wrapper Views or a shadow library.
+ * React Native 0.86 on the New Architecture takes a CSS-style `boxShadow`
+ * array natively — `uimanager/style/BoxShadow.kt` plus the Inset/Outset
+ * shadow drawables — so a neumorphic surface is now one style prop and no
+ * extra views. Verify on a device before widening the offsets further.
+ *
+ * Depth is deliberately *additive*, not load-bearing. The 1px `border` and
+ * the `surface`/`bg` fill difference still do the separating, because these
+ * users read outdoors in bright sun where a soft shadow all but vanishes. No
+ * control may signal its state through shadow alone: a selected or pressed
+ * thing pairs `sunken` with an accent colour.
  */
-export const elevation = {
-  card: {
-    elevation: 0,
-    shadowOpacity: 0,
+export type NeuTokens = {
+  /** The down-right shadow. */
+  shadowDark: string;
+  /** The up-left highlight. Barely there in dark mode, where a white lift
+   * over a near-black ground turns into a halo rather than a bevel. */
+  shadowLight: string;
+};
+
+/** Ported unchanged from the web app's `--neo-shadow-dark`/`--neo-shadow-light`
+ * (frontend/src/index.css), which were left in place when that app's shadows
+ * were switched off — so both platforms still agree on the light source. */
+export const neu: Record<ColorScheme, NeuTokens> = {
+  light: {
+    shadowDark: 'rgba(112, 128, 141, 0.36)',
+    shadowLight: 'rgba(255, 255, 255, 0.9)',
   },
-  raised: {
-    elevation: 0,
-    shadowOpacity: 0,
+  dark: {
+    shadowDark: 'rgba(0, 0, 0, 0.42)',
+    shadowLight: 'rgba(80, 112, 96, 0.16)',
   },
+};
+
+/**
+ * Offset and blur, in dp, per depth step. Blur runs a little over twice the
+ * offset: tighter reads as a hard drop shadow, looser as fog.
+ *
+ * `sm` chips, badges, small inline marks.
+ * `md` buttons, controls, nested blocks, panels floating over a map.
+ * `lg` cards, the tab bar, the hero medallion.
+ */
+const DEPTH = {
+  sm: { offset: 2, blur: 5 },
+  md: { offset: 4, blur: 9 },
+  lg: { offset: 7, blur: 16 },
 } as const;
+
+export type DepthLevel = keyof typeof DEPTH;
+
+/** A shadow pair, in the shape RN's `boxShadow` style prop takes. Kept
+ * structural (not a string) so callers can spread or filter it, and so the
+ * builders stay unit-testable without parsing CSS. */
+export type ShadowPair = {
+  offsetX: number;
+  offsetY: number;
+  blurRadius: number;
+  color: string;
+  inset?: boolean;
+}[];
+
+/** A surface standing forward of the page. */
+export function raised(tokens: NeuTokens, level: DepthLevel = 'md'): ShadowPair {
+  const { offset, blur } = DEPTH[level];
+  return [
+    { offsetX: offset, offsetY: offset, blurRadius: blur, color: tokens.shadowDark },
+    { offsetX: -offset, offsetY: -offset, blurRadius: blur, color: tokens.shadowLight },
+  ];
+}
+
+/**
+ * `raised` with the highlight dropped — for a surface floating over content it
+ * does not control.
+ *
+ * The pair assumes the surface sits on the page background of its own scheme,
+ * which is what makes a white highlight read as a lit bevel rather than as
+ * light. Float the same surface over a photograph, a map, or a subtree pinned
+ * to the opposite scheme, and the highlight has nothing to bevel against: at
+ * `light.shadowLight`'s 0.9 alpha it paints an opaque white haze on whatever is
+ * behind. The tab bar showed exactly that — a white band above it over the
+ * precipitation map, invisible on Home only because that page is already
+ * near-white.
+ *
+ * Keeps the dark half at its usual down-right offset, so the light source stays
+ * where every other surface puts it.
+ */
+export function lifted(tokens: NeuTokens, level: DepthLevel = 'md'): ShadowPair {
+  const { offset, blur } = DEPTH[level];
+  return [{ offsetX: offset, offsetY: offset, blurRadius: blur, color: tokens.shadowDark }];
+}
+
+/**
+ * A single dark shadow thrown one way, for a panel that overlays the page from
+ * a screen edge.
+ *
+ * `raised` is the wrong tool for those, and silently so. It is a *pair* — dark
+ * down-right, near-opaque white up-left — which reads correctly only when the
+ * surface sits inside the page and both halves land on it. Pin a panel to an
+ * edge and one half falls off the screen while the other takes the only visible
+ * side. A right-anchored drawer showed its white half down its left edge and
+ * lit the app behind it; a bottom sheet does the same along its top edge. The
+ * depth language had no way to say "in front of everything, from that side",
+ * so callers reached for `raised` and got a glow.
+ *
+ * Offset on one axis only, because an edge-anchored panel spans the full width
+ * or height and has no corner to cast from. `shadowDark` keeps it on the theme
+ * so it still follows the scheme.
+ */
+export function cast(tokens: NeuTokens, from: 'top' | 'bottom' | 'left' | 'right', level: DepthLevel = 'md'): ShadowPair {
+  const { offset, blur } = DEPTH[level];
+  // The panel is anchored to `from`, so the shadow falls away from that edge.
+  const away = { top: [0, offset], bottom: [0, -offset], left: [offset, 0], right: [-offset, 0] }[from];
+  return [{ offsetX: away[0], offsetY: away[1], blurRadius: blur * 1.75, color: tokens.shadowDark }];
+}
+
+/** The same pair thrown inward — a well, a track, or a control being pressed. */
+export function sunken(tokens: NeuTokens, level: DepthLevel = 'md'): ShadowPair {
+  const { offset, blur } = DEPTH[level];
+  return [
+    { offsetX: offset, offsetY: offset, blurRadius: blur, color: tokens.shadowDark, inset: true },
+    { offsetX: -offset, offsetY: -offset, blurRadius: blur, color: tokens.shadowLight, inset: true },
+  ];
+}
 
 /** Font family names as exported by @expo-google-fonts/*. Loaded once via
  * useFonts in app/_layout.tsx; until loaded, RN falls back to the system
