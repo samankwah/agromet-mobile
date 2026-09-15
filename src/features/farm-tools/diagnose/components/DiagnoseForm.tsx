@@ -25,14 +25,7 @@ type Props = {
  * since the whole screen is the form. Cards are kept for the result, where
  * they mean "this is the answer".
  */
-export function DiagnoseForm({
-  crop,
-  growthStage,
-  symptoms,
-  onChangeCrop,
-  onChangeGrowthStage,
-  onChangeSymptoms,
-}: Props) {
+export function DiagnoseForm({ crop, growthStage, symptoms, onChangeCrop, onChangeGrowthStage, onChangeSymptoms }: Props) {
   const theme = useTheme();
 
   return (
@@ -42,13 +35,7 @@ export function DiagnoseForm({
       </Field>
 
       <Field label="What stage is it at?">
-        <ChipGrid
-          options={GROWTH_STAGES}
-          columns={2}
-          selected={growthStage}
-          onSelect={onChangeGrowthStage}
-          groupLabel="Growth stage"
-        />
+        <ChipGrid options={GROWTH_STAGES} columns={2} selected={growthStage} onSelect={onChangeGrowthStage} groupLabel="Growth stage" />
       </Field>
 
       <Field label="What do you see?">
@@ -141,17 +128,19 @@ function ChipGrid({
                       justifyContent: 'center',
                       borderRadius: theme.radii.md,
                       borderWidth: 1,
-                      borderColor: isSelected ? theme.colors.accent : theme.colors.border,
-                      backgroundColor: isSelected ? theme.colors.accent + '1a' : theme.colors.surface,
+                      borderColor: isSelected ? theme.colors.focusRim : theme.colors.border,
+                      backgroundColor: isSelected ? theme.colors.focus : theme.colors.surface,
                       // The chosen option stays pressed in, and keeps its
-                      // accent fill and border, so the state is never carried
-                      // by the shadow alone.
+                      // highlight fill and rim, so the state is never carried
+                      // by the shadow alone. The fill no longer needs an alpha
+                      // suffix — `focus` is already a pale wash at full
+                      // strength, and tinting it further erased it.
                       boxShadow: isSelected || pressed ? theme.sunken('sm') : theme.raised('sm'),
                     }}
                   >
                     <Text
                       variant={isSelected ? 'bodyStrong' : 'body'}
-                      color={isSelected ? theme.colors.accent : theme.colors.text}
+                      color={isSelected ? theme.colors.focusRim : theme.colors.text}
                       numberOfLines={1}
                     >
                       {option}

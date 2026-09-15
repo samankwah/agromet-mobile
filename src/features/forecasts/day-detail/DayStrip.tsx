@@ -46,14 +46,17 @@ export function DayStrip({ days, selectedDate, onSelect }: Props) {
                 borderRadius: 17,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: isSelected ? theme.colors.accent : 'transparent',
+                backgroundColor: isSelected ? theme.colors.focus : 'transparent',
+                borderWidth: isSelected ? 1 : 0,
+                borderColor: theme.colors.focusRim,
                 // The day you are reading is set into the strip, the way the
-                // reference designs mark the selected day. The accent fill
-                // still carries the state on its own.
+                // reference designs mark the selected day. The fill and its rim
+                // carry the state between them, so the shadow is never the only
+                // thing saying which day you are on.
                 ...(isSelected ? { boxShadow: theme.sunken('sm') } : null),
               }}
             >
-              <Text variant="bodyStrong" color={isSelected ? theme.colors.onAccent : theme.colors.text}>
+              <Text variant="bodyStrong" color={isSelected ? theme.colors.onFocus : theme.colors.text}>
                 {date.getDate()}
               </Text>
             </View>

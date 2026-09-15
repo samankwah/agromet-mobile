@@ -55,12 +55,21 @@ export function StartCycleForm({ visible, subject, isCycle, isSubmitting, error,
             borderTopLeftRadius: theme.radii.xl,
             borderTopRightRadius: theme.radii.xl,
             // Slides up over the whole screen, so it takes the deepest lift.
-            boxShadow: theme.raised('lg'),
+            boxShadow: theme.cast('bottom', 'lg'),
             padding: theme.spacing.lg,
             gap: theme.spacing.lg,
           }}
         >
-          <View style={{ width: 40, height: 5, borderRadius: theme.radii.pill, backgroundColor: theme.colors.bg, boxShadow: theme.sunken('sm'), alignSelf: 'center' }} />
+          <View
+            style={{
+              width: 40,
+              height: 5,
+              borderRadius: theme.radii.pill,
+              backgroundColor: theme.colors.bg,
+              boxShadow: theme.sunken('sm'),
+              alignSelf: 'center',
+            }}
+          />
 
           <View style={{ gap: 2 }}>
             <Text variant="h3">Start a cycle</Text>

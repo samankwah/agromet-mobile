@@ -3,12 +3,7 @@ import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import {
-  REPEAT_LABELS,
-  type FarmReminder,
-  type ReminderDraft,
-  type ReminderRepeat,
-} from '../../../../shared/domain/farmReminder';
+import { REPEAT_LABELS, type FarmReminder, type ReminderDraft, type ReminderRepeat } from '../../../../shared/domain/farmReminder';
 import { useTheme } from '../../../../shared/theme/ThemeProvider';
 import { Button } from '../../../../shared/ui/Button';
 import { DateTimeField } from '../../../../shared/ui/DateTimeField';
@@ -123,7 +118,7 @@ export function ReminderForm({ visible, seed, onSubmit, onDelete, onClose }: Pro
             borderTopLeftRadius: theme.radii.xl,
             borderTopRightRadius: theme.radii.xl,
             // Slides up over the whole screen, so it takes the deepest lift.
-            boxShadow: theme.raised('lg'),
+            boxShadow: theme.cast('bottom', 'lg'),
             paddingTop: theme.spacing.lg,
             paddingHorizontal: theme.spacing.lg,
             // The sheet is a sibling of the screen, so it inherits no safe-area
@@ -134,7 +129,14 @@ export function ReminderForm({ visible, seed, onSubmit, onDelete, onClose }: Pro
           }}
         >
           <View
-            style={{ width: 40, height: 5, borderRadius: theme.radii.pill, backgroundColor: theme.colors.bg, boxShadow: theme.sunken('sm'), alignSelf: 'center' }}
+            style={{
+              width: 40,
+              height: 5,
+              borderRadius: theme.radii.pill,
+              backgroundColor: theme.colors.bg,
+              boxShadow: theme.sunken('sm'),
+              alignSelf: 'center',
+            }}
           />
 
           <Text variant="h3">{isEditing ? 'Edit reminder' : 'New reminder'}</Text>

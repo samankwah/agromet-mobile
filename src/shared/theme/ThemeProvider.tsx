@@ -9,6 +9,8 @@ import {
   minTouchTarget,
   neu,
   radii,
+  cast,
+  lifted,
   raised,
   scaleTypeScale,
   severityColors,
@@ -37,6 +39,14 @@ export type Theme = {
    * `boxShadow: theme.raised('lg')` and never has to pass the tokens in. */
   raised: (level?: DepthLevel) => ShadowPair;
   sunken: (level?: DepthLevel) => ShadowPair;
+  /** For a panel pinned to a screen edge — a drawer, a bottom sheet. `raised`
+   * throws a white half that lands on the one edge such a panel actually
+   * shows; this throws a single dark shadow away from the named edge. */
+  cast: (from: 'top' | 'bottom' | 'left' | 'right', level?: DepthLevel) => ShadowPair;
+  /** For a surface floating over content it does not control — a photograph, a
+   * map, a subtree pinned to the other scheme. `raised`'s white highlight has
+   * nothing to bevel against there and paints a haze; this drops it. */
+  lifted: (level?: DepthLevel) => ShadowPair;
 };
 
 const ThemeContext = createContext<Theme | null>(null);
@@ -87,6 +97,8 @@ export function ThemeProvider({ children, forceScheme }: ThemeProviderProps) {
       neu: tokens,
       raised: (level) => raised(tokens, level),
       sunken: (level) => sunken(tokens, level),
+      cast: (from, level) => cast(tokens, from, level),
+      lifted: (level) => lifted(tokens, level),
     };
   }, [scheme, textSize]);
 

@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useReduceMotion } from '../a11y/useReduceMotion';
 import { useTheme } from '../theme/ThemeProvider';
+import { drawerPanelPath } from './drawerShape';
 import { Text } from './Text';
 
 export type MenuRow = {
@@ -73,10 +75,16 @@ const HOVER_FILL = 'rgba(255,255,255,0.06)';
  * Named `MenuDrawer`, not `Drawer` — `ui/Drawer.tsx` is already the map's
  * bottom panel and has nothing to do with this.
  *
- * The silhouette used to be an SVG path whose two left corners were cut on a
- * shallow diagonal, because no `borderRadius` cuts a corner straight. Under the
- * soft-UI design the panel is simply rounded on its left corners, so the path,
- * the `onLayout` measure it needed and the size state are all gone.
+ * The silhouette is an SVG path whose two left corners are cut on a shallow
+ * diagonal, because no `borderRadius` cuts a corner straight, let alone at ~35
+ * degrees. It is measured with `onLayout` and repainted only on a real size
+ * change; see `ui/drawerShape.ts` for the geometry.
+ *
+ * This shape was dropped during the soft-UI rebuild in favour of a rounded
+ * corner and is back by request, matched to the design reference. The one thing
+ * that did not come back with it is the panel's cast shadow: a box shadow
+ * follows the view's rectangle, so beside a diagonal edge it drew a straight
+ * one. The scrim and the accent rim on the path do the separating instead.
  *
  * Animated with React Native's own `Animated`, not Framer Motion — that is a DOM
  * library and does not run on native. The native equivalent would be Moti or
@@ -100,7 +108,10 @@ export function MenuDrawer({ visible, onClose, rows, title }: Props) {
 
   // The Modal has to outlive `visible` so the panel can slide back out before it
   // unmounts; closing it on the same tick would make the drawer vanish.
+  const cut = panelWidth * theme.drawerShape.cutRatio;
+
   const [mounted, setMounted] = useState(visible);
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const progress = useRef(new Animated.Value(0)).current;
   const cascade = useRef(new Animated.Value(0)).current;
@@ -136,6 +147,13 @@ export function MenuDrawer({ visible, onClose, rows, title }: Props) {
 
   if (!mounted) return null;
 
+  // Built from the measured box, so it is null for the first frame. The panel
+  // is off-screen then anyway — it starts translated fully right — so nothing
+  // ever shows unpainted.
+  const path = size
+    ? drawerPanelPath({ width: size.width, height: size.height, topCut: cut, bottomCut: cut, radius: theme.radii.lg })
+    : null;
+
   /** The slice of the cascade belonging to row `index`. */
   const rowRange = (index: number) => {
     const start = rows.length > 1 ? (index / (rows.length - 1)) * STAGGER_SPAN : 0;
@@ -168,45 +186,51 @@ export function MenuDrawer({ visible, onClose, rows, title }: Props) {
           // with the menu for attention.
           style={[StyleSheet.absoluteFill, { backgroundColor: '#000000A6', opacity: progress }]}
         />
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel="Close menu"
-        />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close menu" />
 
         <Animated.View
+          onLayout={(event) => {
+            const { width, height } = event.nativeEvent.layout;
+            // Repaint only on a real size change. `onLayout` fires on every
+            // slide frame otherwise, and rebuilding the path string each frame
+            // is what makes a drawer stutter on a cheap phone.
+            setSize((current) => (current && current.width === width && current.height === height ? current : { width, height }));
+          }}
           style={{
             position: 'absolute',
             top: 0,
             bottom: 0,
             right: 0,
             width: panelWidth,
-            backgroundColor: theme.colors.chrome,
-            // Only the left corners round: the panel is anchored to the right
-            // edge of the screen, so its right side has no corner to show.
-            borderTopLeftRadius: theme.radii.xl,
-            borderBottomLeftRadius: theme.radii.xl,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-            // The drawer slides over the whole app, so it takes the deepest
-            // lift, like the bottom sheets.
-            boxShadow: theme.raised('lg'),
-            transform: [
-              { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [panelWidth, 0] }) },
-            ],
+            /*
+             * Transparent, and no border, radius or shadow: the panel is an SVG
+             * path now, and paints its own fill and rim below.
+             *
+             * Its two left corners are cut on a shallow diagonal, which no
+             * `borderRadius` can do. That also rules out the `cast('right')`
+             * shadow this carried until now — a box shadow follows the *view's*
+             * rectangle, so it would have drawn a straight-edged shadow beside
+             * a diagonal panel, which is worse than none. Separation comes from
+             * the scrim behind and the accent rim on the path, which is how the
+             * reference does it too.
+             */
+            transform: [{ translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [panelWidth, 0] }) }],
           }}
         >
-
+          {size && path ? (
+            <Svg pointerEvents="none" style={StyleSheet.absoluteFill} width={size.width} height={size.height}>
+              <Path d={path} fill={theme.colors.chrome} stroke={theme.colors.accentStrong} strokeWidth={1} />
+            </Svg>
+          ) : null}
           <View
             accessibilityRole="menu"
             style={{
               flex: 1,
-              /* The status bar is all there is to clear now. The old diagonal
-                 cut ran a long way down the panel's left edge and content had
-                 to start below it; a rounded corner costs only its radius. */
-              paddingTop: insets.top + theme.spacing.lg,
-              paddingBottom: insets.bottom + theme.spacing.lg,
+              /* Clear of the top diagonal, not merely of the status bar. The
+                 cut runs `cut` dp down the panel's left edge, so a title that
+                 only cleared the inset would sit in the sliced-off corner. */
+              paddingTop: Math.max(insets.top, cut) + theme.spacing.lg,
+              paddingBottom: Math.max(insets.bottom, cut * 0.35) + theme.spacing.lg,
             }}
           >
             <Text variant="h2" style={{ textAlign: 'center' }}>
@@ -271,9 +295,7 @@ export function MenuDrawer({ visible, onClose, rows, title }: Props) {
                           marginRight: DIVIDER_RIGHT,
                           // A row being touched presses into the panel, the
                           // same way every other control in the app does.
-                          ...(hovered === row.id || pressed
-                            ? { backgroundColor: HOVER_FILL, boxShadow: theme.sunken('sm') }
-                            : null),
+                          ...(hovered === row.id || pressed ? { backgroundColor: HOVER_FILL, boxShadow: theme.sunken('sm') } : null),
                         }}
                       >
                         <View style={{ width: ICON_SLOT, alignItems: 'center' }}>

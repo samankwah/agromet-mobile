@@ -3,14 +3,39 @@ import { View } from 'react-native';
 import type { Icon } from 'phosphor-react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
+import { ClayIcon } from './clay/ClayIcon';
+import type { ClayIconName } from './clay/clayIcons';
 import { DuotoneIcon } from './DuotoneIcon';
 import { Surface } from './Surface';
 import { Text } from './Text';
 
 type Props = {
-  icon: Icon;
+  /**
+   * Either a name from the 3D set or a Phosphor glyph, and the choice is not
+   * stylistic.
+   *
+   * A tile showing a *measurement* — temperature, humidity, wind, rainfall —
+   * takes the 3D icon: the thing being measured has a picture, and the picture
+   * is what makes a grid of six readings scannable. A tile showing a
+   * *direction* — a price that rose, a range between a min and a max — keeps
+   * the Phosphor arrow, because an arrow is not a picture of anything. It means
+   * up or down, it has to be read instantly at 18dp, and it is tinted by the
+   * caller to say whether up is good news. None of that survives being cast in
+   * clay.
+   */
+  icon: ClayIconName | Icon;
   label: string;
   value: string;
+  /**
+   * A second, quieter reading under the value, for a figure that belongs to the
+   * same measurement rather than to a tile of its own.
+   *
+   * Home's temperature tile carries the day's range this way. Split across two
+   * tiles, "Feels like" and "Min / Max" were two thermometers side by side
+   * saying one thing, and the odd count pushed Wind onto a row by itself. Keep
+   * it to a few characters: it is a footnote to the value, not a second value.
+   */
+  hint?: string;
   /** Renders flat and unfilled, for a tile on a photographic backdrop. */
   onBackdrop?: boolean;
 };
@@ -29,7 +54,7 @@ type Props = {
  * `flat` on a photographic backdrop: see Card's `translucent` note. Passed by
  * the Forecasts Today section, which sits on a photograph.
  */
-export function StatTile({ icon, label, value, onBackdrop = false }: Props) {
+export function StatTile({ icon, label, value, hint, onBackdrop = false }: Props) {
   const theme = useTheme();
 
   return (
@@ -50,12 +75,25 @@ export function StatTile({ icon, label, value, onBackdrop = false }: Props) {
         paddingHorizontal: theme.spacing.md,
       }}
     >
-      <DuotoneIcon icon={icon} size={18} color={theme.colors.muted} />
+      {typeof icon === 'string' ? (
+        // A touch larger than the Phosphor glyph beside it. A duotone mark at
+        // 18dp is a flat silhouette; a render at 18dp is a shaded object that
+        // has to give up its detail first, so it needs the extra few points to
+        // hold the same visual weight.
+        <ClayIcon name={icon} size={22} />
+      ) : (
+        <DuotoneIcon icon={icon} size={18} color={theme.colors.muted} />
+      )}
       <View style={{ flexShrink: 1 }}>
         <Text variant="caption" muted>
           {label}
         </Text>
         <Text variant="bodyStrong">{value}</Text>
+        {hint ? (
+          <Text variant="caption" muted numberOfLines={1}>
+            {hint}
+          </Text>
+        ) : null}
       </View>
     </Surface>
   );

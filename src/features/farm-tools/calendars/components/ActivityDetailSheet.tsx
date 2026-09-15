@@ -56,12 +56,21 @@ export function ActivityDetailSheet({ activity, totalWeeks, weekOneDate, current
             borderTopLeftRadius: theme.radii.xl,
             borderTopRightRadius: theme.radii.xl,
             // Slides up over the whole screen, so it takes the deepest lift.
-            boxShadow: theme.raised('lg'),
+            boxShadow: theme.cast('bottom', 'lg'),
             padding: theme.spacing.lg,
             gap: theme.spacing.md,
           }}
         >
-          <View style={{ width: 40, height: 5, borderRadius: theme.radii.pill, backgroundColor: theme.colors.bg, boxShadow: theme.sunken('sm'), alignSelf: 'center' }} />
+          <View
+            style={{
+              width: 40,
+              height: 5,
+              borderRadius: theme.radii.pill,
+              backgroundColor: theme.colors.bg,
+              boxShadow: theme.sunken('sm'),
+              alignSelf: 'center',
+            }}
+          />
 
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md }}>
             <View
@@ -108,9 +117,7 @@ export function ActivityDetailSheet({ activity, totalWeeks, weekOneDate, current
           <RemindMeButton
             label="Remind me"
             disabledReason={
-              weekOneDate
-                ? null
-                : 'Start a cycle on this calendar to turn its week numbers into dates you can be reminded about.'
+              weekOneDate ? null : 'Start a cycle on this calendar to turn its week numbers into dates you can be reminded about.'
             }
             seed={
               weekOneDate && span

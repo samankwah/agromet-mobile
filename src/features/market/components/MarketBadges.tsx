@@ -63,7 +63,11 @@ export function TrendBadge({
         borderColor: color + '55',
         // Only the on-image variant lifts. The tinted one sits flush inside a
         // panel, where a shadow on something this small just reads as blur.
-        ...(onImage ? { boxShadow: theme.raised('sm') } : null),
+        //
+        // `lifted`, not `raised`, and the prop name says why: this variant sits
+        // on a photograph, so the pair's white half has no page background to
+        // bevel against and would fog the image behind the badge.
+        ...(onImage ? { boxShadow: theme.lifted('sm') } : null),
       }}
     >
       <Ionicons name={meta.icon} size={size === 'sm' ? 12 : 16} color={color} />

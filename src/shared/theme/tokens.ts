@@ -65,6 +65,18 @@ export type ColorTokens = {
   focus: string;
   onFocus: string;
   /**
+   * The edge and the ink of a selection.
+   *
+   * `focus` is a pale ice blue, which is the point of it — but a pale fill
+   * cannot carry a state on its own against this palette's pale light surfaces
+   * (it lands at ~1.08:1 on `surface`). So a selected thing is marked by its
+   * rim as well as its fill, and this is the rim. Both schemes clear 4.5:1
+   * against `surface`, `bg` and `chrome`, which also makes it safe as *text* —
+   * `ui/OptionSheet.tsx` uses it that way, where a row is chosen without any
+   * fill behind it.
+   */
+  focusRim: string;
+  /**
    * The chat transcript's three surfaces.
    *
    * A conversation needs a colour language the rest of the app does not have:
@@ -113,12 +125,19 @@ const light: ColorTokens = {
   onWarning: '#20303b',
   danger: '#be4141',
   onDanger: '#ffffff',
-  focus: '#52b788',
-  // Both light.focus and dark.focus are light/bright greens (a mint-toned
-  // "selected chip" color, distinct from the deeper `accent`), so the same
-  // dark, near-black text reads correctly against either — not scheme-
-  // dependent the way onAccent/onTeal are.
+  // The selected-chip fill, and the one highlight in the palette that is not
+  // green. A selection is not the brand speaking: `accent` is what the app
+  // *is*, so when a selected chip wore it too, "this is AgroMet" and "this is
+  // the one you picked" were the same colour and the second had to be inferred
+  // from position. A pale ice blue has no other job in this palette, which is
+  // what lets it mean "chosen" on sight.
+  focus: '#cbf1f5',
+  // Deliberately shared by both schemes. `focus` is a pale, high-luminance
+  // fill in each, so one near-black ink reads on either (~15:1 on #cbf1f5) —
+  // unlike onAccent/onTeal, which have to invert. Anything approaching white
+  // here would fail: this fill is far too light to carry it.
   onFocus: '#0c1f18',
+  focusRim: '#0e6d7c',
   bubbleIn: '#ffffff',
   bubbleOut: '#d3ecdf',
   wallpaperInk: '#c2d1db',
@@ -144,8 +163,15 @@ const dark: ColorTokens = {
   onWarning: '#0c1f18',
   danger: '#ff8585',
   onDanger: '#2b0d0d',
-  focus: '#6fd8a8',
+  // Same ice blue as light. It reads as a bright chip against the near-black
+  // `bg` rather than glaring, because a chip is small — the warning above
+  // chartTemp/chartRain is about large fills, not this.
+  focus: '#cbf1f5',
   onFocus: '#0c1f18',
+  // Lighter than the light scheme's rim, not darker: on a near-black ground
+  // the edge has to be the bright half of the pair, the same inversion
+  // `border`/`borderStrong` already document above.
+  focusRim: '#5fc8da',
   bubbleIn: '#1b2925',
   // Deep, not bright: `accent` pulled down towards `bg` until a bubble-sized
   // fill sits quiet behind light text. Roughly tint(accent, bg, 0.3), nudged
@@ -219,6 +245,19 @@ export const radii = {
 export const drawerShape = {
   widthRatio: 0.71,
   maxWidth: 340,
+  /**
+   * How far down the panel's left edge each corner cut runs, as a fraction of
+   * the panel's own width.
+   *
+   * A ratio of the width, not of the height, because the horizontal run of the
+   * diagonal *is* the width: at 0.7 the cut is ~35 degrees, which is what the
+   * reference draws, and it stays that angle on any screen. Tie it to height
+   * instead and the angle would change with the phone.
+   *
+   * `ui/drawerShape.ts` clamps the pair against the real height, so a short
+   * panel narrows its cuts rather than turning inside out.
+   */
+  cutRatio: 0.7,
 } as const;
 
 /**
@@ -298,6 +337,51 @@ export function raised(tokens: NeuTokens, level: DepthLevel = 'md'): ShadowPair 
     { offsetX: offset, offsetY: offset, blurRadius: blur, color: tokens.shadowDark },
     { offsetX: -offset, offsetY: -offset, blurRadius: blur, color: tokens.shadowLight },
   ];
+}
+
+/**
+ * `raised` with the highlight dropped — for a surface floating over content it
+ * does not control.
+ *
+ * The pair assumes the surface sits on the page background of its own scheme,
+ * which is what makes a white highlight read as a lit bevel rather than as
+ * light. Float the same surface over a photograph, a map, or a subtree pinned
+ * to the opposite scheme, and the highlight has nothing to bevel against: at
+ * `light.shadowLight`'s 0.9 alpha it paints an opaque white haze on whatever is
+ * behind. The tab bar showed exactly that — a white band above it over the
+ * precipitation map, invisible on Home only because that page is already
+ * near-white.
+ *
+ * Keeps the dark half at its usual down-right offset, so the light source stays
+ * where every other surface puts it.
+ */
+export function lifted(tokens: NeuTokens, level: DepthLevel = 'md'): ShadowPair {
+  const { offset, blur } = DEPTH[level];
+  return [{ offsetX: offset, offsetY: offset, blurRadius: blur, color: tokens.shadowDark }];
+}
+
+/**
+ * A single dark shadow thrown one way, for a panel that overlays the page from
+ * a screen edge.
+ *
+ * `raised` is the wrong tool for those, and silently so. It is a *pair* — dark
+ * down-right, near-opaque white up-left — which reads correctly only when the
+ * surface sits inside the page and both halves land on it. Pin a panel to an
+ * edge and one half falls off the screen while the other takes the only visible
+ * side. A right-anchored drawer showed its white half down its left edge and
+ * lit the app behind it; a bottom sheet does the same along its top edge. The
+ * depth language had no way to say "in front of everything, from that side",
+ * so callers reached for `raised` and got a glow.
+ *
+ * Offset on one axis only, because an edge-anchored panel spans the full width
+ * or height and has no corner to cast from. `shadowDark` keeps it on the theme
+ * so it still follows the scheme.
+ */
+export function cast(tokens: NeuTokens, from: 'top' | 'bottom' | 'left' | 'right', level: DepthLevel = 'md'): ShadowPair {
+  const { offset, blur } = DEPTH[level];
+  // The panel is anchored to `from`, so the shadow falls away from that edge.
+  const away = { top: [0, offset], bottom: [0, -offset], left: [offset, 0], right: [-offset, 0] }[from];
+  return [{ offsetX: away[0], offsetY: away[1], blurRadius: blur * 1.75, color: tokens.shadowDark }];
 }
 
 /** The same pair thrown inward — a well, a track, or a control being pressed. */

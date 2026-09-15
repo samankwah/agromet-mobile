@@ -15,10 +15,14 @@ type Props = {
   /**
    * 'tab' (default) — compact, subtle, for page-level navigation (the
    * Forecasts tab's timescale switch).
-   * 'pill' — chunkier, fully-rounded, high-contrast selected state; for a
-   * prominent filter/form control (the spatial outlook drawer's Forecast
-   * View / Geography toggles). Same underlying behavior either way — one
+   * 'pill' — chunkier, fully-rounded, taller target; for a prominent
+   * filter/form control (the spatial outlook drawer's Forecast View /
+   * Geography toggles). Same underlying behavior either way — one
    * component, a themed appearance, not two parallel implementations.
+   *
+   * The two used to differ in colour as well, `focus` against `accent`. They
+   * no longer do: one selection colour across the app is the point, so the
+   * variants now differ only in shape and size.
    */
   variant?: Variant;
   /**
@@ -93,8 +97,14 @@ export function SegmentedControl({ segments, selectedIndex, onChange, accessibil
               depth={isSelected ? 'raised' : 'flat'}
               level="sm"
               radius={segmentRadius}
-              bordered={false}
-              background={isSelected ? (isPill ? theme.colors.focus : theme.colors.accent) : 'transparent'}
+              // The selected segment is rimmed as well as filled. `focus` is a
+              // pale ice blue that lands around 1.1:1 on this palette's light
+              // surfaces, so the fill alone cannot say "this one" — the border
+              // is what carries the state there, and the fill is what makes it
+              // the selection colour rather than just an outline.
+              bordered={isSelected}
+              borderColor={theme.colors.focusRim}
+              background={isSelected ? theme.colors.focus : 'transparent'}
               style={{
                 minHeight: isPill ? theme.minTouchTarget + 8 : theme.minTouchTarget - 6,
                 alignItems: 'center',
@@ -104,7 +114,7 @@ export function SegmentedControl({ segments, selectedIndex, onChange, accessibil
             >
               <Text
                 variant="bodyStrong"
-                color={isSelected ? (isPill ? theme.colors.onFocus : theme.colors.onAccent) : theme.colors.muted}
+                color={isSelected ? theme.colors.onFocus : theme.colors.muted}
                 numberOfLines={1}
                 // Safety net only — with content-based sizing the labels
                 // normally render at full size; this keeps a very long label

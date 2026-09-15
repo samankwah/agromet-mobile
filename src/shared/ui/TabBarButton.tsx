@@ -71,7 +71,13 @@ export function TabBarButton({ children, style, ...props }: BottomTabBarButtonPr
             level="sm"
             radius={theme.radii.md}
             background={theme.colors.focus}
-            bordered={false}
+            // Rimmed, because the fill cannot do this alone. `focus` is a pale
+            // ice blue and the bar it sits on is `chrome`, which in the light
+            // scheme is pale too — about 1.07:1 between them. The border is
+            // what makes the active tab findable there; in dark the fill
+            // already carries it and the rim just tidies the edge.
+            bordered
+            borderColor={theme.colors.focusRim}
             style={styles.fill}
           />
         ) : null}

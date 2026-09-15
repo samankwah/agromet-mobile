@@ -1,6 +1,5 @@
 import React from 'react';
 import { View } from 'react-native';
-import { Archive, Drop, Egg, Leaf } from 'phosphor-react-native';
 
 import { useLocationStore } from '../../shared/state/locationStore';
 import { HubGrid, HubTile } from '../../shared/ui/HubGrid';
@@ -71,16 +70,16 @@ export function AdvisoriesScreen() {
       ) : null}
 
       <HubGrid>
-        <HubTile icon={Leaf} title="Crop advisory" linkLabel="Read advisory" actionLabel="Open crop advisory" route="/advisory/crop" />
+        <HubTile icon="crop" title="Crop advisory" linkLabel="Read advisory" actionLabel="Open crop advisory" route="/advisory/crop" />
         <HubTile
-          icon={Egg}
+          icon="poultry"
           title="Poultry advisory"
           linkLabel="Read advisory"
           actionLabel="Open poultry advisory"
           route="/advisory/poultry"
         />
         <HubTile
-          icon={Drop}
+          icon="humidity"
           title="Flood & drought"
           hint={
             hazards.national
@@ -92,7 +91,7 @@ export function AdvisoriesScreen() {
           route="/flood-drought"
         />
         <HubTile
-          icon={Archive}
+          icon="archive"
           title="Advisory archive"
           linkLabel="Browse archive"
           actionLabel="Open the archive"

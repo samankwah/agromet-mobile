@@ -55,7 +55,7 @@ export function QuickViewSheet({ resolved, region, onClose, onAddToCart }: Props
             borderTopLeftRadius: theme.radii.xl,
             borderTopRightRadius: theme.radii.xl,
             // Slides up over the whole screen, so it takes the deepest lift.
-            boxShadow: theme.raised('lg'),
+            boxShadow: theme.cast('bottom', 'lg'),
             padding: theme.spacing.lg,
             // The sheet is a sibling of the screen, not a child, so it does
             // not inherit SafeAreaView's insets — without this the action row
@@ -64,13 +64,20 @@ export function QuickViewSheet({ resolved, region, onClose, onAddToCart }: Props
             gap: theme.spacing.md,
           }}
         >
-          <View style={{ width: 40, height: 5, borderRadius: theme.radii.pill, backgroundColor: theme.colors.bg, boxShadow: theme.sunken('sm'), alignSelf: 'center' }} />
+          <View
+            style={{
+              width: 40,
+              height: 5,
+              borderRadius: theme.radii.pill,
+              backgroundColor: theme.colors.bg,
+              boxShadow: theme.sunken('sm'),
+              alignSelf: 'center',
+            }}
+          />
 
           {/* Identity */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-            {image ? (
-              <Image source={image} style={{ width: 48, height: 48, borderRadius: theme.radii.sm }} resizeMode="cover" />
-            ) : null}
+            {image ? <Image source={image} style={{ width: 48, height: 48, borderRadius: theme.radii.sm }} resizeMode="cover" /> : null}
             <View style={{ flex: 1 }}>
               <Text variant="h3" numberOfLines={1}>
                 {entry.name}

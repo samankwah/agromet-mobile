@@ -1,6 +1,5 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { Drop, Leaf } from 'phosphor-react-native';
 import { router } from 'expo-router';
 
 import { HubGrid, HubTile } from '../../shared/ui/HubGrid';
@@ -18,9 +17,9 @@ describe('HubGrid', () => {
   it('shows each tile by name, with its live figure', () => {
     renderGrid(
       <HubGrid>
-        <HubTile icon={Leaf} title="Crop advisory" actionLabel="Open crop advisory" route="/advisory/crop" />
+        <HubTile icon="crop" title="Crop advisory" actionLabel="Open crop advisory" route="/advisory/crop" />
         <HubTile
-          icon={Drop}
+          icon="humidity"
           title="Flood & drought"
           hint="5 on flood alert · 0 in drought stress"
           actionLabel="Open flood & drought"
@@ -41,8 +40,8 @@ describe('HubGrid', () => {
   it('is one button per tile, named for a screen reader, routing where it says', () => {
     renderGrid(
       <HubGrid>
-        <HubTile icon={Leaf} title="Crop advisory" actionLabel="Open crop advisory" route="/advisory/crop" />
-        <HubTile icon={Drop} title="Flood & drought" actionLabel="Open flood & drought" route="/flood-drought" />
+        <HubTile icon="crop" title="Crop advisory" actionLabel="Open crop advisory" route="/advisory/crop" />
+        <HubTile icon="humidity" title="Flood & drought" actionLabel="Open flood & drought" route="/flood-drought" />
       </HubGrid>,
     );
 
@@ -61,7 +60,7 @@ describe('HubGrid', () => {
   it('hides the attention badge at zero and shows it above', () => {
     const { rerender } = renderGrid(
       <HubGrid>
-        <HubTile icon={Leaf} title="Farm reminders" actionLabel="Open reminders" route="/reminders" badge={0} />
+        <HubTile icon="crop" title="Farm reminders" actionLabel="Open reminders" route="/reminders" badge={0} />
       </HubGrid>,
     );
 
@@ -70,7 +69,7 @@ describe('HubGrid', () => {
     rerender(
       <ThemeProvider>
         <HubGrid>
-          <HubTile icon={Leaf} title="Farm reminders" actionLabel="Open reminders" route="/reminders" badge={3} />
+          <HubTile icon="crop" title="Farm reminders" actionLabel="Open reminders" route="/reminders" badge={3} />
         </HubGrid>
       </ThemeProvider>,
     );

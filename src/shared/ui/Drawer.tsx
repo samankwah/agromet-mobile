@@ -76,10 +76,7 @@ export function Drawer({ expanded, onExpandedChange, children, persistentContent
     sheetRef.current?.snapToIndex(expanded ? 1 : 0);
   }, [expanded, collapsedHeight]);
 
-  const handleSheetChange = useCallback(
-    (index: number) => onExpandedChange(index >= 1),
-    [onExpandedChange],
-  );
+  const handleSheetChange = useCallback((index: number) => onExpandedChange(index >= 1), [onExpandedChange]);
 
   // Read from a ref rather than closed over directly, so `handleComponent`
   // below can be created once and never remounted — see its own comment.
@@ -141,9 +138,12 @@ export function Drawer({ expanded, onExpandedChange, children, persistentContent
         borderTopRightRadius: theme.radii.xl,
         borderTopWidth: 1,
         borderColor: theme.colors.border,
-        // Restrained on purpose: this sheet sits over a map, and a large soft
-        // shadow there smears the imagery it is supposed to let you read.
-        boxShadow: theme.raised('md'),
+        // Cast upward, not `raised`: the sheet is pinned to the bottom of the
+        // screen, so `raised`'s white half was the only one of its pair still
+        // on screen and it sat along the top edge as a glow over the map.
+        // Restrained on purpose at `md` — a large soft shadow here smears the
+        // imagery the sheet exists to let you read.
+        boxShadow: theme.cast('bottom', 'md'),
       }}
       // The search field inside `children` needs the sheet to ride up with
       // the keyboard rather than sit behind it — gorhom's own handling here

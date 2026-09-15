@@ -17,7 +17,6 @@ import { LineAreaChart } from '../../../shared/ui/LineAreaChart';
 import { Screen } from '../../../shared/ui/Screen';
 import { SectionHeading } from '../../../shared/ui/SectionHeading';
 import { SegmentedControl } from '../../../shared/ui/SegmentedControl';
-import { Drop, NavigationArrow } from 'phosphor-react-native';
 
 import { StatTile } from '../../../shared/ui/StatTile';
 import { Text } from '../../../shared/ui/Text';
@@ -337,7 +336,7 @@ function MetricPill({ metric, onSelect }: { metric: MetricId; onSelect: (id: Met
                       doesn't honour a transparent colour on Android, which
                       made every row look selected. */}
                   <View style={{ width: 18, alignItems: 'center' }}>
-                    {isSelected ? <Ionicons name="checkmark" size={18} color={theme.colors.accent} /> : null}
+                    {isSelected ? <Ionicons name="checkmark" size={18} color={theme.colors.focusRim} /> : null}
                   </View>
                   <Ionicons name={entry.icon} size={20} color={theme.colors.muted} />
                   <View style={{ flexShrink: 1 }}>
@@ -523,7 +522,7 @@ function DayDetail({
             <Text variant="h1" style={{ fontSize: 38, lineHeight: 44 }}>
               {Math.round(headlineTempC)}°
             </Text>
-            <LiveWeatherIcon weatherCode={day.weatherCode} isDay={day.isDay} size={32} color={theme.colors.muted} animated />
+            <LiveWeatherIcon weatherCode={day.weatherCode} isDay={day.isDay} size={38} animated />
           </View>
           {/* One headline figure with the range beneath it, as the reference
               has it — not two large numbers competing side by side. */}
@@ -593,8 +592,8 @@ function DayDetail({
           to support, and neither appears anywhere else on it. */}
       <SectionHeading title="Wind & Humidity" />
       <Card style={{ flexDirection: 'row', gap: theme.spacing.md }}>
-        <StatTile icon={NavigationArrow} label="Wind" value={formatWind(day.windKph)} />
-        <StatTile icon={Drop} label="Humidity" value={`${day.humidityPct}%`} />
+        <StatTile icon="wind" label="Wind" value={formatWind(day.windKph)} />
+        <StatTile icon="humidity" label="Humidity" value={`${day.humidityPct}%`} />
       </Card>
 
       <SectionHeading title="Daily Summary" />

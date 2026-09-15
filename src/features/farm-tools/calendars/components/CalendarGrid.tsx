@@ -303,7 +303,7 @@ const ActivityNameCell = React.memo(function ActivityNameCell({
             paddingHorizontal: theme.spacing.sm,
             overflow: 'hidden',
             backgroundColor: isSelected
-              ? theme.colors.accent
+              ? theme.colors.focus
               : pressed
                 ? theme.colors.surfaceStrong
                 : isAlternate
@@ -313,11 +313,11 @@ const ActivityNameCell = React.memo(function ActivityNameCell({
             borderColor: theme.colors.border,
           }}
         >
-          <Text variant="caption" color={isSelected ? theme.colors.onAccent : theme.colors.text} numberOfLines={2} ellipsizeMode="tail">
+          <Text variant="caption" color={isSelected ? theme.colors.onFocus : theme.colors.text} numberOfLines={2} ellipsizeMode="tail">
             {name}
           </Text>
           {qualifier ? (
-            <Text variant="caption" color={isSelected ? theme.colors.onAccent : theme.colors.muted} numberOfLines={1}>
+            <Text variant="caption" color={isSelected ? theme.colors.onFocus : theme.colors.muted} numberOfLines={1}>
               {qualifier}
             </Text>
           ) : null}
@@ -362,7 +362,10 @@ const ActivityBarRow = React.memo(function ActivityBarRow({
       accessibilityElementsHidden
       style={{
         height,
-        backgroundColor: isSelected ? theme.colors.accent + '22' : isAlternate ? theme.colors.surface : 'transparent',
+        // The selected row's wash is the highlight at full strength, not an
+        // alpha of it: `focus` is already pale, and a '22' suffix on a pale
+        // colour is indistinguishable from the row beneath it.
+        backgroundColor: isSelected ? theme.colors.focus : isAlternate ? theme.colors.surface : 'transparent',
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderColor: theme.colors.border,
       }}

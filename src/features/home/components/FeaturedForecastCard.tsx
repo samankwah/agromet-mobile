@@ -96,7 +96,7 @@ function WeekStrip({ days }: { days: DailyForecast[] }) {
                 <Text variant="caption" muted numberOfLines={1}>
                   {label}
                 </Text>
-                <LiveWeatherIcon weatherCode={day.weatherCode} isDay={day.isDay} size={17} color={theme.colors.muted} />
+                <LiveWeatherIcon weatherCode={day.weatherCode} isDay={day.isDay} size={27} />
                 <Text variant="bodyStrong" numberOfLines={1}>
                   {formatDegrees(day.tempMaxC)}
                 </Text>

@@ -5,13 +5,12 @@ import type { CurrentWeather } from '../../../shared/domain/currentWeather';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../../shared/ui/AsyncStateView';
 import { Card } from '../../../shared/ui/Card';
-import { ArrowsVertical, CloudRain, Drop, NavigationArrow, Thermometer } from 'phosphor-react-native';
 
 import { StatTile } from '../../../shared/ui/StatTile';
 import { Text } from '../../../shared/ui/Text';
 import { LiveWeatherIcon } from '../../../shared/ui/weather/LiveWeatherIcon';
 import { formatRelativeTime } from '../../../shared/utils/formatRelativeTime';
-import { formatTemperature } from '../../../shared/utils/formatTemperature';
+import { formatDegrees, formatTemperature } from '../../../shared/utils/formatTemperature';
 import { formatWind } from '../../../shared/utils/formatWind';
 import { CurrentConditionsSkeleton } from './HomeSkeletons';
 
@@ -53,7 +52,12 @@ export function CurrentConditionsCard({ conditions, status, error, onRetry }: Pr
                 <LiveWeatherIcon
                   weatherCode={conditions.weatherCode}
                   isDay={conditions.isDay}
-                  size={MEDALLION * 0.56}
+                  // 0.56 was right for a drawn glyph, which used its whole box.
+                  // The 3D renders carry their own margin inside the PNG, so at
+                  // the same nominal size the art lands visibly smaller and the
+                  // medallion reads as mostly empty circle. This buys that
+                  // padding back.
+                  size={MEDALLION * 0.78}
                   animated
                 />
               </View>
@@ -70,15 +74,20 @@ export function CurrentConditionsCard({ conditions, status, error, onRetry }: Pr
           </View>
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: theme.spacing.md, columnGap: theme.spacing.lg }}>
-            <StatTile icon={Thermometer} label="Feels like" value={formatTemperature(conditions.feelsLikeC)} />
+            {/* The day's range rides under the feels-like figure rather than
+                taking a tile of its own. Two thermometer tiles side by side
+                were saying one thing about temperature, and the odd tile count
+                left Wind stranded on a full-width row by itself. Four tiles
+                make the 2x2 the rest of the card is built for. */}
             <StatTile
-              icon={ArrowsVertical}
-              label="Min / Max"
-              value={`${formatTemperature(conditions.minC)} / ${formatTemperature(conditions.maxC)}`}
+              icon="temperature"
+              label="Feels like"
+              value={formatTemperature(conditions.feelsLikeC)}
+              hint={`H ${formatDegrees(conditions.maxC)} · L ${formatDegrees(conditions.minC)}`}
             />
-            <StatTile icon={CloudRain} label="Rainfall" value={`${conditions.rainfallMm} mm`} />
-            <StatTile icon={Drop} label="Humidity" value={`${conditions.humidityPct}%`} />
-            <StatTile icon={NavigationArrow} label="Wind" value={formatWind(conditions.windKph)} />
+            <StatTile icon="wind" label="Wind" value={formatWind(conditions.windKph)} />
+            <StatTile icon="rainfall" label="Rainfall" value={`${conditions.rainfallMm} mm`} />
+            <StatTile icon="humidity" label="Humidity" value={`${conditions.humidityPct}%`} />
           </View>
         </Card>
       ) : null}

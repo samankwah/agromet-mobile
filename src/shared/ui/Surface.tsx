@@ -4,7 +4,7 @@ import { View, type ViewProps, type ViewStyle } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import type { DepthLevel } from '../theme/tokens';
 
-export type SurfaceDepth = 'raised' | 'sunken' | 'flat';
+export type SurfaceDepth = 'raised' | 'sunken' | 'lifted' | 'flat';
 
 type Props = ViewProps & {
   /**
@@ -12,6 +12,12 @@ type Props = ViewProps & {
    * (a well, a track, a control being held). `flat` keeps the fill and the
    * hairline but casts nothing — for a surface sitting on a photograph, or
    * inside a parent that clips (see the overflow note below).
+   *
+   * `lifted` is `raised` without the highlight, for a surface that floats over
+   * content it does not control: a map, a photograph, a subtree pinned to the
+   * opposite scheme. The pair's white half only reads as a bevel against the
+   * page background of its own scheme — over foreign content it paints a haze,
+   * which is what put a white band above the tab bar on the forecasts map.
    */
   depth?: SurfaceDepth;
   level?: DepthLevel;
@@ -77,6 +83,8 @@ export function Surface({
     base.boxShadow = theme.raised(level);
   } else if (depth === 'sunken') {
     base.boxShadow = theme.sunken(level);
+  } else if (depth === 'lifted') {
+    base.boxShadow = theme.lifted(level);
   }
 
   return (

@@ -49,7 +49,7 @@ export function OptionSheet({ visible, options, selectedId, onSelect, onClose, t
             // The sheet slides up over the whole screen, so it takes the
             // deepest lift — the one surface that is unambiguously in front
             // of everything else.
-            boxShadow: theme.raised('lg'),
+            boxShadow: theme.cast('bottom', 'lg'),
             paddingVertical: theme.spacing.sm,
             /* A sheet is a sibling of the screen, so it inherits no safe-area
                inset of its own. Clearing the inset is not enough either: a
@@ -112,11 +112,11 @@ export function OptionSheet({ visible, options, selectedId, onSelect, onClose, t
                       colour on Android, which left every row looking
                       selected. The slot keeps the labels aligned. */}
                   <View style={{ width: 18, alignItems: 'center' }}>
-                    {isSelected ? <Ionicons name="checkmark" size={18} color={theme.colors.teal} /> : null}
+                    {isSelected ? <Ionicons name="checkmark" size={18} color={theme.colors.focusRim} /> : null}
                   </View>
                   <Text
                     variant={isSelected ? 'bodyStrong' : 'body'}
-                    color={isSelected ? theme.colors.teal : theme.colors.text}
+                    color={isSelected ? theme.colors.focusRim : theme.colors.text}
                     style={{ flex: 1 }}
                   >
                     {item.label}

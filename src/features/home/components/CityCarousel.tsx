@@ -100,17 +100,9 @@ export function CityCarousel() {
 
   const gap = theme.spacing.sm;
   const cardWidth = cityCardWidth(theme.typeScale.bodyStrong.fontSize);
-  const cardHeight = cityCardHeight(
-    theme.typeScale.body.lineHeight,
-    theme.spacing.sm,
-    theme.spacing.xs,
-    theme.minTouchTarget + 16,
-  );
+  const cardHeight = cityCardHeight(theme.typeScale.body.lineHeight, theme.spacing.sm, theme.spacing.xs, theme.minTouchTarget + 16);
   const cycleWidth = marqueeCycleWidth(HOME_LOCATIONS.length, cardWidth, gap);
-  const snapOffsets = useMemo(
-    () => citySnapOffsets(HOME_LOCATIONS.length, cardWidth, gap),
-    [cardWidth, gap],
-  );
+  const snapOffsets = useMemo(() => citySnapOffsets(HOME_LOCATIONS.length, cardWidth, gap), [cardWidth, gap]);
   const selectedIndex = HOME_LOCATIONS.findIndex((location) => location.id === selectedLocationId);
   const isFlowing = !interacted && !reduceMotion;
 
@@ -170,7 +162,11 @@ export function CityCarousel() {
   const renderCard = (location: (typeof HOME_LOCATIONS)[number], copy = 0) => {
     const isSelected = location.id === selectedLocationId;
     const conditions = strip.data?.[location.id];
-    const fg = isSelected ? theme.colors.onAccent : theme.colors.text;
+    // `focus`/`onFocus`, not `accent`/`onAccent`: the same selected-chip pair
+    // the tab bar's highlight uses, so "the one you picked" looks the same
+    // wherever the app asks you to pick. `onFocus` is near-black because the
+    // fill is a pale ice blue — the old white would be invisible on it.
+    const fg = isSelected ? theme.colors.onFocus : theme.colors.text;
 
     return (
       <Pressable
@@ -190,14 +186,14 @@ export function CityCarousel() {
           // directly and got away with it only because the style was a static
           // object; a pressed state makes it a function, which is the case that
           // breaks.
-          // The selected town presses into the strip and keeps its accent
+          // The selected town presses into the strip and keeps its highlight
           // fill, so the state never rests on the shadow alone.
           <Surface
             depth={isSelected || pressed ? 'sunken' : 'raised'}
             level="sm"
             radius={theme.radii.lg}
-            background={isSelected ? theme.colors.accent : theme.colors.surface}
-            borderColor={isSelected ? theme.colors.accent : theme.colors.border}
+            background={isSelected ? theme.colors.focus : theme.colors.surface}
+            borderColor={isSelected ? theme.colors.focusRim : theme.colors.border}
             style={{
               width: cardWidth,
               // An exact height, not a minimum: the row's layout maths is built
@@ -247,11 +243,7 @@ export function CityCarousel() {
           {/* The second pass exists only so the loop can restart without a
               visible rewind, so it is hidden from assistive tech — a screen
               reader should hear ten towns, not twenty. */}
-          <View
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            style={{ flexDirection: 'row', gap }}
-          >
+          <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ flexDirection: 'row', gap }}>
             {HOME_LOCATIONS.map((location) => renderCard(location, 1))}
           </View>
         </Animated.View>

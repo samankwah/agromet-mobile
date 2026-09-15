@@ -4,6 +4,7 @@ import { act, render } from '@testing-library/react-native';
 
 import { glyphFromCondition, glyphFromWmo, hasNightForm } from '../../shared/domain/weatherGlyph';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
+import { clayIcons, type ClayIconName } from '../../shared/ui/clay/clayIcons';
 import { LiveWeatherIcon } from '../../shared/ui/weather/LiveWeatherIcon';
 
 /* The mapping is the part worth pinning: it decides which picture a farmer
@@ -99,82 +100,100 @@ function renderIcon(props: React.ComponentProps<typeof LiveWeatherIcon>) {
   );
 }
 
-/** Every `d` attribute in the rendered tree, so a test can ask which shapes
- * were drawn without depending on the component's nesting. */
-function pathData(node: unknown): string[] {
-  const found: string[] = [];
+/**
+ * The image the icon actually drew.
+ *
+ * Metro's jest transform turns a `require`d PNG into an opaque asset id, so the
+ * only way to say *which* render appeared is to compare against the same entry
+ * of `clayIcons`. That is a stronger check than it looks: it fails if the
+ * registry is rewired as well as if the mapping is.
+ */
+function drawnIcon(node: unknown): unknown {
+  let found: unknown;
   const walk = (current: any) => {
-    if (!current || typeof current !== 'object') return;
+    if (found !== undefined || !current || typeof current !== 'object') return;
     if (Array.isArray(current)) return current.forEach(walk);
-    if (typeof current.props?.d === 'string') found.push(current.props.d);
+    if (current.props?.source !== undefined) {
+      found = current.props.source;
+      return;
+    }
     walk(current.children);
   };
   walk(node);
   return found;
 }
 
-/** Circles, which is how the sun is told apart from the moon: the sun has a
- * disc, the crescent is a single path. */
-function circleCount(node: unknown): number {
-  let count = 0;
-  const walk = (current: any) => {
-    if (!current || typeof current !== 'object') return;
-    if (Array.isArray(current)) return current.forEach(walk);
-    if (current.type === 'RNSVGCircle') count += 1;
-    walk(current.children);
-  };
-  walk(node);
-  return count;
+function expectIcon(props: React.ComponentProps<typeof LiveWeatherIcon>, name: ClayIconName) {
+  expect(drawnIcon(renderIcon(props).toJSON())).toBe(clayIcons[name]);
 }
 
 describe('LiveWeatherIcon', () => {
   it('draws the sun by day and the moon by night for a clear sky', () => {
-    const day = renderIcon({ weatherCode: 0, isDay: true, size: 24 });
-    expect(circleCount(day.toJSON())).toBe(1); // the sun's disc
+    expectIcon({ weatherCode: 0, isDay: true, size: 24 }, 'sun');
+    expectIcon({ weatherCode: 0, isDay: false, size: 24 }, 'moon');
+  });
 
-    const night = renderIcon({ weatherCode: 0, isDay: false, size: 24 });
-    expect(circleCount(night.toJSON())).toBe(0);
-    expect(pathData(night.toJSON()).length).toBeGreaterThan(0); // the crescent
+  it('walks the cloud ladder as the WMO codes climb', () => {
+    // The glyph names and the codes pull opposite ways here — `partly-cloudy`
+    // is WMO 1, *mainly clear*, so it takes the smallest cloud of the three.
+    expectIcon({ weatherCode: 1, size: 24 }, 'sun-small-cloud');
+    expectIcon({ weatherCode: 2, size: 24 }, 'sun-cloud');
+    expectIcon({ weatherCode: 3, size: 24 }, 'cloud');
+  });
+
+  it('gives rain, storms and fog their own renders', () => {
+    expectIcon({ weatherCode: 63, size: 24 }, 'cloud-rain');
+    expectIcon({ weatherCode: 95, size: 24 }, 'cloud-lightning-rain');
+    expectIcon({ weatherCode: 45, size: 24 }, 'fog');
+  });
+
+  it('shows a lightly clouded night as cloud, never as sunshine', () => {
+    // There is no moon-behind-cloud in the set. A plain cloud after dark is
+    // incomplete; a sun behind a cloud at 2am would be wrong, and that is the
+    // trade this asserts.
+    expectIcon({ weatherCode: 1, isDay: false, size: 24 }, 'cloud');
   });
 
   it('ignores isDay for weather with no night form', () => {
-    const day = renderIcon({ weatherCode: 63, isDay: true, size: 24 });
-    const night = renderIcon({ weatherCode: 63, isDay: false, size: 24 });
+    const day = drawnIcon(renderIcon({ weatherCode: 63, isDay: true, size: 24 }).toJSON());
+    const night = drawnIcon(renderIcon({ weatherCode: 63, isDay: false, size: 24 }).toJSON());
 
-    expect(pathData(night.toJSON())).toEqual(pathData(day.toJSON()));
+    expect(night).toBe(day);
   });
 
-  it('draws more drops the heavier the rain', () => {
-    const countDrops = (code: number) => {
-      const tree = renderIcon({ weatherCode: code, size: 24 }).toJSON();
-      let lines = 0;
-      const walk = (current: any) => {
-        if (!current || typeof current !== 'object') return;
-        if (Array.isArray(current)) return current.forEach(walk);
-        if (current.type === 'RNSVGLine') lines += 1;
-        walk(current.children);
-      };
-      walk(tree);
-      return lines;
-    };
+  it('collapses the two pairs the set has no separate art for', () => {
+    // Documented in LiveWeatherIcon's `iconFor`: a real cost, pinned here so it
+    // stays a decision rather than drifting into a surprise. The WMO codes
+    // still separate them everywhere upstream of the picture.
+    const drizzle = drawnIcon(renderIcon({ weatherCode: 53, size: 24 }).toJSON());
+    const showers = drawnIcon(renderIcon({ weatherCode: 81, size: 24 }).toJSON());
+    expect(drizzle).toBe(showers);
 
-    expect(countDrops(53)).toBeLessThan(countDrops(63));
-    expect(countDrops(63)).toBeLessThan(countDrops(65));
+    const rain = drawnIcon(renderIcon({ weatherCode: 63, size: 24 }).toJSON());
+    const heavy = drawnIcon(renderIcon({ weatherCode: 65, size: 24 }).toJSON());
+    expect(rain).toBe(heavy);
   });
 
   it('falls back to the condition string when no code is given', () => {
-    const fromString = renderIcon({ condition: 'Thunderstorms likely', size: 24 });
-    const fromCode = renderIcon({ weatherCode: 95, size: 24 });
+    const fromString = drawnIcon(renderIcon({ condition: 'Thunderstorms likely', size: 24 }).toJSON());
+    const fromCode = drawnIcon(renderIcon({ weatherCode: 95, size: 24 }).toJSON());
 
-    expect(pathData(fromString.toJSON())).toEqual(pathData(fromCode.toJSON()));
+    expect(fromString).toBe(fromCode);
   });
 
   it('stays out of the accessibility tree', () => {
     // The condition is always written beside the icon, so announcing it here
     // would read the weather twice. Same contract as ui/DuotoneIcon.
     const tree = renderIcon({ weatherCode: 0, size: 24 }).toJSON() as any;
-    expect(tree.props.accessibilityElementsHidden).toBe(true);
-    expect(tree.props.importantForAccessibility).toBe('no-hide-descendants');
+    const walk = (current: any): any => {
+      if (!current || typeof current !== 'object') return undefined;
+      if (Array.isArray(current)) return current.map(walk).find(Boolean);
+      if (current.props?.accessibilityElementsHidden === true) return current;
+      return walk(current.children);
+    };
+    const hidden = walk(tree);
+    expect(hidden).toBeTruthy();
+    expect(hidden.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 
   it('still renders a legible icon when motion is switched off', async () => {
@@ -186,6 +205,6 @@ describe('LiveWeatherIcon', () => {
     await act(async () => {});
 
     // The rule the whole app follows: stop the motion, never hide the element.
-    expect(pathData(view.toJSON()).length).toBeGreaterThan(0);
+    expect(drawnIcon(view.toJSON())).toBe(clayIcons['cloud-rain']);
   });
 });

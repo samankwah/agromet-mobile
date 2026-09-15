@@ -54,14 +54,14 @@ export function HourlyConditionStrip({ hours, chartWidth }: Props) {
   const toX = (hour: number) => (hour / LAST_HOUR) * plotW;
 
   return (
-    <View style={{ width: plotW, height: 22 }}>
+    <View style={{ width: plotW, height: 26 }}>
       {STRIP_HOURS.map((hour) => {
         const match = hours.find((entry) => new Date(entry.hour).getUTCHours() === hour);
         if (!match) return null;
 
         return (
           <View key={hour} style={{ position: 'absolute', left: toX(hour) - CELL / 2, width: CELL, alignItems: 'center' }}>
-            <LiveWeatherIcon weatherCode={match.weatherCode} isDay={match.isDay} size={18} color={theme.colors.muted} />
+            <LiveWeatherIcon weatherCode={match.weatherCode} isDay={match.isDay} size={25} />
           </View>
         );
       })}

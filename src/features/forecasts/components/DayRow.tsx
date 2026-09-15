@@ -47,7 +47,7 @@ export function DayRow({ label, day, weekMinC, weekMaxC, isFirst }: Props) {
         {label}
       </Text>
 
-      <LiveWeatherIcon weatherCode={day.weatherCode} isDay={day.isDay} size={20} color={theme.colors.accent} />
+      <LiveWeatherIcon weatherCode={day.weatherCode} isDay={day.isDay} size={27} />
 
       <View style={{ width: 34 }}>
         {day.rainfallProbabilityPct >= 30 ? (

@@ -16,7 +16,7 @@ export function HourlyStripItem({ hour }: { hour: HourlyForecast }) {
       <Text variant="caption" muted>
         {label}
       </Text>
-      <LiveWeatherIcon weatherCode={hour.weatherCode} isDay={hour.isDay} size={22} color={theme.colors.accent} />
+      <LiveWeatherIcon weatherCode={hour.weatherCode} isDay={hour.isDay} size={27} />
       <Text variant="bodyStrong">{formatTemperature(hour.tempC)}</Text>
       {hour.rainfallProbabilityPct >= 30 ? (
         <Text variant="caption" color={theme.colors.teal}>

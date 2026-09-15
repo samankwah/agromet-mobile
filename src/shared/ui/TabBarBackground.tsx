@@ -35,7 +35,13 @@ export function TabBarBackground() {
   return (
     <Surface
       pointerEvents="none"
-      depth="raised"
+      // `lifted`, not `raised`. The bar is inset from the screen edges, so both
+      // halves of a pair would land on screen — but it floats over whatever the
+      // current tab is showing, and that is not always its own page. Over the
+      // forecasts map the highlight had nothing to bevel against and drew a
+      // white band across the screen above the bar. Home hid it only because
+      // that page is already near-white.
+      depth="lifted"
       level="lg"
       radius={theme.radii.xl}
       background={theme.colors.chrome}

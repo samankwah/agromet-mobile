@@ -2,11 +2,11 @@ import React from 'react';
 import { Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
-import type { Icon } from 'phosphor-react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
 import { Card } from './Card';
-import { DuotoneIcon } from './DuotoneIcon';
+import { ClayIcon } from './clay/ClayIcon';
+import type { ClayIconName } from './clay/clayIcons';
 import { Text } from './Text';
 
 /**
@@ -59,7 +59,7 @@ export function HubTile({
   badge,
   linkLabel = 'Take a look',
 }: {
-  icon: Icon;
+  icon: ClayIconName;
   title: string;
   /** The full phrase, e.g. "Open crop advisory". The tile shows "Open" — all
    * a half-width tile has room for — and speaks this instead, so a screen
@@ -157,7 +157,7 @@ export function HubTile({
               level with that space's centre — growing to fill it is what keeps
               the mark level as titles wrap to one line or two. */}
           <View style={{ flexGrow: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
-            <DuotoneIcon icon={icon} size={56} />
+            <ClayIcon name={icon} size={56} />
           </View>
 
           {/* The same affordance Home's teaser cards use (home/components/
