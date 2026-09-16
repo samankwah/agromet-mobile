@@ -1,4 +1,5 @@
 import type { PrecipFrame } from '../../domain/precipitationTimeline';
+import { fetchWithTimeout } from '../http';
 
 /**
  * NASA GIBS IMERG: satellite-measured rain rate, the observed half of the
@@ -53,6 +54,10 @@ const PROBE_TILE = { z: 4, x: 7, y: 7 };
 
 const HORIZON_TTL_MS = 15 * 60 * 1000;
 
+/** A probe is one small tile. Up to six run one after another, so a probe that
+ * hangs must give up quickly or the rain map waits on it. */
+const PROBE_TIMEOUT_MS = 5_000;
+
 export function tileUrlTemplate(validAt: string): string {
   return TILE_URL.replace('{TIME}', validAt);
 }
@@ -74,7 +79,7 @@ async function timestampExists(validAt: string): Promise<boolean> {
     .replace('{x}', String(PROBE_TILE.x));
 
   try {
-    const response = await fetch(url, { method: 'GET' });
+    const response = await fetchWithTimeout(url, { method: 'GET' }, PROBE_TIMEOUT_MS);
     // GIBS answers 404 for a time outside the archive and 200 for one inside
     // it, including a fully transparent tile when that half hour simply had no
     // rain. A 200 therefore means "this frame exists", not "there is rain in
@@ -138,5 +143,4 @@ export function observedFrames(horizon: Date, count: number): PrecipFrame[] {
   });
 }
 
-export const GIBS_ATTRIBUTION =
-  'Rain imagery: NASA GIBS / GPM IMERG';
+export const GIBS_ATTRIBUTION = 'Rain imagery: NASA GIBS / GPM IMERG';

@@ -25,6 +25,27 @@ export class NetworkError extends Error {
   }
 }
 
+/**
+ * `fetch` with the same budget our own requests get, for the few calls that go
+ * straight to a third party (Open-Meteo, NASA GIBS) rather than through
+ * `request` below.
+ *
+ * A bare `fetch` has no timeout at all. Those calls are mostly the *fallback*
+ * for a backend that already failed to answer inside ten seconds, so without
+ * this a farmer on a bad connection waited ten seconds and then indefinitely.
+ * An abort rejects like any transport failure, so callers' existing `catch`
+ * keeps working unchanged.
+ */
+export async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export type QueryParams = Record<string, string | number | undefined | null>;
 
 export type RequestOptions = {

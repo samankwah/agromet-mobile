@@ -12,12 +12,14 @@ import { SpaceGrotesk_500Medium, SpaceGrotesk_700Bold } from '@expo-google-fonts
 import { NotoSans_400Regular, NotoSans_600SemiBold } from '@expo-google-fonts/noto-sans';
 
 import { Text } from '../src/shared/ui/Text';
-import { queryClient } from '../src/shared/api/queryClient';
+import { bindQueryClientToDevice, queryClient } from '../src/shared/api/queryClient';
 import { useOnboardingStore } from '../src/shared/state/onboardingStore';
 import { WelcomeScreen } from '../src/features/onboarding/WelcomeScreen';
 import { ThemeProvider, useTheme } from '../src/shared/theme/ThemeProvider';
 import { OfflineBanner } from '../src/shared/ui/OfflineBanner';
 import { useReminderNotifications } from '../src/features/farm-tools/reminders/useReminderNotifications';
+
+bindQueryClientToDevice();
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   // No-op: if the splash screen is already hidden (e.g. fast refresh),
