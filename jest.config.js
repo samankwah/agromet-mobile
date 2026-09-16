@@ -24,6 +24,12 @@ module.exports = {
      * because the loader that consumes it is mocked in jest.setup.js.
      */
     '\\.tflite$': '<rootDir>/src/tests/fixtures/tfliteAssetStub.js',
+    /**
+     * `shared/ui/phosphorIcons.ts` loads each glyph from Phosphor's per-icon
+     * `.tsx` source, which Metro compiles but Jest's transform skips inside
+     * node_modules. The package ships the same files compiled; point Jest there.
+     */
+    '^phosphor-react-native/src/icons/(.*)$': '<rootDir>/node_modules/phosphor-react-native/lib/commonjs/icons/$1.js',
   },
   /**
    * Jest's default is 5000ms, and it was defeating the screen suites.

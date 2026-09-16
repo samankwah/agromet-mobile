@@ -12,7 +12,7 @@ import type { ImageSourcePropType } from 'react-native';
  */
 const IMAGES: Record<string, ImageSourcePropType> = {
   'yellow-maize': require('../../../assets/commodities/yellow-maize.jpg'),
-  'white-maize': require('../../../assets/commodities/white-maize.png'),
+  'white-maize': require('../../../assets/commodities/white-maize.jpg'),
   'yellow-soybeans': require('../../../assets/commodities/yellow-soybeans.jpg'),
   yam: require('../../../assets/commodities/yam.jpg'),
   tomatoes: require('../../../assets/commodities/tomatoes.jpg'),
@@ -21,12 +21,12 @@ const IMAGES: Record<string, ImageSourcePropType> = {
   'anaheim-pepper': require('../../../assets/commodities/anaheim-pepper.jpg'),
   'aleppo-pepper': require('../../../assets/commodities/aleppo-pepper.jpg'),
   'red-onion': require('../../../assets/commodities/red-onion.jpg'),
-  'white-onion': require('../../../assets/commodities/white-onion.png'),
+  'white-onion': require('../../../assets/commodities/white-onion.jpg'),
   'yellow-onion': require('../../../assets/commodities/yellow-onion.jpg'),
-  'dressed-chicken': require('../../../assets/commodities/dressed-chicken.png'),
+  'dressed-chicken': require('../../../assets/commodities/dressed-chicken.jpg'),
   'live-chicken': require('../../../assets/commodities/live-chicken.jpg'),
   beans: require('../../../assets/commodities/beans.jpg'),
-  plantain: require('../../../assets/commodities/plantain.png'),
+  plantain: require('../../../assets/commodities/plantain.jpg'),
   cassava: require('../../../assets/commodities/cassava.jpg'),
   sorghum: require('../../../assets/commodities/sorghum.jpg'),
 };
