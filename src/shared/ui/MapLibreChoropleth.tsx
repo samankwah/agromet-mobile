@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
@@ -147,9 +147,28 @@ function buildColorRamp(
   return JSON.stringify(['step', ['get', 'value'], first.color, ...steps]);
 }
 
-function buildHtml(props: Props): string {
-  const { cells, min, max, geography, variableLabel, valueFormat, isTercile, palette, stops } = props;
+/**
+ * Everything that changes when the reader picks another variable, period or
+ * view: the cells, the colour ramp and the popup's caption. Pushed into the
+ * running map as one script rather than baked into the document, because a new
+ * document reloads MapLibre from the CDN, refetches the basemap style, parses
+ * the boundaries again and throws away the reader's pan and zoom.
+ */
+function buildDataScript(
+  props: Pick<Props, 'cells' | 'min' | 'max' | 'variableLabel' | 'valueFormat' | 'isTercile' | 'palette' | 'stops'>,
+): string {
+  const { cells, min, max, variableLabel, valueFormat, isTercile, palette, stops } = props;
   const categories = palette ?? TERCILE_CATEGORIES;
+  return (
+    `(function(){var d={geojson:${buildGeoJson(cells, valueFormat, max - min, isTercile, categories)},` +
+    `ramp:${buildColorRamp(min, max, isTercile, categories, stops)},label:${JSON.stringify(variableLabel)}};` +
+    `if(window.__setData){window.__setData(d);}else{window.__pendingData=d;}})();true;`
+  );
+}
+
+/** The map itself: basemap, boundaries and behaviour. Depends on the geography
+ * alone, so it is built once per boundary level rather than per data change. */
+function buildHtml(geography: SpatialGeography): string {
   const { minLng, minLat, maxLng, maxLat } = GHANA_BOUNDARIES.bounds;
 
   return `<!DOCTYPE html>
@@ -199,7 +218,9 @@ function buildHtml(props: Props): string {
       });
 
       map.on('load', function () {
-        map.addSource('forecast', { type: 'geojson', data: ${buildGeoJson(cells, valueFormat, max - min, isTercile, categories)} });
+        // Starts empty; the host pushes the cells once this page says it is
+        // ready (see the 'ready' message below).
+        map.addSource('forecast', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addSource('boundaries', { type: 'geojson', data: ${buildBoundaryGeoJson(geography)} });
 
         // Forecast fill sits above the basemap's land but below its
@@ -208,7 +229,7 @@ function buildHtml(props: Props): string {
           id: 'forecast-fill',
           type: 'fill',
           source: 'forecast',
-          paint: { 'fill-color': ${buildColorRamp(min, max, isTercile, categories, stops)}, 'fill-opacity': 0.72 }
+          paint: { 'fill-color': 'rgba(0,0,0,0)', 'fill-opacity': 0.72 }
         });
 
         map.addLayer({
@@ -238,6 +259,23 @@ function buildHtml(props: Props): string {
         if (window.__pendingSelected) {
           window.__setSelected(window.__pendingSelected);
           window.__pendingSelected = null;
+        }
+
+        var variableLabel = '';
+        window.__setData = function (d) {
+          map.getSource('forecast').setData(d.geojson);
+          map.setPaintProperty('forecast-fill', 'fill-color', d.ramp);
+          variableLabel = d.label;
+        };
+        if (window.__pendingData) {
+          window.__setData(window.__pendingData);
+          window.__pendingData = null;
+        }
+
+        // Anything injected before this document existed ran against a blank
+        // page and was lost, so the host waits for this before pushing data.
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
         }
 
         map.on('click', function (e) {
@@ -271,7 +309,7 @@ function buildHtml(props: Props): string {
           new maplibregl.Popup({ closeButton: false })
             .setLngLat(e.lngLat)
             .setHTML('<div style="font-family:system-ui,sans-serif;font-size:12px"><strong>' + place + '</strong><br/>' +
-                     ${JSON.stringify(variableLabel)} + ': ' + p.label + '</div>')
+                     variableLabel + ': ' + p.label + '</div>')
             .addTo(map);
         });
         map.on('mouseenter', 'forecast-fill', function () { map.getCanvas().style.cursor = 'pointer'; });
@@ -304,16 +342,31 @@ export function MapLibreChoropleth({
   const theme = useTheme();
   const webViewRef = useRef<WebView>(null);
 
-  // Rebuild the document only when the rendered data actually changes —
-  // otherwise every parent re-render would remount the map and lose the
-  // user's pan/zoom position.
-  const html = useMemo(
-    () => buildHtml({ cells, min, max, geography, height, variableLabel, valueFormat, isTercile, palette, stops }),
-    // `palette` belongs here: without it the document kept the default
-    // three-colour ramp while the legend showed the variable's own five-band
-    // one, so the map and its key disagreed about what a colour meant.
-    [cells, min, max, geography, height, variableLabel, valueFormat, isTercile, palette, stops],
+  const [documentReady, setDocumentReady] = useState(false);
+
+  // The document depends on the boundary level only. It used to depend on the
+  // cells too, so every variable, period or view change reloaded the whole map.
+  const html = useMemo(() => buildHtml(geography), [geography]);
+
+  // A new document has not said it is ready yet. Adjusted during render rather
+  // than in an effect, so no push is aimed at the page being replaced.
+  const [htmlShown, setHtmlShown] = useState(html);
+  if (htmlShown !== html) {
+    setHtmlShown(html);
+    setDocumentReady(false);
+  }
+
+  // `palette` belongs here: without it the map kept the default three-colour
+  // ramp while the legend showed the variable's own five-band one, so the map
+  // and its key disagreed about what a colour meant.
+  const dataScript = useMemo(
+    () => buildDataScript({ cells, min, max, variableLabel, valueFormat, isTercile, palette, stops }),
+    [cells, min, max, variableLabel, valueFormat, isTercile, palette, stops],
   );
+
+  useEffect(() => {
+    if (documentReady) webViewRef.current?.injectJavaScript(dataScript);
+  }, [documentReady, dataScript]);
 
   /**
    * Push the selected outline into the running map.
@@ -336,7 +389,7 @@ export function MapLibreChoropleth({
       `(function(){var f=${JSON.stringify(filter)};` +
         `if(window.__setSelected){window.__setSelected(f);}else{window.__pendingSelected=f;}})();true;`,
     );
-  }, [selected, geography, html]);
+  }, [selected, geography, html, documentReady]);
 
   /**
    * The WebView's only channel back.
@@ -350,6 +403,10 @@ export function MapLibreChoropleth({
       try {
         const payload = JSON.parse(event.nativeEvent.data) as Partial<MapSelection> & { type?: string };
 
+        if (payload.type === 'ready') {
+          setDocumentReady(true);
+          return;
+        }
         if (payload.type === 'dismiss') {
           onDismiss?.();
           return;

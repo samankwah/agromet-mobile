@@ -39,18 +39,19 @@ export function buildSubseasonalCells(
 ): SpatialGridCell[] {
   if (modelCells.length === 0) return [];
 
+  const covering = coveringCells(modelCells);
   const cells: SpatialGridCell[] = [];
-  for (const cell of GHANA_BOUNDARIES.grid) {
+  GHANA_BOUNDARIES.grid.forEach((cell, index) => {
     // Region view still requires a region; district view additionally requires a
     // district, so a cell the boundary build could not place is never drawn.
-    if (!cell.regionName) continue;
-    if (geography === 'district' && !cell.districtName) continue;
+    if (!cell.regionName) return;
+    if (geography === 'district' && !cell.districtName) return;
 
-    const reading = readingFor(cellAt(modelCells, cell.lat, cell.lng), variable);
-    if (!reading) continue;
+    const reading = readingFor(covering[index], variable);
+    if (!reading) return;
 
     const value = view === 'probability' ? probabilityValue(reading) : reading.value;
-    if (value === null) continue;
+    if (value === null) return;
 
     cells.push({
       id: cell.id,
@@ -60,8 +61,28 @@ export function buildSubseasonalCells(
       districtName: cell.districtName,
       value,
     });
-  }
+  });
   return cells;
+}
+
+const coveringByField = new WeakMap<SubseasonalCell[], (SubseasonalCell | undefined)[]>();
+
+/**
+ * The model cell covering each display cell, in `GHANA_BOUNDARIES.grid` order.
+ *
+ * The nearest-cell search is 865 display cells against 165 model cells, about
+ * 143,000 distance checks, and it used to run again on every variable, view or
+ * geography toggle. None of those change which model cell covers which display
+ * cell; only a new field does. So it is worked out once per field, keyed by the
+ * array itself, and forgotten with it.
+ */
+function coveringCells(modelCells: SubseasonalCell[]): (SubseasonalCell | undefined)[] {
+  let covering = coveringByField.get(modelCells);
+  if (!covering) {
+    covering = GHANA_BOUNDARIES.grid.map((cell) => cellAt(modelCells, cell.lat, cell.lng));
+    coveringByField.set(modelCells, covering);
+  }
+  return covering;
 }
 
 function readingFor(cell: SubseasonalCell | undefined, variable: SubseasonalVariableId) {
@@ -96,12 +117,8 @@ export function deterministicRange(cells: SpatialGridCell[]): { min: number; max
  * Falls back to the other name rather than to nothing: an unlabelled panel is
  * worse than a coarser label.
  */
-export function selectionPlaceName(
-  selection: { region: string | null; district: string | null },
-  geography: SpatialGeography,
-): string {
-  const [preferred, fallback] =
-    geography === 'district' ? [selection.district, selection.region] : [selection.region, selection.district];
+export function selectionPlaceName(selection: { region: string | null; district: string | null }, geography: SpatialGeography): string {
+  const [preferred, fallback] = geography === 'district' ? [selection.district, selection.region] : [selection.region, selection.district];
 
   return preferred ?? fallback ?? 'Selected area';
 }

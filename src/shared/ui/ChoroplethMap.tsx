@@ -36,7 +36,16 @@ type Props = {
  * so a full map library would be unjustified weight for what's actually
  * needed here.
  */
-export function ChoroplethMap({ cells, min, max, geography, height, isTercile = false, palette, stops }: Props) {
+export const ChoroplethMap = React.memo(function ChoroplethMap({
+  cells,
+  min,
+  max,
+  geography,
+  height,
+  isTercile = false,
+  palette,
+  stops,
+}: Props) {
   const theme = useTheme();
   const { width } = useWindowDimensions();
 
@@ -64,29 +73,37 @@ export function ChoroplethMap({ cells, min, max, geography, height, isTercile = 
     return Math.max(Math.abs(adjacent.x - origin.x), Math.abs(origin.y - adjacent.y));
   }, [project]);
 
+  // Up to 865 squares, each projected and classed. Built once per change in the
+  // data or the frame, not on every render of the screen around the map.
+  const rects = useMemo(
+    () =>
+      cells.map((cell) => {
+        const point = project(cell.lng, cell.lat);
+        return (
+          <Rect
+            key={cell.id}
+            x={point.x - cellSizePx / 2}
+            y={point.y - cellSizePx / 2}
+            width={cellSizePx}
+            height={cellSizePx}
+            fill={
+              isTercile
+                ? (categories[cell.value]?.color ?? categories[neutralIndex].color)
+                : valueToClassColor(cell.value, min, max, undefined, stops)
+            }
+          />
+        );
+      }),
+    [cells, project, cellSizePx, isTercile, categories, neutralIndex, min, max, stops],
+  );
+
   return (
     <View style={{ width: '100%', height, backgroundColor: theme.colors.bg }}>
       <Svg width={width} height={height}>
-        {cells.map((cell) => {
-          const point = project(cell.lng, cell.lat);
-          return (
-            <Rect
-              key={cell.id}
-              x={point.x - cellSizePx / 2}
-              y={point.y - cellSizePx / 2}
-              width={cellSizePx}
-              height={cellSizePx}
-              fill={
-                isTercile
-                  ? (categories[cell.value]?.color ?? categories[neutralIndex].color)
-                  : valueToClassColor(cell.value, min, max, undefined, stops)
-              }
-            />
-          );
-        })}
+        {rects}
         <Path d={internalBoundaryPath} stroke={theme.colors.surfaceStrong} strokeWidth={0.75} fill="none" opacity={0.6} />
         <Path d={countryPath} stroke={theme.colors.text} strokeWidth={1.5} fill="none" />
       </Svg>
     </View>
   );
-}
+});
