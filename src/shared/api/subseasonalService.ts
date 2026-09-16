@@ -33,6 +33,8 @@ type ApiCell = {
 type ApiPayload = {
   cells: ApiCell[];
   unavailable: boolean;
+  fetchFailed: boolean;
+  computing: boolean;
   issuedAt: string | null;
   windowStart: string;
   windowEnd: string;
@@ -47,6 +49,8 @@ export async function getSubseasonalOutlookSet(): Promise<SubseasonalOutlookSet>
   return {
     cells: (payload.cells ?? []) as SubseasonalCell[],
     unavailable: Boolean(payload.unavailable),
+    fetchFailed: Boolean(payload.fetchFailed),
+    computing: Boolean(payload.computing),
     issuedAt: payload.issuedAt ?? null,
     windowStart: payload.windowStart,
     windowEnd: payload.windowEnd,
@@ -112,7 +116,16 @@ export function cellAt(cells: SubseasonalCell[], lat: number, lng: number): Subs
 export async function getSubseasonalOutlook(locationId: string): Promise<SubseasonalOutlook> {
   const set = await getSubseasonalOutlookSet();
   if (set.unavailable) {
-    throw new ServiceError('No subseasonal outlook has been computed yet.');
+    // `computing` first: a refresh already running is the one case where the
+    // reader has to do nothing at all, so it must not be described as a failure
+    // even though the last attempt may well have failed.
+    throw new ServiceError(
+      set.computing
+        ? 'The weeks 2 to 4 outlook is being prepared. It will be ready in a moment.'
+        : set.fetchFailed
+          ? 'The weather service did not answer. Try again in a moment.'
+          : 'No subseasonal outlook has been computed yet.',
+    );
   }
 
   const place = HOME_LOCATIONS.find((entry) => entry.id === locationId);

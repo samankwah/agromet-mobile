@@ -50,6 +50,10 @@ export function useForecastsData() {
     queryKey: ['subseasonalOutlook', locationId],
     queryFn: () => getSubseasonalOutlook(locationId),
     enabled: hasHydrated,
+    // This one throws on an empty field rather than returning a flag, so the
+    // poll has to key off the error. Same bounded wait as the map above.
+    refetchInterval: (query) =>
+      query.state.status === 'error' && /being prepared/.test(String(query.state.error)) ? 4000 : false,
   });
 
   // The national picture behind the map. Its own key rather than a slice of the
@@ -60,6 +64,11 @@ export function useForecastsData() {
     queryKey: ['subseasonalOutlookSet'],
     queryFn: getSubseasonalOutlookSet,
     enabled: hasHydrated,
+    // The server starts the 165-point fetch without waiting for it, so the first
+    // response on a cold cache is legitimately empty and a few seconds early.
+    // Polling only while that is true turns a dead end into a short wait: the
+    // map fills itself in, and the interval stops the moment it does.
+    refetchInterval: (query) => (query.state.data?.computing ? 4000 : false),
   });
 
   const seasonal = useQuery({

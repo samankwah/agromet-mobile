@@ -78,6 +78,18 @@ export type SubseasonalOutlookSet = {
   cells: SubseasonalCell[];
   /** True when nothing could be computed at all. */
   unavailable: boolean;
+  /**
+   * True when the emptiness is a failed fetch rather than work not yet done.
+   * Both arrive as `unavailable`, and they need opposite copy: one is worth
+   * retrying now, the other is not.
+   */
+  fetchFailed: boolean;
+  /**
+   * True while the server is fetching the field right now. The empty response is
+   * then a "not yet" that fixes itself, so the screen waits rather than offering
+   * a retry for work already under way.
+   */
+  computing: boolean;
   issuedAt: string | null;
   windowStart: string;
   windowEnd: string;
