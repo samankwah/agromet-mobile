@@ -1,11 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { getDayDetail } from '../../../shared/api/forecastService';
+import { getForecastDetail, pickDay } from '../../../shared/api/forecastService';
 import type { DailyForecast, HourlyForecast, WeeklyForecast } from '../../../shared/domain/forecast';
 import { useLocationStore } from '../../../shared/state/locationStore';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -87,10 +87,25 @@ export function DayDetailScreen({ date }: Props) {
   const [tempMode, setTempMode] = useState(0);
   const [metric, setMetric] = useState<MetricId>('conditions');
 
+  // Keyed by town, not by date. The date used to be in the key, so every day
+  // the reader tapped downloaded the whole week again to show a slice of data
+  // the screen already had.
   const query = useQuery({
-    queryKey: ['dayDetail', locationId, selectedDate],
-    queryFn: () => getDayDetail(locationId, selectedDate),
+    queryKey: ['forecastDetail', locationId],
+    queryFn: () => getForecastDetail(locationId),
   });
+
+  const picked = useMemo(() => {
+    if (!query.data) return { data: undefined, error: undefined };
+    try {
+      return { data: pickDay(query.data, locationId, selectedDate), error: undefined };
+    } catch (error) {
+      return { data: undefined, error };
+    }
+  }, [query.data, locationId, selectedDate]);
+
+  const status = query.status === 'success' && picked.error ? 'error' : query.status;
+  const data = picked.data;
 
   return (
     // Full-bleed so the header can span edge to edge and the charts aren't
@@ -110,16 +125,16 @@ export function DayDetailScreen({ date }: Props) {
         }}
       >
         <AsyncStateView
-          status={query.status}
-          error={query.error}
+          status={status}
+          error={picked.error ?? query.error}
           onRetry={query.refetch}
           skeleton={<DayDetailSkeleton chartWidth={width - theme.spacing.lg * 2} />}
         >
-          {query.data ? (
+          {data ? (
             <DayDetail
-              day={query.data.day}
-              hours={query.data.hours}
-              week={query.data.week}
+              day={data.day}
+              hours={data.hours}
+              week={data.week}
               selectedDate={selectedDate}
               onSelectDate={setSelectedDate}
               tempMode={tempMode}

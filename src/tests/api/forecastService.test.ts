@@ -1,4 +1,5 @@
 import { getHourlyForecast, getSeasonalOutlook, getWeeklyForecast } from '../../shared/api/forecastService';
+import { getCurrentConditions } from '../../shared/api/weatherService';
 import { buildOpenMeteoFixture, stubWeatherFetch } from '../fixtures/openMeteo';
 
 // Open-Meteo, stubbed. Without this the suite makes a live request per test —
@@ -72,5 +73,23 @@ describe('forecastService', () => {
   it('getSeasonalOutlook always carries a non-empty plain-language summary', async () => {
     const outlook = await getSeasonalOutlook('northern');
     expect(outlook.plainLanguageSummary.length).toBeGreaterThan(0);
+  });
+});
+
+describe('the shared weather bundle', () => {
+  it('is downloaded once when several forecast queries start together', async () => {
+    // Current conditions, the hourly strip and the week are separate queries
+    // that all fire when the Forecasts tab mounts. They used to fetch the same
+    // ~40 KB bundle three times over.
+    const fetchMock = stubWeatherFetch();
+    await Promise.all([getCurrentConditions('accra'), getHourlyForecast('accra'), getWeeklyForecast('accra')]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('is not kept once settled, so a later refetch gets fresh data', async () => {
+    const fetchMock = stubWeatherFetch();
+    await getWeeklyForecast('accra');
+    await getWeeklyForecast('accra');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
