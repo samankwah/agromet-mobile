@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
 
 import { useReduceMotion } from '../../../shared/a11y/useReduceMotion';
-import { getCarouselConditions } from '../../../shared/api/weatherService';
+import { getCarouselConditions, type BriefConditions } from '../../../shared/api/weatherService';
 import { HOME_LOCATIONS } from '../../../shared/data/mockWeather';
 import { useLocationStore } from '../../../shared/state/locationStore';
 import { useSettingsStore } from '../../../shared/state/settingsStore';
@@ -159,63 +159,25 @@ export function CityCarousel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFlowing, hasHydrated, selectedIndex, cardWidth]);
 
-  const renderCard = (location: (typeof HOME_LOCATIONS)[number], copy = 0) => {
-    const isSelected = location.id === selectedLocationId;
-    const conditions = strip.data?.[location.id];
-    // `focus`/`onFocus`, not `accent`/`onAccent`: the same selected-chip pair
-    // the tab bar's highlight uses, so "the one you picked" looks the same
-    // wherever the app asks you to pick. `onFocus` is near-black because the
-    // fill is a pale ice blue — the old white would be invisible on it.
-    const fg = isSelected ? theme.colors.onFocus : theme.colors.text;
+  const chooseTown = useCallback(
+    (locationId: string) => {
+      takeOver();
+      setSelectedLocationId(locationId);
+    },
+    [takeOver, setSelectedLocationId],
+  );
 
-    return (
-      <Pressable
-        key={`${location.id}-${copy}`}
-        onPress={() => {
-          takeOver();
-          setSelectedLocationId(location.id);
-        }}
-        accessibilityRole="radio"
-        accessibilityState={{ selected: isSelected }}
-        accessibilityLabel={`${location.name}${conditions ? `, ${formatTemperature(conditions.temperatureC)}, ${conditions.condition}` : ''}`}
-      >
-        {({ pressed }) => (
-          // Chrome on a View, never on the Pressable — Button.tsx documents why:
-          // Android drops a Pressable's own background and border while still
-          // drawing its children. This component used to style the Pressable
-          // directly and got away with it only because the style was a static
-          // object; a pressed state makes it a function, which is the case that
-          // breaks.
-          // The selected town presses into the strip and keeps its highlight
-          // fill, so the state never rests on the shadow alone.
-          <Surface
-            depth={isSelected || pressed ? 'sunken' : 'raised'}
-            level="sm"
-            radius={theme.radii.lg}
-            background={isSelected ? theme.colors.focus : theme.colors.surface}
-            borderColor={isSelected ? theme.colors.focusRim : theme.colors.border}
-            style={{
-              width: cardWidth,
-              // An exact height, not a minimum: the row's layout maths is built
-              // on every card being this tall, so one that grew would break the
-              // marquee's cycle width.
-              height: cardHeight,
-              paddingHorizontal: theme.spacing.md,
-              justifyContent: 'center',
-              gap: theme.spacing.xs,
-            }}
-          >
-            <Text variant="bodyStrong" color={fg} numberOfLines={1}>
-              {location.name}
-            </Text>
-            <Text variant="body" color={fg}>
-              {conditions ? formatTemperature(conditions.temperatureC) : '…'}
-            </Text>
-          </Surface>
-        )}
-      </Pressable>
-    );
-  };
+  const renderCard = (location: (typeof HOME_LOCATIONS)[number], copy = 0) => (
+    <CityCard
+      key={`${location.id}-${copy}`}
+      location={location}
+      isSelected={location.id === selectedLocationId}
+      conditions={strip.data?.[location.id]}
+      onChoose={chooseTown}
+      width={cardWidth}
+      height={cardHeight}
+    />
+  );
 
   // Runs to both screen edges instead of stopping at the page gutter, so cards
   // travel off the edge rather than vanishing at an invisible margin. The
@@ -268,3 +230,76 @@ export function CityCarousel() {
     </ScrollView>
   );
 }
+
+type CityCardProps = {
+  location: (typeof HOME_LOCATIONS)[number];
+  isSelected: boolean;
+  conditions: BriefConditions | undefined;
+  onChoose: (locationId: string) => void;
+  width: number;
+  height: number;
+};
+
+/**
+ * One town. Memoized because the flowing strip renders every town twice, over
+ * sixty cards, and picking a town used to re-render all of them to change two.
+ * Every prop is stable between renders unless that card's own state changed.
+ */
+const CityCard = React.memo(function CityCard({ location, isSelected, conditions, onChoose, width, height }: CityCardProps) {
+  const theme = useTheme();
+  // `focus`/`onFocus`, not `accent`/`onAccent`: the same selected-chip pair
+  // the tab bar's highlight uses, so "the one you picked" looks the same
+  // wherever the app asks you to pick. `onFocus` is near-black because the
+  // fill is a pale ice blue — the old white would be invisible on it.
+  const fg = isSelected ? theme.colors.onFocus : theme.colors.text;
+
+  return (
+    <Pressable
+      onPress={() => onChoose(location.id)}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: isSelected }}
+      accessibilityLabel={`${location.name}${conditions ? `, ${formatTemperature(conditions.temperatureC)}, ${conditions.condition}` : ''}`}
+    >
+      {({ pressed }) => (
+        // Chrome on a View, never on the Pressable — Button.tsx documents why:
+        // Android drops a Pressable's own background and border while still
+        // drawing its children. This component used to style the Pressable
+        // directly and got away with it only because the style was a static
+        // object; a pressed state makes it a function, which is the case that
+        // breaks.
+        // The selected town presses into the strip and keeps its highlight
+        // fill, so the state never rests on the shadow alone.
+        //
+        // `lifted` rather than `raised` at rest: one blurred layer instead of
+        // two, on a row of over sixty cards that is moving the whole time Home
+        // is open. The dropped half is the highlight, which is near-white on a
+        // near-white page and all but invisible here, while the blur it cost
+        // was redrawn on every frame of the flow.
+        <Surface
+          depth={isSelected || pressed ? 'sunken' : 'lifted'}
+          level="sm"
+          radius={theme.radii.lg}
+          background={isSelected ? theme.colors.focus : theme.colors.surface}
+          borderColor={isSelected ? theme.colors.focusRim : theme.colors.border}
+          style={{
+            width,
+            // An exact height, not a minimum: the row's layout maths is built
+            // on every card being this tall, so one that grew would break the
+            // marquee's cycle width.
+            height,
+            paddingHorizontal: theme.spacing.md,
+            justifyContent: 'center',
+            gap: theme.spacing.xs,
+          }}
+        >
+          <Text variant="bodyStrong" color={fg} numberOfLines={1}>
+            {location.name}
+          </Text>
+          <Text variant="body" color={fg}>
+            {conditions ? formatTemperature(conditions.temperatureC) : '…'}
+          </Text>
+        </Surface>
+      )}
+    </Pressable>
+  );
+});

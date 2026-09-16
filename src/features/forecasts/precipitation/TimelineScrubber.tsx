@@ -37,7 +37,9 @@ function clockTime(iso: string): string {
  */
 export function TimelineScrubber({ frames, index, playing, reduceMotion, span, nowIso, onSeek }: Props) {
   const [trackWidth, setTrackWidth] = useState(0);
-  const fillWidth = useRef(new Animated.Value(0)).current;
+  /** How far along the fill is, 0 to 1. A fraction rather than a width, so a
+   * relayout does not leave it pointing at the old track. */
+  const progress = useRef(new Animated.Value(0)).current;
 
   const fractions = useMemo(() => frames.map((_, i) => timeFraction(frames, i)), [frames]);
 
@@ -52,19 +54,22 @@ export function TimelineScrubber({ frames, index, playing, reduceMotion, span, n
   // The fill glides on the frame's own dwell so it arrives exactly as the next
   // frame paints. Under reduced motion, and when paused, it simply jumps.
   useEffect(() => {
-    const target = (fractions[index] ?? 0) * trackWidth;
+    const target = fractions[index] ?? 0;
     if (reduceMotion || !playing) {
-      fillWidth.setValue(target);
+      progress.setValue(target);
       return;
     }
-    Animated.timing(fillWidth, {
+    Animated.timing(progress, {
       toValue: target,
       duration: dwellMs(frames[index] ?? frames[0], span),
       easing: Easing.linear,
-      // Width cannot be driven natively, so this one stays on the JS driver.
-      useNativeDriver: false,
+      // A scale, not a width, so this runs on the native driver. Animating the
+      // width meant a JavaScript tick and a layout pass on every frame for as
+      // long as the timeline played, on the same thread that is also stepping
+      // the map through its frames.
+      useNativeDriver: true,
     }).start();
-  }, [index, fractions, trackWidth, reduceMotion, playing, fillWidth, frames, span]);
+  }, [index, fractions, reduceMotion, playing, progress, frames, span]);
 
   const panResponder = useMemo(
     () =>
@@ -123,7 +128,10 @@ export function TimelineScrubber({ frames, index, playing, reduceMotion, span, n
             position: 'absolute',
             left: 0,
             height: LINE_HEIGHT,
-            width: fillWidth,
+            width: trackWidth,
+            // Grows from the left edge rather than from the middle.
+            transformOrigin: 'left',
+            transform: [{ scaleX: progress }],
             borderRadius: LINE_HEIGHT / 2,
             backgroundColor: '#ffffff',
           }}
@@ -141,8 +149,7 @@ export function TimelineScrubber({ frames, index, playing, reduceMotion, span, n
               // The difference between a measurement and a forecast is the most
               // important thing this strip has to say.
               height: frame.kind === 'observed' ? 12 : 8,
-              backgroundColor:
-                frame.kind === 'observed' ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.28)',
+              backgroundColor: frame.kind === 'observed' ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.28)',
             }}
           />
         ))}

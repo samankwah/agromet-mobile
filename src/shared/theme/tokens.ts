@@ -330,8 +330,40 @@ export type ShadowPair = {
   inset?: boolean;
 }[];
 
+const shadowCache = new WeakMap<NeuTokens, Map<string, ShadowPair>>();
+
+/**
+ * One shadow array per scheme, helper and level, built once and handed out
+ * again on every later call.
+ *
+ * Every `Surface` asks for its shadow on every render, and there are well over
+ * a hundred of them. A new array each time is a new style value each time, so
+ * React Native diffed and re-sent every blurred shadow to the native side even
+ * when nothing about it had changed. The same array is an unchanged prop.
+ *
+ * Frozen because it is shared: spreading or filtering it is fine, but a caller
+ * that pushed onto it would change every surface in the app.
+ */
+function memoShadow(tokens: NeuTokens, key: string, build: () => ShadowPair): ShadowPair {
+  let byKey = shadowCache.get(tokens);
+  if (!byKey) {
+    byKey = new Map();
+    shadowCache.set(tokens, byKey);
+  }
+  let shadow = byKey.get(key);
+  if (!shadow) {
+    shadow = Object.freeze(build().map((layer) => Object.freeze(layer))) as ShadowPair;
+    byKey.set(key, shadow);
+  }
+  return shadow;
+}
+
 /** A surface standing forward of the page. */
 export function raised(tokens: NeuTokens, level: DepthLevel = 'md'): ShadowPair {
+  return memoShadow(tokens, `raised:${level}`, () => buildRaised(tokens, level));
+}
+
+function buildRaised(tokens: NeuTokens, level: DepthLevel): ShadowPair {
   const { offset, blur } = DEPTH[level];
   return [
     { offsetX: offset, offsetY: offset, blurRadius: blur, color: tokens.shadowDark },
@@ -356,8 +388,10 @@ export function raised(tokens: NeuTokens, level: DepthLevel = 'md'): ShadowPair 
  * where every other surface puts it.
  */
 export function lifted(tokens: NeuTokens, level: DepthLevel = 'md'): ShadowPair {
-  const { offset, blur } = DEPTH[level];
-  return [{ offsetX: offset, offsetY: offset, blurRadius: blur, color: tokens.shadowDark }];
+  return memoShadow(tokens, `lifted:${level}`, () => {
+    const { offset, blur } = DEPTH[level];
+    return [{ offsetX: offset, offsetY: offset, blurRadius: blur, color: tokens.shadowDark }];
+  });
 }
 
 /**
@@ -378,19 +412,23 @@ export function lifted(tokens: NeuTokens, level: DepthLevel = 'md'): ShadowPair 
  * so it still follows the scheme.
  */
 export function cast(tokens: NeuTokens, from: 'top' | 'bottom' | 'left' | 'right', level: DepthLevel = 'md'): ShadowPair {
-  const { offset, blur } = DEPTH[level];
-  // The panel is anchored to `from`, so the shadow falls away from that edge.
-  const away = { top: [0, offset], bottom: [0, -offset], left: [offset, 0], right: [-offset, 0] }[from];
-  return [{ offsetX: away[0], offsetY: away[1], blurRadius: blur * 1.75, color: tokens.shadowDark }];
+  return memoShadow(tokens, `cast:${from}:${level}`, () => {
+    const { offset, blur } = DEPTH[level];
+    // The panel is anchored to `from`, so the shadow falls away from that edge.
+    const away = { top: [0, offset], bottom: [0, -offset], left: [offset, 0], right: [-offset, 0] }[from];
+    return [{ offsetX: away[0], offsetY: away[1], blurRadius: blur * 1.75, color: tokens.shadowDark }];
+  });
 }
 
 /** The same pair thrown inward — a well, a track, or a control being pressed. */
 export function sunken(tokens: NeuTokens, level: DepthLevel = 'md'): ShadowPair {
-  const { offset, blur } = DEPTH[level];
-  return [
-    { offsetX: offset, offsetY: offset, blurRadius: blur, color: tokens.shadowDark, inset: true },
-    { offsetX: -offset, offsetY: -offset, blurRadius: blur, color: tokens.shadowLight, inset: true },
-  ];
+  return memoShadow(tokens, `sunken:${level}`, () => {
+    const { offset, blur } = DEPTH[level];
+    return [
+      { offsetX: offset, offsetY: offset, blurRadius: blur, color: tokens.shadowDark, inset: true },
+      { offsetX: -offset, offsetY: -offset, blurRadius: blur, color: tokens.shadowLight, inset: true },
+    ];
+  });
 }
 
 /** Font family names as exported by @expo-google-fonts/*. Loaded once via
