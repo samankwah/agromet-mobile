@@ -1,7 +1,14 @@
 import { useCallback, useEffect } from 'react';
 import { Pressable, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavigationThemeProvider, router } from 'expo-router';
+import {
+  DarkTheme,
+  DefaultTheme,
+  Stack,
+  ThemeProvider as NavigationThemeProvider,
+  router,
+  type ErrorBoundaryProps,
+} from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -13,12 +20,16 @@ import { NotoSans_400Regular, NotoSans_600SemiBold } from '@expo-google-fonts/no
 
 import { Text } from '../src/shared/ui/Text';
 import { bindQueryClientToDevice, queryClient } from '../src/shared/api/queryClient';
+import { initMonitoring, reportError, withMonitoring } from '../src/shared/monitoring/sentry';
+import { AppErrorScreen } from '../src/shared/ui/AppErrorScreen';
 import { useOnboardingStore } from '../src/shared/state/onboardingStore';
 import { WelcomeScreen } from '../src/features/onboarding/WelcomeScreen';
 import { ThemeProvider, useTheme } from '../src/shared/theme/ThemeProvider';
 import { OfflineBanner } from '../src/shared/ui/OfflineBanner';
 import { useReminderNotifications } from '../src/features/farm-tools/reminders/useReminderNotifications';
 
+// Before anything else renders, so an error during the first render is caught.
+initMonitoring();
 bindQueryClientToDevice();
 
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -35,7 +46,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {
  * screen until the brand fonts are ready so there's no flash of the
  * system font on a slow first load.
  */
-export default function RootLayout() {
+function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     SpaceGrotesk_700Bold,
     SpaceGrotesk_500Medium,
@@ -78,6 +89,45 @@ export default function RootLayout() {
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+  );
+}
+
+export default withMonitoring(RootLayout);
+
+/**
+ * The app-wide error screen, in place of a white screen.
+ *
+ * expo-router renders a layout's `ErrorBoundary` export when anything beneath
+ * that layout throws while rendering. It replaces the layout, providers and all,
+ * so this brings its own safe-area and theme providers rather than assuming the
+ * ones above survived.
+ *
+ * Reported once per error. "Go to Home" leaves the failed route first and then
+ * clears the error, so the boundary does not simply re-render the screen that
+ * just broke.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  useEffect(() => {
+    reportError(error, { boundary: 'root' });
+  }, [error]);
+
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <AppErrorScreen
+          onRetry={retry}
+          onGoHome={async () => {
+            try {
+              router.replace('/');
+            } catch {
+              // No navigator to go through (the error was above it). Retrying is
+              // still the right next step.
+            }
+            await retry();
+          }}
+        />
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
 
