@@ -6,7 +6,6 @@ import type { ArchivedAdvisory } from '../../../shared/domain/weeklyAdvisory';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../../shared/ui/AsyncStateView';
 import { Card } from '../../../shared/ui/Card';
-import { MockDataTag } from '../../../shared/ui/MockDataTag';
 import { Screen } from '../../../shared/ui/Screen';
 import { Text } from '../../../shared/ui/Text';
 import { formatRelativeTime } from '../../../shared/utils/formatRelativeTime';
@@ -178,17 +177,13 @@ export function AdvisoryArchiveScreen() {
           skeleton={<ArchiveSkeleton />}
         >
           <View style={{ flex: 1, gap: theme.spacing.lg }}>
-            {/* Three situations, three different things to say. A single generic
-                "nothing here" would leave a farmer unable to tell an unpublished
-                district from a lost connection. */}
-            {fallback !== null ? (
+            {/* A lost connection is worth saying: it is the one the farmer can
+                fix. A saved copy says how old it is. */}
+            {fallback === 'offline' ? (
               <Card style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
                 <Text variant="body" muted style={{ flex: 1 }}>
-                  {fallback === 'empty'
-                    ? 'Nothing has been published yet. These are samples, showing what will appear once your extension office uploads an advisory.'
-                    : 'The server could not be reached, so these are samples rather than your own advisories.'}
+                  Could not reach the AgroMet server. Check your connection.
                 </Text>
-                <MockDataTag />
               </Card>
             ) : archive.usingCachedFallback ? (
               <Text variant="caption" muted>

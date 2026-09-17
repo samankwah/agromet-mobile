@@ -7,26 +7,20 @@ import { Card } from '../../../../shared/ui/Card';
 import { Text } from '../../../../shared/ui/Text';
 
 /**
- * Says, in words, why what's on screen isn't live.
- *
- * The MockDataTag alone is a dev-only marker and disappears in a release
- * build. This is the user-facing half, and it exists as much for the
- * developer as the farmer: "couldn't reach the server" on screen is what
- * stops a misconfigured API address from looking like a working app.
+ * Says when the server could not be reached, which is the one fallback the
+ * farmer can act on. It is also what stops a misconfigured API address from
+ * looking like a working app. Nothing is shown when the server simply has no
+ * calendars published.
  */
 export function SampleDataNotice({ reason }: { reason: FallbackReason }) {
   const theme = useTheme();
-  if (!reason) return null;
-
-  const offline = reason === 'offline';
+  if (reason !== 'offline') return null;
 
   return (
     <Card style={{ flexDirection: 'row', gap: theme.spacing.sm, alignItems: 'flex-start' }}>
-      <Ionicons name={offline ? 'cloud-offline-outline' : 'information-circle-outline'} size={18} color={theme.colors.muted} />
+      <Ionicons name="cloud-offline-outline" size={18} color={theme.colors.muted} />
       <Text variant="caption" muted style={{ flex: 1 }}>
-        {offline
-          ? 'Could not reach the AgroMet server, so these are sample calendars. Check your connection. The published calendars for your district may differ.'
-          : 'No calendars have been published for this yet, so these are samples to show what a calendar looks like.'}
+        Could not reach the AgroMet server. Check your connection.
       </Text>
     </Card>
   );

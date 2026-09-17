@@ -48,7 +48,6 @@ export function AdvisoryTeaserCard({ advisory, status, error, onRetry }: Props) 
           href="/advisory/crop"
           action="Read advisory"
           accessibilityLabel={`This week's advisory: ${advisory.title}. ${advisory.summary}`}
-          notice="Sample advisory"
         >
           <Text variant="h3" numberOfLines={2}>
             {advisory.title}

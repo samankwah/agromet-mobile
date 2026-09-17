@@ -373,10 +373,12 @@ describe('CalendarDetailScreen', () => {
     expect(screen.queryByText(/^\d{2}-\d{2}$/)).toBeNull();
   });
 
-  it('labels sample data rather than passing it off as live', async () => {
+  it('shows no sample or mock-data tag on a calendar', async () => {
+    // Product decision: seeded calendars carry no "sample" label. What is still
+    // said is the one thing a farmer can act on, a lost connection.
     renderScreen(<CalendarDetailScreen id="sample-broiler-cycle" />);
 
     expect(await screen.findByText('Broiler Production Cycle')).toBeTruthy();
-    expect(screen.getByText('Mock data')).toBeTruthy();
+    expect(screen.queryByText(/mock data|samples?/i)).toBeNull();
   });
 });

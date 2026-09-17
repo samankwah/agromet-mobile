@@ -13,7 +13,6 @@ import { Drawer } from '../../../shared/ui/Drawer';
 import { Dropdown } from '../../../shared/ui/Dropdown';
 import { FieldLabel } from '../../../shared/ui/FieldLabel';
 import { MapLibreChoropleth } from '../../../shared/ui/MapLibreChoropleth';
-import { MockDataTag } from '../../../shared/ui/MockDataTag';
 import { SegmentedControl } from '../../../shared/ui/SegmentedControl';
 import { Text } from '../../../shared/ui/Text';
 import { useSpatialOutlookData } from './useSpatialOutlookData';
@@ -173,7 +172,6 @@ export function SpatialOutlookView({ seasonal }: Props) {
             </View>
           ) : null}
 
-          <MockDataTag />
         </View>
       </Drawer>
     </View>

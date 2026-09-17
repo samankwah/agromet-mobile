@@ -91,17 +91,19 @@ describe('AdvisoryArchiveScreen', () => {
      same news, and a farmer needs to be able to tell them apart. */
   it('says the server was unreachable rather than that nothing is published', async () => {
     renderScreen();
-    await screen.findByText(/could not be reached/i);
+    await screen.findByText(/Could not reach the AgroMet server/i);
 
     expect(screen.queryByText(/Nothing has been published yet/i)).toBeNull();
   });
 
-  it('says nothing is published when the server answers with an empty archive', async () => {
+  it('shows no notice or sample label when the server answers with an empty archive', async () => {
+    // The connection is fine, so there is nothing for the farmer to act on.
     respondWith({ success: true, data: [] });
     renderScreen();
-    await screen.findByText(/Nothing has been published yet/i);
+    await screen.findByText('2026');
 
-    expect(screen.getByText(/once your extension office uploads an advisory/i)).toBeTruthy();
+    expect(screen.queryByText(/Could not reach the AgroMet server/i)).toBeNull();
+    expect(screen.queryByText(/samples?/i)).toBeNull();
   });
 
   it('renders real records without any sample notice', async () => {
@@ -128,7 +130,7 @@ describe('AdvisoryArchiveScreen', () => {
 
     // readableName strips the "REG05/" prefix the uploader leaves behind.
     expect(screen.getByText(/Ho Municipal, Volta Region/)).toBeTruthy();
-    expect(screen.queryByText(/could not be reached/i)).toBeNull();
+    expect(screen.queryByText(/Could not reach the AgroMet server/i)).toBeNull();
     expect(screen.queryByText(/Nothing has been published yet/i)).toBeNull();
   });
 

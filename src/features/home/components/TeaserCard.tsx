@@ -6,7 +6,6 @@ import { router, type Href } from 'expo-router';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Card } from '../../../shared/ui/Card';
 import { Divider } from '../../../shared/ui/Divider';
-import { SampleContentNotice } from '../../../shared/ui/SampleContentNotice';
 import { Text } from '../../../shared/ui/Text';
 
 type Props = {
@@ -19,8 +18,6 @@ type Props = {
   action: string;
   /** The whole card is one button, so it needs one spoken description. */
   accessibilityLabel: string;
-  /** Set when the content is a sample rather than something GMet issued. */
-  notice?: string;
   children: React.ReactNode;
 };
 
@@ -39,7 +36,7 @@ type Props = {
  * balances it against an explicit affordance, so a card that is a link finally
  * looks like one.
  */
-export function TeaserCard({ label, trailing, href, action, accessibilityLabel, notice, children }: Props) {
+export function TeaserCard({ label, trailing, href, action, accessibilityLabel, children }: Props) {
   const theme = useTheme();
 
   return (
@@ -63,8 +60,7 @@ export function TeaserCard({ label, trailing, href, action, accessibilityLabel, 
             <Divider />
           </View>
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: theme.spacing.sm }}>
-            {notice ? <SampleContentNotice text={notice} /> : <View />}
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: theme.spacing.sm }}>
             {/* Decorative: the Pressable above already carries the spoken
                 label, so reading this again would say the card twice. */}
             <View

@@ -376,10 +376,12 @@ describe('WeeklyAdvisoryScreen — every field is its own control', () => {
 });
 
 describe('WeeklyAdvisoryScreen — saying where the data came from', () => {
-  it('says the server could not be reached, rather than passing samples off as published', async () => {
+  it('says the server could not be reached, and which district the bulletin was written for', async () => {
     renderScreen('crop');
     await selectCrop();
 
-    expect(screen.getByText(/could not be reached/)).toBeTruthy();
+    expect(screen.getByText(/Could not reach the AgroMet server/)).toBeTruthy();
+    expect(screen.getByText(/The bulletin below was written for/)).toBeTruthy();
+    expect(screen.queryByText(/sample/i)).toBeNull();
   });
 });

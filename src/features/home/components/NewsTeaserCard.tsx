@@ -46,7 +46,6 @@ export function NewsTeaserCard({ news, status, error, onRetry }: Props) {
           href="/(tabs)/advisories"
           action="More updates"
           accessibilityLabel={`Latest news, ${formatRelativeTime(news.publishedAt)}: ${news.title}. ${news.summary}`}
-          notice="Sample update"
         >
           <Text variant="h3" numberOfLines={2}>
             {news.title}

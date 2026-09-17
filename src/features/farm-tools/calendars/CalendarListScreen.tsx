@@ -7,7 +7,6 @@ import type { Calendar, CalendarKind } from '../../../shared/domain/calendar';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../../shared/ui/AsyncStateView';
 import { Card } from '../../../shared/ui/Card';
-import { MockDataTag } from '../../../shared/ui/MockDataTag';
 import { Screen } from '../../../shared/ui/Screen';
 import { Text } from '../../../shared/ui/Text';
 import { formatRelativeTime } from '../../../shared/utils/formatRelativeTime';
@@ -125,10 +124,7 @@ export function CalendarListScreen({ kind }: Props) {
           ) : null}
 
           {ready && visible.length > 0 && isSample ? (
-            <>
-              <SampleDataNotice reason={fallback ?? 'empty'} />
-              <MockDataTag />
-            </>
+            <SampleDataNotice reason={fallback ?? 'empty'} />
           ) : null}
         </View>
       </AsyncStateView>
