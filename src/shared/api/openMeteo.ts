@@ -1,7 +1,7 @@
 import type { CurrentWeather } from '../domain/currentWeather';
 import type { DailyForecast, HourlyForecast, WeeklyForecast } from '../domain/forecast';
 import { buildWeekSummary, describeDay } from '../utils/weatherNarrative';
-import { getJson, NetworkError } from './http';
+import { fetchWithTimeout, getJson, NetworkError } from './http';
 
 /**
  * Open-Meteo, and the one place its shape becomes this app's shape.
@@ -109,7 +109,26 @@ function round1(value: number): number {
  * route around it. Silently bypassing a 500 would hide the outage that caused
  * it.
  */
-export async function fetchWeatherBundle(lat: number, lng: number): Promise<OpenMeteoBundle> {
+export function fetchWeatherBundle(lat: number, lng: number): Promise<OpenMeteoBundle> {
+  // Current conditions, the hourly strip, the week and the alert banner are
+  // separate queries, and on first mount they all fire at once for the same
+  // town. Each one used to download this whole bundle for itself: three
+  // identical ~40 KB requests on the Forecasts tab, two on Home. Sharing the
+  // request while it is in flight turns those into one, without tying the
+  // queries' own caching together. Settled requests are not kept: freshness is
+  // the query cache's job, not this module's.
+  const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+  const pending = inFlight.get(key);
+  if (pending) return pending;
+
+  const request = loadWeatherBundle(lat, lng).finally(() => inFlight.delete(key));
+  inFlight.set(key, request);
+  return request;
+}
+
+const inFlight = new Map<string, Promise<OpenMeteoBundle>>();
+
+async function loadWeatherBundle(lat: number, lng: number): Promise<OpenMeteoBundle> {
   try {
     // `getJson` unwraps the `{ success, data }` envelope for us, so this is
     // already the bundle — not the envelope. Checking `.data` here instead
@@ -140,7 +159,7 @@ async function fetchDirect(lat: number, lng: number): Promise<OpenMeteoBundle> {
 
   let response: Response;
   try {
-    response = await fetch(`${OPEN_METEO_URL}?${params.toString()}`);
+    response = await fetchWithTimeout(`${OPEN_METEO_URL}?${params.toString()}`);
   } catch {
     throw new NetworkError('Could not reach the weather service. Check your connection and try again.');
   }
@@ -173,9 +192,7 @@ async function fetchDirect(lat: number, lng: number): Promise<OpenMeteoBundle> {
  */
 export type BriefConditions = { temperatureC: number; condition: string };
 
-export async function fetchCurrentBatch(
-  points: { lat: number; lng: number }[],
-): Promise<(BriefConditions | null)[]> {
+export async function fetchCurrentBatch(points: { lat: number; lng: number }[]): Promise<(BriefConditions | null)[]> {
   if (points.length === 0) return [];
 
   const params = new URLSearchParams({
@@ -187,7 +204,7 @@ export async function fetchCurrentBatch(
 
   let response: Response;
   try {
-    response = await fetch(`${OPEN_METEO_URL}?${params.toString()}`);
+    response = await fetchWithTimeout(`${OPEN_METEO_URL}?${params.toString()}`);
   } catch {
     throw new NetworkError('Could not reach the weather service. Check your connection and try again.');
   }

@@ -7,7 +7,6 @@ import { AsyncStateView } from '../../../shared/ui/AsyncStateView';
 import { BulletList } from '../../../shared/ui/BulletList';
 import { Card } from '../../../shared/ui/Card';
 import { ConfidenceBadge } from '../../../shared/ui/ConfidenceBadge';
-import { MockDataTag } from '../../../shared/ui/MockDataTag';
 import { Text } from '../../../shared/ui/Text';
 import { OutlookCategoryStat } from './OutlookCategoryStat';
 import { SubseasonalOutlookSkeleton } from './ForecastSkeletons';
@@ -55,7 +54,6 @@ export function SubseasonalOutlookCard({ outlook, status, error, onRetry }: Prop
             </Text>
             <BulletList items={outlook.farmerActionCard.actions} accent />
           </View>
-          <MockDataTag />
         </Card>
       ) : null}
     </AsyncStateView>

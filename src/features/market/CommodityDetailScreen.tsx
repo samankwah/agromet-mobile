@@ -15,8 +15,7 @@ import { Dropdown } from '../../shared/ui/Dropdown';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { LineAreaChart } from '../../shared/ui/LineAreaChart';
 import { Screen } from '../../shared/ui/Screen';
-import { ArrowDown, ArrowUp, TrendDown, TrendUp } from 'phosphor-react-native';
-
+import { ArrowDown, ArrowUp, TrendDown, TrendUp } from '../../shared/ui/phosphorIcons';
 import { StatTile } from '../../shared/ui/StatTile';
 import { Text } from '../../shared/ui/Text';
 import { buildMarketOrderUrl, canPlaceOrder } from '../../shared/utils/buildMarketOrderText';

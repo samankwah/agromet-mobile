@@ -154,3 +154,21 @@ describe('the scheme tokens', () => {
     expect(Object.keys(neu).sort()).toEqual(['dark', 'light']);
   });
 });
+
+describe('shadow identity', () => {
+  /* Every Surface asks for its shadow on every render. A fresh array each time
+     is a changed style prop each time, which re-sends the blurred shadow to the
+     native side for nothing. */
+  it('hands back the same array for the same scheme and level', () => {
+    expect(raised(neu.light, 'md')).toBe(raised(neu.light, 'md'));
+    expect(sunken(neu.dark, 'sm')).toBe(sunken(neu.dark, 'sm'));
+    expect(lifted(neu.light, 'lg')).toBe(lifted(neu.light, 'lg'));
+    expect(cast(neu.light, 'bottom', 'md')).toBe(cast(neu.light, 'bottom', 'md'));
+  });
+
+  it('keeps schemes, levels and edges apart', () => {
+    expect(raised(neu.light, 'md')).not.toBe(raised(neu.dark, 'md'));
+    expect(raised(neu.light, 'md')).not.toBe(raised(neu.light, 'lg'));
+    expect(cast(neu.light, 'top', 'md')).not.toBe(cast(neu.light, 'bottom', 'md'));
+  });
+});

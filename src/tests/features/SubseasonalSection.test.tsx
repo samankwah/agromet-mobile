@@ -52,6 +52,8 @@ function set(withProbabilities: boolean): SubseasonalOutlookSet {
   return {
     cells: [cell(withProbabilities)],
     unavailable: false,
+    fetchFailed: false,
+    computing: false,
     issuedAt: '2026-08-24T00:00:00Z',
     windowStart: '2026-09-07',
     windowEnd: '2026-09-21',
@@ -65,6 +67,9 @@ type RenderOverrides = {
   outlookStatus?: 'pending' | 'error' | 'success';
   outlookError?: unknown;
   onRetryOutlook?: () => void;
+  /** Replaces the whole field, for the states that have no cells at all. */
+  set?: SubseasonalOutlookSet;
+  onRetry?: () => void;
 };
 
 function renderSection(withProbabilities: boolean, overrides: RenderOverrides = {}) {
@@ -74,9 +79,9 @@ function renderSection(withProbabilities: boolean, overrides: RenderOverrides = 
         <QueryClientProvider client={client}>
           <SubseasonalSection
             outlook={undefined}
-            set={set(withProbabilities)}
+            set={overrides.set ?? set(withProbabilities)}
             status="success"
-            onRetry={() => {}}
+            onRetry={overrides.onRetry ?? (() => {})}
             outlookStatus={overrides.outlookStatus ?? 'success'}
             outlookError={overrides.outlookError}
             onRetryOutlook={overrides.onRetryOutlook ?? (() => {})}
@@ -153,6 +158,67 @@ describe('the empty probability view', () => {
     fireEvent.press(getByLabelText('Forecast view').findByProps({ accessibilityLabel: 'Probability' }));
 
     expect(queryByText(/below/i)).toBeNull();
+  });
+});
+
+/**
+ * A failed fetch is not an empty forecast.
+ *
+ * Both reach this screen as `unavailable`, and both used to read "No outlook has
+ * been computed yet", which tells a farmer the outlook does not exist and that
+ * waiting is the only option. When the real cause is a refused upstream call
+ * (Open-Meteo rate-limits the 165-point ensemble), the useful instruction is the
+ * opposite one: try again now. So the copy follows `fetchFailed`.
+ */
+describe('the failed-fetch empty state', () => {
+  function failedSet(): SubseasonalOutlookSet {
+    return { ...set(false), cells: [], unavailable: true, fetchFailed: true };
+  }
+
+  it('says the service did not answer rather than that nothing was computed', () => {
+    const { getByText, queryByText } = renderSection(false, { set: failedSet() });
+
+    expect(getByText('The weather service did not answer')).toBeTruthy();
+    expect(queryByText('No outlook has been computed yet')).toBeNull();
+  });
+
+  it('offers a retry, because this is the state where retrying works', () => {
+    const onRetry = jest.fn();
+    const { getByText } = renderSection(false, { set: failedSet(), onRetry });
+
+    fireEvent.press(getByText('Try again'));
+
+    expect(onRetry).toHaveBeenCalled();
+  });
+
+  it('does not offer the ensemble average, which is just as empty', () => {
+    // The deterministic view is the escape from a *missing baseline*. With no
+    // cells at all there is nothing to switch to, so offering it would be a
+    // button that changes nothing.
+    const { queryByText } = renderSection(false, { set: failedSet() });
+
+    expect(queryByText('Show the ensemble average')).toBeNull();
+  });
+
+  it('waits rather than offering a retry while the server is still fetching', () => {
+    // The server now starts the fetch and answers immediately, so an empty first
+    // response is normal and self-correcting. Calling that a failure, or handing
+    // the reader a button, would both be wrong.
+    const preparing = { ...set(false), cells: [], unavailable: true, fetchFailed: true, computing: true };
+    const { getByText, queryByText } = renderSection(false, { set: preparing });
+
+    expect(getByText('Getting the outlook ready')).toBeTruthy();
+    expect(queryByText('Try again')).toBeNull();
+    // `computing` outranks `fetchFailed`, which is set from the attempt before.
+    expect(queryByText('The weather service did not answer')).toBeNull();
+  });
+
+  it('still says "not computed yet" when the cache is genuinely empty', () => {
+    const empty = { ...set(false), cells: [], unavailable: true, fetchFailed: false };
+    const { getByText, queryByText } = renderSection(false, { set: empty });
+
+    expect(getByText('No outlook has been computed yet')).toBeTruthy();
+    expect(queryByText('The weather service did not answer')).toBeNull();
   });
 });
 

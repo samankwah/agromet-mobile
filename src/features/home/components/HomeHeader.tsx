@@ -3,8 +3,9 @@ import { Image } from 'react-native';
 
 import { AppHeader } from '../../../shared/ui/AppHeader';
 
-/** The lockup is 1958x679 in assets/agromet-logo.png; the width below is that
- * ratio. Taller than the 36pt badge it replaced: with the app's name and
+/** The lockup's ratio is 1958:679, the size of the original artwork; the width
+ * below keeps it. The file itself is 554x192, four times the height it is drawn
+ * at: the original decoded to about 5 MB of bitmap to show a 48pt logo. Taller than the 36pt badge it replaced: with the app's name and
  * tagline gone from the row, there is nothing beside it to crowd, and it is
  * the only thing on Home that says whose app this is. */
 const LOGO_HEIGHT = 48;

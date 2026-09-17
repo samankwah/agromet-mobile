@@ -63,6 +63,31 @@ export async function getWeeklyForecast(locationId: string): Promise<WeeklyForec
   return getWeekly(locationId);
 }
 
+/** Everything the day-detail screen can show for a town: the week, and every
+ * hourly step in it. One download serves every day the reader taps through;
+ * `pickDay` below cuts out the one they are looking at. */
+export async function getForecastDetail(locationId: string): Promise<{ week: WeeklyForecast; hours: HourlyForecast[] }> {
+  const place = placeFor(locationId);
+  const bundle = await fetchWeatherBundle(place.lat, place.lng);
+  return { week: toWeeklyForecast(bundle, locationId), hours: toHourlyForecasts(bundle, locationId) };
+}
+
+/** One day out of `getForecastDetail`, with its own 24 hours. Throws when the
+ * week has no such date, the same failure `getDayDetail` reports. */
+export function pickDay(
+  detail: { week: WeeklyForecast; hours: HourlyForecast[] },
+  locationId: string,
+  date: string,
+): { day: DailyForecast; hours: HourlyForecast[]; week: WeeklyForecast } {
+  const day = detail.week.days.find((entry) => entry.date === date);
+  if (!day) {
+    throw new ServiceError(`No forecast for ${date} at location "${locationId}"`);
+  }
+  // The bundle carries the whole week's hours; take the requested day's.
+  const hours = detail.hours.filter((hour) => hour.hour.startsWith(date));
+  return { day, hours, week: detail.week };
+}
+
 /** A single day from the week, with its full 24 hourly steps — what the
  * day-detail screen charts. Returns both together so the screen can't end
  * up rendering a chart for one day beside a header for another. */
@@ -70,18 +95,7 @@ export async function getDayDetail(
   locationId: string,
   date: string,
 ): Promise<{ day: DailyForecast; hours: HourlyForecast[]; week: WeeklyForecast }> {
-  const place = placeFor(locationId);
-  const bundle = await fetchWeatherBundle(place.lat, place.lng);
-
-  const week = toWeeklyForecast(bundle, locationId);
-  const day = week.days.find((entry) => entry.date === date);
-  if (!day) {
-    throw new ServiceError(`No forecast for ${date} at location "${locationId}"`);
-  }
-
-  // The bundle carries the whole week's hours; take the requested day's.
-  const hours = toHourlyForecasts(bundle, locationId).filter((hour) => hour.hour.startsWith(date));
-  return { day, hours, week };
+  return pickDay(await getForecastDetail(locationId), locationId, date);
 }
 
 /** The Forecasts tab's "Today" section — the next six hours.

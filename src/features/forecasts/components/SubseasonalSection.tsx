@@ -138,6 +138,17 @@ export function SubseasonalSection({
 
   const isEmpty = Boolean(set?.unavailable) || cells.length === 0;
 
+  // A failed fetch and an uncomputed outlook both arrive empty, and the old copy
+  // called both "not computed yet" -- which reads as "come back tomorrow" when
+  // the truth is "the server could not reach the model, tap Retry". The backend
+  // now says which one it is, so the reader gets the sentence that matches.
+  const fetchFailed = Boolean(set?.fetchFailed);
+
+  // Ordered deliberately: a refresh already running outranks the failure that
+  // may have preceded it, because the reader has nothing to do but wait, and the
+  // query is polling on their behalf.
+  const computing = Boolean(set?.computing);
+
   // Selecting a place opens the drawer at its detail: a chart behind a collapsed
   // drawer would be a tap that appears to do nothing.
   const handleSelect = useCallback((next: MapSelection) => {
@@ -194,19 +205,36 @@ export function SubseasonalSection({
             // ensemble sees no signal" look identical on a map and mean opposite
             // things.
             <EmptyState
-              icon="calendar-outline"
-              title={isProbability ? 'No probabilities have been computed yet' : 'No outlook has been computed yet'}
+              icon={computing ? 'time-outline' : fetchFailed ? 'cloud-offline-outline' : 'calendar-outline'}
+              title={
+                computing
+                  ? 'Getting the outlook ready'
+                  : fetchFailed
+                    ? 'The weather service did not answer'
+                    : isProbability
+                      ? 'No probabilities have been computed yet'
+                      : 'No outlook has been computed yet'
+              }
               message={
-                isProbability
-                  ? 'The tercile baseline is still being built. The ensemble average needs no baseline and is ready now.'
-                  : 'The weeks 2 to 4 outlook could not be computed. The Today and 7-Day forecasts are unaffected.'
+                computing
+                  ? 'The weeks 2 to 4 outlook covers the whole country, so it takes a few seconds to build. This will fill in on its own.'
+                  : fetchFailed
+                    ? 'The weeks 2 to 4 outlook could not be fetched. Try again in a moment. The Today and 7-Day forecasts are unaffected.'
+                    : isProbability
+                      ? 'The tercile baseline is still being built. The ensemble average needs no baseline and is ready now.'
+                      : 'The weeks 2 to 4 outlook could not be computed. The Today and 7-Day forecasts are unaffected.'
               }
             >
               {/* The action itself, not directions to it. Telling a reader to
                   "switch below" points at a control inside the drawer, which is
                   hidden whenever the drawer is collapsed -- advice they cannot
                   follow, on the one screen with nothing else to do. */}
-              {isProbability ? (
+              {/* No button while it is being prepared: the query is already
+                  polling, so a Retry would either do nothing visible or invite
+                  the reader to hammer an endpoint that is working. */}
+              {computing ? null : fetchFailed ? (
+                <Button label="Try again" variant="outline" onPress={onRetry} />
+              ) : isProbability ? (
                 <Button
                   label="Show the ensemble average"
                   variant="outline"

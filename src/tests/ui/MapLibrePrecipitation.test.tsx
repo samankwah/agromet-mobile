@@ -104,11 +104,11 @@ function signalReady(tree: unknown) {
 beforeEach(() => mockInject.mockClear());
 
 describe('MapLibrePrecipitation', () => {
-  /* The load-bearing property of this component. `MapLibreChoropleth` rebuilds
-     its document whenever its data changes, which reloads the basemap and
-     throws away the reader's pan and zoom. On a map that changes several times
-     a second that would be fatal, so the document must be byte-identical across
-     a frame change and the frame must travel over the bridge instead. */
+  /* The load-bearing property of this component. A rebuilt document reloads
+     the basemap and throws away the reader's pan and zoom. On a map that
+     changes several times a second that would be fatal, so the document must
+     be byte-identical across a frame change and the frame must travel over the
+     bridge instead. `MapLibreChoropleth` now works the same way. */
   it('does not rebuild the document when the frame changes', () => {
     const view = renderMap(0);
     const before = htmlOf(view.toJSON());

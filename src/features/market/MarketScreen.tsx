@@ -8,7 +8,6 @@ import { useMarketRegionStore } from '../../shared/state/marketRegionStore';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../shared/ui/AsyncStateView';
 import { Dropdown } from '../../shared/ui/Dropdown';
-import { MockDataTag } from '../../shared/ui/MockDataTag';
 import { Screen } from '../../shared/ui/Screen';
 import { Text } from '../../shared/ui/Text';
 import { formatRelativeTime } from '../../shared/utils/formatRelativeTime';
@@ -124,20 +123,12 @@ export function MarketScreen() {
           Showing the prices saved {formatRelativeTime(cachedAt!)}. You are offline.
         </Text>
       ) : null}
-      {/* Both fallback reasons mean the same thing on screen: these are the
-          seeded prices, not live ones. Saying so beats silently passing them
-          off as current. */}
-      {data?.fallback ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-          <MockDataTag />
-          <Text variant="caption" muted style={{ flex: 1 }}>
-            {data.fallback === 'offline'
-              ? 'Showing sample prices. The AgroMet server could not be reached.'
-              : data.fallback === 'partial'
-                ? 'Some prices are samples. The server has not published every commodity yet.'
-                : 'Showing sample prices. The server has no market data published yet.'}
-          </Text>
-        </View>
+      {/* Only the connection is worth a sentence here: it is the one fallback
+          the farmer can do something about. */}
+      {data?.fallback === 'offline' ? (
+        <Text variant="caption" muted>
+          Could not reach the AgroMet server. Check your connection.
+        </Text>
       ) : null}
 
       {/* Filters */}

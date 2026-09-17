@@ -8,7 +8,6 @@ import { AsyncStateView } from '../../../shared/ui/AsyncStateView';
 import { Card } from '../../../shared/ui/Card';
 import { Button } from '../../../shared/ui/Button';
 import { Divider } from '../../../shared/ui/Divider';
-import { MockDataTag } from '../../../shared/ui/MockDataTag';
 import { Screen } from '../../../shared/ui/Screen';
 import { SegmentedControl } from '../../../shared/ui/SegmentedControl';
 import { Text } from '../../../shared/ui/Text';
@@ -147,12 +146,7 @@ export function CalendarDetailScreen({ id }: Props) {
               </View>
             )}
 
-            {fallback ? (
-              <>
-                <SampleDataNotice reason={fallback} />
-                <MockDataTag />
-              </>
-            ) : null}
+            <SampleDataNotice reason={fallback} />
 
             {/* Said once, plainly. A production calendar is a planning guide
                 built from a district's own schedule — it is not a forecast,

@@ -198,11 +198,14 @@ function FallbackNotice({
       ? 'anywhere in Ghana'
       : `for ${filter.subject || 'your crop'} in ${filter.district || 'your district'}`;
 
+  // No "sample" wording (the product decision), but the bulletin below was
+  // written for another district, and saying which one stays: that is a fact
+  // about where the advice applies, not a label on its quality.
   const message = usingCache
     ? 'Showing the copy saved on this phone. The server could not be reached.'
     : fallback === 'offline'
-      ? `The AgroMet server could not be reached, so this is a sample bulletin from ${origin}. It is here to show the layout, not to advise your farm.`
-      : `No advisory has been published ${scope} yet. Below is a sample written for ${origin}, so you can see what one looks like.`;
+      ? `Could not reach the AgroMet server. Check your connection. The bulletin below was written for ${origin}.`
+      : `No advisory has been published ${scope} yet. The bulletin below was written for ${origin}.`;
 
   return (
     <Card

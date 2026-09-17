@@ -1,4 +1,4 @@
-import { getJson, NetworkError } from '../http';
+import { fetchWithTimeout, getJson, NetworkError } from '../http';
 import { toUtcIso } from '../openMeteo';
 
 /**
@@ -78,6 +78,10 @@ export async function fetchPrecipField(
  * hours behind, so without the model's own recent hours the timeline has a hole
  * between the last measurement and now.
  */
+/** Several hundred locations in one response is a large body on a slow link,
+ * so the direct call gets more room than the default ten seconds. */
+const DIRECT_TIMEOUT_MS = 25_000;
+
 async function fetchDirect(
   grid: { lat: number; lng: number }[],
   options: { pastDays: number; forecastDays: number; stepDeg: number },
@@ -96,7 +100,7 @@ async function fetchDirect(
 
   let response: Response;
   try {
-    response = await fetch(`${FORECAST_URL}?${params.toString()}`);
+    response = await fetchWithTimeout(`${FORECAST_URL}?${params.toString()}`, undefined, DIRECT_TIMEOUT_MS);
   } catch {
     throw new NetworkError('Could not reach the forecast service. Check your connection and try again.');
   }
