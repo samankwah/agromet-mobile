@@ -12,7 +12,8 @@
       },
       "ios": {
         "simulator": false
-      }
+      },
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
@@ -21,13 +22,27 @@
       },
       "ios": {
         "simulator": false
+      },
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://agromet-backend.vercel.app",
+        "EXPO_PUBLIC_MARKET_WHATSAPP": "233243999631",
+        "EXPO_PUBLIC_SENTRY_DSN": "",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
       },
-      "autoIncrement": true
+      "autoIncrement": true,
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://agromet-backend.vercel.app",
+        "EXPO_PUBLIC_MARKET_WHATSAPP": "233243999631",
+        "EXPO_PUBLIC_SENTRY_DSN": "",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      }
     }
   },
   "submit": {

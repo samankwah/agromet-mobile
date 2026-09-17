@@ -3,13 +3,16 @@
     "name": "AgroMet Ghana",
     "slug": "agromet-ghana",
     "scheme": "agromet",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.agromet.ghana"
+      "bundleIdentifier": "com.agromet.ghana",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.agromet.ghana",
@@ -23,7 +26,6 @@
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.SCHEDULE_EXACT_ALARM",
-        "android.permission.USE_EXACT_ALARM",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
@@ -87,7 +89,8 @@
       "react-native-fast-tflite",
       "expo-sharing",
       "expo-status-bar",
-      "expo-asset"
+      "expo-asset",
+      "@sentry/react-native"
     ],
     "extra": {
       "router": {},
@@ -95,6 +98,14 @@
         "projectId": "4a713d46-adac-4cc4-b307-70aaaf115c54"
       }
     },
-    "owner": "byteshiftlab"
+    "owner": "byteshiftlab",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/4a713d46-adac-4cc4-b307-70aaaf115c54",
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD"
+    }
   }
 }
