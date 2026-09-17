@@ -27,7 +27,6 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://agromet-backend.vercel.app",
         "EXPO_PUBLIC_MARKET_WHATSAPP": "233243999631",
-        "EXPO_PUBLIC_SENTRY_DSN": "",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
@@ -40,7 +39,6 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://agromet-backend.vercel.app",
         "EXPO_PUBLIC_MARKET_WHATSAPP": "233243999631",
-        "EXPO_PUBLIC_SENTRY_DSN": "",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     }
