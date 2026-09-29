@@ -71,9 +71,21 @@ export type DiagnosisResult = {
    * parse; absent means `provider`.
    */
   source?: DiagnosisSource;
+  /** The on-device model's class id (e.g. `cmd`). Only set by the offline
+   * path; it is what the explanation request names the disease by. */
+  classId?: string;
+  /** Plain-words explanation written by the backend's language model from the
+   * bundled advice. Absent when there was no connection or the call failed,
+   * in which case the knowledge-base text is what the farmer reads. */
+  explanation?: string;
+  /** Where the action and prevention lists came from. Absent means the
+   * provider or, for offline records, the bundled knowledge base. */
+  adviceSource?: DiagnosisAdviceSource;
 };
 
 export type DiagnosisSource = 'provider' | 'offline-model';
+
+export type DiagnosisAdviceSource = 'knowledge-base' | 'ai';
 
 export function isDiagnosisUnavailable(value: DiagnosisResult | DiagnosisUnavailable): value is DiagnosisUnavailable {
   return 'status' in value && value.status === 'unavailable';

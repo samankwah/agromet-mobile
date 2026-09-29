@@ -51,7 +51,7 @@ export function DiagnoseScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const { submit, reset, result, unavailable, lastOutcome, isSubmitting, queuedCount, abandonedCount } =
+  const { submit, reset, result, unavailable, lastOutcome, isSubmitting, isExplaining, queuedCount, abandonedCount } =
     useDiagnose();
   const region = useLocationStore((state) => HOME_LOCATIONS.find((l) => l.id === state.selectedLocationId)?.region);
 
@@ -115,6 +115,7 @@ export function DiagnoseScreen() {
     return (
       <DiagnosisOutcome
         result={result}
+        isExplaining={isExplaining}
         unavailable={unavailable}
         request={{ crop, growthStage, symptoms: trimmedSymptoms, imageUri }}
         onStartOver={startOver}
@@ -331,11 +332,13 @@ function OfflineQueueNotice({ queuedCount, abandonedCount }: { queuedCount: numb
  */
 function DiagnosisOutcome({
   result,
+  isExplaining,
   unavailable,
   request,
   onStartOver,
 }: {
   result: ReturnType<typeof useDiagnose>['result'];
+  isExplaining: boolean;
   unavailable: ReturnType<typeof useDiagnose>['unavailable'];
   request: { crop: string; growthStage: string; symptoms: string; imageUri?: string };
   onStartOver: () => void;
@@ -346,7 +349,7 @@ function DiagnosisOutcome({
     <Screen>
       {result ? (
         <>
-          <DiagnosisResultCard result={result} />
+          <DiagnosisResultCard result={result} isExplaining={isExplaining} />
           <ShareWhatsAppButton result={result} request={request} />
         </>
       ) : unavailable ? (

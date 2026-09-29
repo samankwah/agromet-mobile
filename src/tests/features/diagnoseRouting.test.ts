@@ -26,6 +26,7 @@ jest.mock('../../shared/net/useNetworkStatus', () => ({
 
 jest.mock('../../shared/api/diagnosisService', () => ({
   submitDiagnosis: jest.fn(),
+  fetchDiagnosisExplanation: jest.fn(async () => null),
 }));
 
 jest.mock('../../features/farm-tools/diagnose/localModel', () => ({
@@ -37,6 +38,7 @@ jest.mock('../../features/farm-tools/diagnose/localModel', () => ({
 
 jest.mock('../../shared/storage/diagnosisHistory', () => ({
   recordDiagnosis: jest.fn(async () => undefined),
+  updateDiagnosis: jest.fn(async () => undefined),
 }));
 
 jest.mock('../../shared/storage/diagnosisQueue', () => ({
@@ -55,13 +57,13 @@ function mockIsOnline() {
 (globalThis as Record<string, unknown>).mockIsOnline = mockIsOnline;
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { submitDiagnosis } = require('../../shared/api/diagnosisService');
+const { submitDiagnosis, fetchDiagnosisExplanation } = require('../../shared/api/diagnosisService');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { diagnoseOffline } = require('../../features/farm-tools/diagnose/localModel');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { enqueueDiagnosisSubmission } = require('../../shared/storage/diagnosisQueue');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { recordDiagnosis } = require('../../shared/storage/diagnosisHistory');
+const { recordDiagnosis, updateDiagnosis } = require('../../shared/storage/diagnosisHistory');
 
 function cassavaRequest(overrides: Partial<DiagnosisRequest> = {}): DiagnosisRequest {
   return {
@@ -97,6 +99,7 @@ const clients: QueryClient[] = [];
 
 beforeEach(() => {
   jest.clearAllMocks();
+  fetchDiagnosisExplanation.mockResolvedValue(null);
   isOnline = true;
   useSettingsStore.setState({ preferOfflineDiagnosis: false });
 });
@@ -109,47 +112,100 @@ afterEach(() => {
   clients.length = 0;
 });
 
-describe('online', () => {
-  it('uses the provider and leaves the on-device model alone', async () => {
-    submitDiagnosis.mockResolvedValue(result('provider'));
-    const { rendered } = await submit(cassavaRequest());
+const EXPLANATION = {
+  explanation: 'Your cassava most likely has mosaic disease, a virus.',
+  immediateActions: ['Pull out the sick plants today.'],
+  preventionGuidance: ['Plant clean cuttings next time.'],
+  adviceSource: 'ai' as const,
+};
 
-    expect(submitDiagnosis).toHaveBeenCalled();
-    // The provider covers two dozen crops and returns treatment prose with its
-    // answer. Running the weaker engine when the stronger one is reachable
-    // would be a downgrade.
-    expect(diagnoseOffline).not.toHaveBeenCalled();
-    expect(rendered.current.lastOutcome).toBe('result');
-  });
-
-  it('does not second-guess a provider that declined to answer', async () => {
-    submitDiagnosis.mockResolvedValue(UNAVAILABLE);
-    const { rendered } = await submit(cassavaRequest());
-
-    // Letting the weaker model answer over the top of the stronger one's
-    // refusal is shopping for the reply we preferred.
-    expect(diagnoseOffline).not.toHaveBeenCalled();
-    expect(rendered.current.lastOutcome).toBe('unavailable');
-    expect(enqueueDiagnosisSubmission).not.toHaveBeenCalled();
-  });
-
-  it('falls back to the phone when the request fails mid-flight', async () => {
-    submitDiagnosis.mockRejectedValue(new Error('timeout'));
+describe('online, cassava', () => {
+  it('answers on the phone first and leaves the provider alone', async () => {
     diagnoseOffline.mockResolvedValue(result('offline-model'));
 
     const { rendered } = await submit(cassavaRequest());
 
-    // Appeared online, request died anyway. The phone can still answer.
+    // The CNN is the primary engine for the crop it was trained on.
+    expect(submitDiagnosis).not.toHaveBeenCalled();
     expect(rendered.current.lastOutcome).toBe('result');
+    expect(rendered.current.result?.source).toBe('offline-model');
+  });
+
+  it('swaps in the AI explanation when it arrives, on screen and in history', async () => {
+    diagnoseOffline.mockResolvedValue(result('offline-model'));
+    fetchDiagnosisExplanation.mockResolvedValue(EXPLANATION);
+
+    const { rendered } = await submit(cassavaRequest());
+
+    await waitFor(() => expect(rendered.current.result?.explanation).toBe(EXPLANATION.explanation));
+    expect(rendered.current.result?.immediateActions).toEqual(EXPLANATION.immediateActions);
+    // The disease name is the phone's, never the language model's.
+    expect(rendered.current.result?.likelyIssue).toBe('Cassava Mosaic Disease');
+    expect(updateDiagnosis).toHaveBeenCalledWith(expect.objectContaining({ id: 'diagnosis-1', adviceSource: 'ai' }));
+    await waitFor(() => expect(rendered.current.isExplaining).toBe(false));
+  });
+
+  it('keeps the phone answer as it is when no explanation comes back', async () => {
+    diagnoseOffline.mockResolvedValue(result('offline-model'));
+
+    const { rendered } = await submit(cassavaRequest());
+
+    await waitFor(() => expect(fetchDiagnosisExplanation).toHaveBeenCalled());
+    await waitFor(() => expect(rendered.current.isExplaining).toBe(false));
+    expect(rendered.current.result?.explanation).toBeUndefined();
+    expect(rendered.current.result?.immediateActions).toEqual(['Uproot severely stunted plants']);
+    expect(updateDiagnosis).not.toHaveBeenCalled();
+  });
+
+  it('goes to the provider when the phone will not commit to an answer', async () => {
+    diagnoseOffline.mockResolvedValue(UNAVAILABLE);
+    submitDiagnosis.mockResolvedValue(result('provider'));
+
+    const { rendered } = await submit(cassavaRequest());
+
+    expect(submitDiagnosis).toHaveBeenCalled();
+    expect(rendered.current.result?.source).toBe('provider');
+    // The explanation step is for the phone's answer only.
+    expect(fetchDiagnosisExplanation).not.toHaveBeenCalled();
+  });
+
+  it('queues when the phone declined and the provider request then fails', async () => {
+    diagnoseOffline.mockResolvedValue(UNAVAILABLE);
+    submitDiagnosis.mockRejectedValue(new Error('timeout'));
+
+    const { rendered } = await submit(cassavaRequest());
+
+    // One try on the phone, not a second one after the network fails.
+    expect(diagnoseOffline).toHaveBeenCalledTimes(1);
+    expect(enqueueDiagnosisSubmission).toHaveBeenCalled();
+    expect(rendered.current.lastOutcome).toBe('queued');
+  });
+});
+
+describe('online, other crops', () => {
+  it('uses the provider and never the on-device model', async () => {
+    submitDiagnosis.mockResolvedValue(result('provider'));
+    const { rendered } = await submit(cassavaRequest({ crop: 'maize' }));
+
+    expect(submitDiagnosis).toHaveBeenCalled();
+    expect(diagnoseOffline).not.toHaveBeenCalled();
+    expect(fetchDiagnosisExplanation).not.toHaveBeenCalled();
+    expect(rendered.current.lastOutcome).toBe('result');
+  });
+
+  it('reports a provider that declined to answer', async () => {
+    submitDiagnosis.mockResolvedValue(UNAVAILABLE);
+    const { rendered } = await submit(cassavaRequest({ crop: 'maize' }));
+
+    expect(rendered.current.lastOutcome).toBe('unavailable');
     expect(enqueueDiagnosisSubmission).not.toHaveBeenCalled();
   });
 
-  it('queues when the request fails and the crop is not cassava', async () => {
+  it('queues when the request fails', async () => {
     submitDiagnosis.mockRejectedValue(new Error('timeout'));
 
     const { rendered } = await submit(cassavaRequest({ crop: 'maize' }));
 
-    expect(diagnoseOffline).not.toHaveBeenCalled();
     expect(enqueueDiagnosisSubmission).toHaveBeenCalled();
     expect(rendered.current.lastOutcome).toBe('queued');
   });
@@ -172,6 +228,7 @@ describe('offline', () => {
     // the same photo into history.
     expect(enqueueDiagnosisSubmission).not.toHaveBeenCalled();
     expect(recordDiagnosis).toHaveBeenCalled();
+    expect(fetchDiagnosisExplanation).not.toHaveBeenCalled();
   });
 
   it('queues a crop the on-device model does not cover', async () => {
@@ -194,32 +251,21 @@ describe('offline', () => {
   });
 });
 
-describe('when the farmer prefers the on-device model', () => {
-  it('uses the phone even on a good connection', async () => {
+describe('with AI explanations turned off', () => {
+  beforeEach(() => {
     useSettingsStore.setState({ preferOfflineDiagnosis: true });
+  });
+
+  it('keeps the phone answer and asks for no explanation', async () => {
     diagnoseOffline.mockResolvedValue(result('offline-model'));
 
     const { rendered } = await submit(cassavaRequest());
 
-    // The whole point of the setting, and how the two engines get run over the
-    // same photograph for comparison.
-    expect(submitDiagnosis).not.toHaveBeenCalled();
     expect(rendered.current.lastOutcome).toBe('result');
+    expect(fetchDiagnosisExplanation).not.toHaveBeenCalled();
   });
 
-  it('still reaches the provider for a crop the phone cannot handle', async () => {
-    useSettingsStore.setState({ preferOfflineDiagnosis: true });
-    submitDiagnosis.mockResolvedValue(result('provider'));
-
-    await submit(cassavaRequest({ crop: 'maize' }));
-
-    // The preference is for the offline engine where it applies, not a refusal
-    // to use the network at all.
-    expect(submitDiagnosis).toHaveBeenCalled();
-  });
-
-  it('falls through to the provider when the phone declines', async () => {
-    useSettingsStore.setState({ preferOfflineDiagnosis: true });
+  it('still falls through to the provider when the phone declines', async () => {
     diagnoseOffline.mockResolvedValue(UNAVAILABLE);
     submitDiagnosis.mockResolvedValue(result('provider'));
 

@@ -31,14 +31,13 @@ export type UserSettings = {
   favouriteCrops: string[];
   livestockType: 'poultry' | 'none';
   /**
-   * Force crop diagnosis through the on-device cassava model even when there
-   * is a working connection.
+   * Keep a cassava diagnosis entirely on the phone: skip the call that asks
+   * the backend's language model to explain the on-device result.
    *
-   * Off by default, because the online provider covers more crops and returns
-   * better advice, so routing around it is a downgrade for an ordinary farmer.
-   * It is exposed anyway for two reasons: a farmer on a metered connection may
-   * genuinely prefer the answer that costs no data, and running both engines
-   * over the same photographs is how the two get compared at all.
+   * The name predates the change that made the on-device model the first
+   * choice for cassava, when this switch was what forced it. Kept so that
+   * saved settings still load; the meaning narrowed to the one network call
+   * that is left for it to control.
    */
   preferOfflineDiagnosis: boolean;
   notificationPrefs: NotificationPrefs;

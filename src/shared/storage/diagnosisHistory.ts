@@ -35,6 +35,18 @@ export async function recordDiagnosis(result: DiagnosisResult): Promise<void> {
   await setCached(KEY, [result, ...history].slice(0, MAX_ENTRIES));
 }
 
+/** Replace one saved result in place, keeping its position. Used when the AI
+ * explanation arrives after the result was already recorded. A result that is
+ * no longer in history (cleared in the meantime) is left gone. */
+export async function updateDiagnosis(result: DiagnosisResult): Promise<void> {
+  const history = await listDiagnosisHistory();
+  if (!history.some((entry) => entry.id === result.id)) return;
+  await setCached(
+    KEY,
+    history.map((entry) => (entry.id === result.id ? result : entry)),
+  );
+}
+
 export async function clearDiagnosisHistory(): Promise<void> {
   await setCached(KEY, []);
 }
