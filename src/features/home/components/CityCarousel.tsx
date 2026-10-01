@@ -8,6 +8,7 @@ import { getCarouselConditions, type BriefConditions } from '../../../shared/api
 import { HOME_LOCATIONS } from '../../../shared/data/mockWeather';
 import { useLocationStore } from '../../../shared/state/locationStore';
 import { useSettingsStore } from '../../../shared/state/settingsStore';
+import { tint } from '../../../shared/theme/blend';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Surface } from '../../../shared/ui/Surface';
 import { Text } from '../../../shared/ui/Text';
@@ -247,11 +248,11 @@ type CityCardProps = {
  */
 const CityCard = React.memo(function CityCard({ location, isSelected, conditions, onChoose, width, height }: CityCardProps) {
   const theme = useTheme();
-  // `focus`/`onFocus`, not `accent`/`onAccent`: the same selected-chip pair
-  // the tab bar's highlight uses, so "the one you picked" looks the same
-  // wherever the app asks you to pick. `onFocus` is near-black because the
-  // fill is a pale ice blue — the old white would be invisible on it.
-  const fg = isSelected ? theme.colors.onFocus : theme.colors.text;
+  // The same glass grey a selected SegmentedControl segment or tab shows
+  // (text at 24% over a 12% track, about 33% in all), so "the one you picked"
+  // looks the same wherever the app asks you to pick. Blended down to an
+  // opaque colour because the cards around it cast shadows (see blend.ts).
+  const selectedFill = tint(theme.colors.text, theme.colors.bg, 0.33);
 
   return (
     <Pressable
@@ -267,8 +268,12 @@ const CityCard = React.memo(function CityCard({ location, isSelected, conditions
         // directly and got away with it only because the style was a static
         // object; a pressed state makes it a function, which is the case that
         // breaks.
-        // The selected town presses into the strip and keeps its highlight
-        // fill, so the state never rests on the shadow alone.
+        // The selected town is flat and filled, with no rim, like the selected
+        // segment of a switch. The fill carries the state, never a shadow.
+        //
+        // Keyed on the selection so a newly picked town is a fresh view:
+        // Android draws a card square once its fill changes in place (see
+        // SegmentedControl).
         //
         // `lifted` rather than `raised` at rest: one blurred layer instead of
         // two, on a row of over sixty cards that is moving the whole time Home
@@ -276,11 +281,12 @@ const CityCard = React.memo(function CityCard({ location, isSelected, conditions
         // near-white page and all but invisible here, while the blur it cost
         // was redrawn on every frame of the flow.
         <Surface
-          depth={isSelected || pressed ? 'sunken' : 'lifted'}
+          key={isSelected ? 'selected' : 'idle'}
+          depth={isSelected ? 'flat' : pressed ? 'sunken' : 'lifted'}
           level="sm"
           radius={theme.radii.lg}
-          background={isSelected ? theme.colors.focus : theme.colors.surface}
-          borderColor={isSelected ? theme.colors.focusRim : theme.colors.border}
+          background={isSelected ? selectedFill : theme.colors.surface}
+          bordered={!isSelected}
           style={{
             width,
             // An exact height, not a minimum: the row's layout maths is built
@@ -292,10 +298,10 @@ const CityCard = React.memo(function CityCard({ location, isSelected, conditions
             gap: theme.spacing.xs,
           }}
         >
-          <Text variant="bodyStrong" color={fg} numberOfLines={1}>
+          <Text variant="bodyStrong" numberOfLines={1}>
             {location.name}
           </Text>
-          <Text variant="body" color={fg}>
+          <Text variant="body">
             {conditions ? formatTemperature(conditions.temperatureC) : '…'}
           </Text>
         </Surface>

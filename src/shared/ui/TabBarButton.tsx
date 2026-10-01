@@ -5,6 +5,7 @@ import { PlatformPressable } from 'expo-router/react-navigation';
 
 import { useTheme } from '../theme/ThemeProvider';
 import { Surface } from './Surface';
+import { TAB_BAR_PADDING } from './tabBarLayout';
 
 /**
  * One tab's button, carrying the selected tab's highlight.
@@ -14,17 +15,10 @@ import { Surface } from './Surface';
  * thing. This paints a filled block behind the focused tab's icon and label,
  * the way a selected chip works elsewhere in the app.
  *
- * The block is *sunken*, not raised. The bar itself is the raised thing; a tab
- * is selected by being pressed into it, which is the one place in the app
- * where the depth language carries a state rather than a hierarchy. The
- * `focus` fill still carries it on its own, so the state is never
- * shadow-only — which matters in sunlight, and for anyone who cannot see the
- * bevel at all.
- *
- * `colors.focus`/`onFocus` rather than `accent`/`onAccent`: those are the
- * palette's designated selected-chip pair, already used by SegmentedControl's
- * pill variant, and `onFocus` is scheme-independent so one active tint reads
- * correctly on the fill in both themes.
+ * The block matches SegmentedControl's selected segment: a flat capsule of the
+ * text colour at 24% over the bar's 12% track, with no rim and no shadow, so
+ * the tab bar and every switch in the app mark a selection the same way. The
+ * fill alone carries the state, never a shadow, which matters in sunlight.
  *
  * The fill stretches to the slot minus a fixed inset. Every slot is the same
  * width, so every highlight is too, and the selected block lands on the same
@@ -42,8 +36,15 @@ import { Surface } from './Surface';
  */
 
 /** How far the fill sits inside its slot, leaving a gutter between neighbours.
- * The pair of them comes to `spacing.sm`, the app's standard small gap. */
-const HIGHLIGHT_INSET = 4;
+ * Kept tight: "Farm Tools" is nearly as wide as its slot, and a wider gutter
+ * left the label running past the fill's rounded ends. */
+const HIGHLIGHT_INSET = 2;
+
+/** How far the fill reaches past the slot, up and down, into the bar's own
+ * padding. The icon and label together are taller than the slot, so a fill
+ * cut to the slot sat below the top of the icon and under the label. This
+ * leaves a 4dp gap to the bar's edge. */
+const HIGHLIGHT_OUTSET = TAB_BAR_PADDING - 4;
 
 /** The navigator's own per-tab padding (its `tabVerticalUiKit` style), cancelled
  * so the highlight spans the whole slot. Left in place it costs 5dp a side, and
@@ -65,19 +66,19 @@ export function TabBarButton({ children, style, ...props }: BottomTabBarButtonPr
           Card.tsx and CityCarousel document the same constraint. */}
       <View style={styles.item}>
         {focused ? (
+          // Mounted only while focused, so a newly selected tab is always a
+          // fresh view. Android draws a pill square when its fill changes in
+          // place (see SegmentedControl), which this sidesteps.
           <Surface
             pointerEvents="none"
-            depth="sunken"
+            depth="flat"
             level="sm"
-            radius={theme.radii.md}
-            background={theme.colors.focus}
-            // Rimmed, because the fill cannot do this alone. `focus` is a pale
-            // ice blue and the bar it sits on is `chrome`, which in the light
-            // scheme is pale too — about 1.07:1 between them. The border is
-            // what makes the active tab findable there; in dark the fill
-            // already carries it and the rim just tidies the edge.
-            bordered
-            borderColor={theme.colors.focusRim}
+            // A rounded rectangle, not a full capsule: at this height a
+            // capsule's ends are as deep as the slot is wide, which turns the
+            // fill into a near-circle that cuts the longer labels.
+            radius={theme.radii.lg}
+            background={theme.colors.text + '3D'}
+            bordered={false}
             style={styles.fill}
           />
         ) : null}
@@ -101,5 +102,5 @@ const styles = StyleSheet.create({
   },
   // Inset rather than absoluteFill: the fill is narrower than its slot, leaving
   // a gutter between neighbours.
-  fill: { position: 'absolute', top: 0, bottom: 0, left: HIGHLIGHT_INSET, right: HIGHLIGHT_INSET },
+  fill: { position: 'absolute', top: -HIGHLIGHT_OUTSET, bottom: -HIGHLIGHT_OUTSET, left: HIGHLIGHT_INSET, right: HIGHLIGHT_INSET },
 });

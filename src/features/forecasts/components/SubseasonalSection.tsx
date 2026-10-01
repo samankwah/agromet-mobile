@@ -296,13 +296,11 @@ export function SubseasonalSection({
               )}
 
               {/* Matches the Seasonal segment's own selector style
-                  (SpatialOutlookView) — a caps FieldLabel over a pill, no
-                  grid or card grouping them. Forecast View keeps the full
-                  width: "Deterministic" is the one label here too long to
-                  share a row and still read at full size — split three
-                  ways, each pill segment would get on the order of 50px.
-                  Geography and Variable both have short labels, so they
-                  share a row (grid 2) instead of each taking a full one. */}
+                  (SpatialOutlookView) — a caps FieldLabel over a pill, one
+                  full-width row each, no grid or card grouping them. Geography
+                  and Variable used to share a row, which left "Temperature"
+                  about 60px and shrank it below every other label in the
+                  drawer. A row each keeps all the labels at the same size. */}
               <View>
                 <FieldLabel>FORECAST VIEW</FieldLabel>
                 <SegmentedControl
@@ -310,35 +308,30 @@ export function SubseasonalSection({
                   selectedIndex={VIEWS.indexOf(view)}
                   onChange={setViewIndex}
                   accessibilityLabel="Forecast view"
-                  variant="pill"
                   equalWidth
                 />
               </View>
 
-              <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
-                <View style={{ flex: 1 }}>
-                  <FieldLabel>GEOGRAPHY</FieldLabel>
-                  <SegmentedControl
-                    segments={GEOGRAPHY_SEGMENTS}
-                    selectedIndex={geographyIndex}
-                    onChange={setGeographyIndex}
-                    accessibilityLabel="Geography"
-                    variant="pill"
-                    equalWidth
-                  />
-                </View>
+              <View>
+                <FieldLabel>GEOGRAPHY</FieldLabel>
+                <SegmentedControl
+                  segments={GEOGRAPHY_SEGMENTS}
+                  selectedIndex={geographyIndex}
+                  onChange={setGeographyIndex}
+                  accessibilityLabel="Geography"
+                  equalWidth
+                />
+              </View>
 
-                <View style={{ flex: 1 }}>
-                  <FieldLabel>VARIABLE</FieldLabel>
-                  <SegmentedControl
-                    segments={VARIABLE_SEGMENTS}
-                    selectedIndex={variableIndex}
-                    onChange={setVariableIndex}
-                    accessibilityLabel="Outlook variable"
-                    variant="pill"
-                    equalWidth
-                  />
-                </View>
+              <View>
+                <FieldLabel>VARIABLE</FieldLabel>
+                <SegmentedControl
+                  segments={VARIABLE_SEGMENTS}
+                  selectedIndex={variableIndex}
+                  onChange={setVariableIndex}
+                  accessibilityLabel="Outlook variable"
+                  equalWidth
+                />
               </View>
 
               {/* The reader's own town is a separate query from the map above,

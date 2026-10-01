@@ -129,7 +129,6 @@ export function SpatialOutlookView({ seasonal }: Props) {
               selectedIndex={forecastView === 'probability' ? 0 : 1}
               onChange={(index) => setForecastView(index === 0 ? 'probability' : 'deterministic')}
               accessibilityLabel="Forecast view"
-              variant="pill"
               equalWidth
             />
           </View>
@@ -141,7 +140,6 @@ export function SpatialOutlookView({ seasonal }: Props) {
               selectedIndex={geography === 'region' ? 0 : 1}
               onChange={(index) => setGeography(index === 0 ? 'region' : 'district')}
               accessibilityLabel="Geography level"
-              variant="pill"
               equalWidth
             />
           </View>
