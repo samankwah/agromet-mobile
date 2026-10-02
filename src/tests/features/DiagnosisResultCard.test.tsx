@@ -1,10 +1,14 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { DiagnosisResultCard } from '../../features/farm-tools/diagnose/components/DiagnosisResultCard';
 import type { DiagnosisResult } from '../../shared/domain/diagnosis';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
+
+const mockFetch = jest.fn();
+globalThis.fetch = mockFetch as unknown as typeof fetch;
 
 /**
  * Whether the card says which engine produced the answer.
@@ -93,7 +97,9 @@ describe('DiagnosisResultCard', () => {
     expect(await screen.findByText(/getting a simpler explanation/i)).toBeTruthy();
 
     rerender(
-      <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 400, height: 800 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}>
+      <SafeAreaProvider
+        initialMetrics={{ frame: { x: 0, y: 0, width: 400, height: 800 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}
+      >
         <ThemeProvider>
           <DiagnosisResultCard result={diagnosis({ source: 'offline-model' })} />
         </ThemeProvider>
@@ -101,5 +107,25 @@ describe('DiagnosisResultCard', () => {
     );
     expect(screen.queryByText(/getting a simpler explanation/i)).toBeNull();
     expect(screen.queryByText(/explained by ai/i)).toBeNull();
+  });
+  it('lets the farmer report the AI explanation without leaving the screen', async () => {
+    // Google Play's AI-generated content policy: an in-app way to flag it.
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockFetch.mockResolvedValue({ ok: true, status: 201, json: async () => ({ success: true, reference: 3 }) } as Response);
+    renderCard(diagnosis({ source: 'offline-model', explanation: 'Your cassava likely has mosaic disease.', adviceSource: 'ai' }));
+
+    fireEvent.press(await screen.findByRole('button', { name: 'Report this answer' }));
+    fireEvent.press(await screen.findByText('The answer is wrong'));
+
+    await waitFor(() => expect(alert).toHaveBeenCalledWith('Thank you', 'We will look at this answer.'));
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body).toEqual({ kind: 'diagnosis', reason: 'wrong', text: 'Your cassava likely has mosaic disease.' });
+    alert.mockRestore();
+  });
+
+  it('offers no report link when there is no AI text to report', async () => {
+    renderCard(diagnosis({ source: 'offline-model' }));
+    await screen.findByText(/Confirm with an extension officer/i);
+    expect(screen.queryByRole('button', { name: 'Report this answer' })).toBeNull();
   });
 });
