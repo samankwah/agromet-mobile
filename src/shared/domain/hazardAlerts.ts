@@ -112,7 +112,11 @@ export const ALERT_LEAD_TIME_MINUTES = 15;
 const HAZARD_LABEL: Record<HazardKind, string> = { flood: 'Flood', drought: 'Drought' };
 const HAZARD_NOUN: Record<HazardKind, string> = { flood: 'flood risk', drought: 'drought stress' };
 
-const slug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const slug = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 
 /**
  * A stable id, deliberately free of the band and the timestamp.
@@ -171,9 +175,7 @@ function certaintyFor(block: HazardBlock): 'likely' | 'possible' {
   const deepInBand = block.score >= floor + CERTAINTY_DEPTH_POINTS;
   // A driver with a null value contributed nothing measured, whatever score the
   // backend gave it.
-  const agreeing = block.drivers.filter(
-    (driver) => driver.value !== null && driver.score >= DRIVER_ELEVATED_SCORE,
-  ).length;
+  const agreeing = block.drivers.filter((driver) => driver.value !== null && driver.score >= DRIVER_ELEVATED_SCORE).length;
 
   return deepInBand && agreeing >= CERTAINTY_MIN_AGREEING_DRIVERS ? 'likely' : 'possible';
 }
@@ -215,9 +217,7 @@ function buildAlert(
     id: hazardAlertId(region.region, hazard),
     // A published bulletin's own words when there is one; otherwise a plain
     // description of what was measured. Never an invented event type.
-    headline: block.overridden && block.headline
-      ? block.headline
-      : `${bandLabel} ${HAZARD_NOUN[hazard]} in ${region.region}`,
+    headline: block.overridden && block.headline ? block.headline : `${bandLabel} ${HAZARD_NOUN[hazard]} in ${region.region}`,
     district,
     region: region.region,
     hazardType: HAZARD_LABEL[hazard],
@@ -240,8 +240,11 @@ function buildAlert(
     // heading must not present them as such.
     evidence: block.drivers.filter((driver) => driver.value !== null).map(evidenceLine),
     farmerActions: block.advisories,
+    // A bulletin credits the issuer it names. One that names none is credited
+    // as what it is, never to an agency: this app is not an official service
+    // and must not put words in one's mouth.
     source: block.overridden
-      ? (block.issuedBy ?? 'Ghana Meteorological Agency (GMet)')
+      ? (block.issuedBy ?? 'Published bulletin')
       : `${COMPUTED_ALERT_ATTRIBUTION} (${summary.sources.map((entry) => entry.label).join(', ')})`,
   };
 }
@@ -252,10 +255,7 @@ function buildAlert(
  * An empty selection returns alerts for every region, so the banner is not
  * blank before a farmer has chosen anything — the behaviour the mock had.
  */
-export function synthesiseAlerts(
-  summary: HazardSummary | undefined,
-  districtIds: string[],
-): WeatherAlert[] {
+export function synthesiseAlerts(summary: HazardSummary | undefined, districtIds: string[]): WeatherAlert[] {
   if (!summary?.regions?.length) return [];
 
   // Which districts the reader saved, grouped by the region that actually
@@ -267,9 +267,7 @@ export function synthesiseAlerts(
     districtsByRegion.set(district.region, [...(districtsByRegion.get(district.region) ?? []), district.name]);
   });
 
-  const scoped = districtIds.length === 0
-    ? summary.regions
-    : summary.regions.filter((region) => districtsByRegion.has(region.region));
+  const scoped = districtIds.length === 0 ? summary.regions : summary.regions.filter((region) => districtsByRegion.has(region.region));
 
   const alerts: WeatherAlert[] = [];
 
@@ -288,8 +286,7 @@ export function synthesiseAlerts(
   });
 
   return alerts.sort((a, b) => {
-    const bySeverity =
-      ALERT_SEVERITY_ORDER.indexOf(b.severity) - ALERT_SEVERITY_ORDER.indexOf(a.severity);
+    const bySeverity = ALERT_SEVERITY_ORDER.indexOf(b.severity) - ALERT_SEVERITY_ORDER.indexOf(a.severity);
     if (bySeverity !== 0) return bySeverity;
     return a.region.localeCompare(b.region);
   });

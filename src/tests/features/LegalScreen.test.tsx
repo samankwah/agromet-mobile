@@ -88,12 +88,15 @@ describe('LegalScreen', () => {
 });
 
 describe('AboutScreen', () => {
-  it('names the publisher and carries the caution about forecasts', () => {
+  it('says the app is independent and carries the caution about forecasts', () => {
     renderScreen(<AboutScreen />);
 
     expect(screen.getByText('What this app is for')).toBeTruthy();
     expect(screen.getByText(/best estimate, not a promise/)).toBeTruthy();
-    expect(screen.getByText('Ghana Meteorological Agency')).toBeTruthy();
+    // Published from a personal store account, so it must never claim an
+    // agency as its publisher: both stores reject that without proof.
+    expect(screen.getByText(/Not an official government app/)).toBeTruthy();
+    expect(screen.queryByText('Ghana Meteorological Agency')).toBeNull();
   });
 
   it('falls back to a readable version rather than a blank row', () => {

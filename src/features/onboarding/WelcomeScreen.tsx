@@ -90,7 +90,7 @@ export function WelcomeScreen() {
 
         <View style={{ gap: theme.spacing.lg }}>
           <Text variant="body" color={ON_BACKDROP_MUTED}>
-            Farm weather, hazard alerts and weekly advisories for your district, built with the Ghana Meteorological Agency.
+            Farm weather, hazard alerts and weekly advisories for your district.
           </Text>
 
           {/* A light hairline and a light label, set in capitals, mirroring the
