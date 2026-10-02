@@ -2,7 +2,7 @@
   "name": "agromet-mobile",
   "description": "AgroMet Ghana — native mobile app delivering agrometeorological alerts, advisories, and crop diagnosis to Ghanaian farmers.",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo-google-fonts/noto-sans": "^0.4.2",

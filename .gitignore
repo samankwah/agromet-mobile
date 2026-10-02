@@ -44,3 +44,9 @@ yarn-error.*
 # Locally downloaded EAS builds — 200MB+ binaries have no business in git.
 *.apk
 *.aab
+
+# Store credentials. EAS keeps these server side; a local copy must never be committed.
+google-play-service-account*.json
+*.p8
+*.p12
+*.mobileprovision

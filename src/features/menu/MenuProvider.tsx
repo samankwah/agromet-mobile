@@ -54,13 +54,14 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   /*
    * Two rows from the reference design are deliberately absent:
    *
-   *   Give Us Rating   — the app is not published and app.json carries no store
-   *                      identifier, so there is no listing to rate.
-   *   Check for Updates — expo-updates is not a dependency and no update channel
-   *                      is configured, so there is nothing to check.
+   *   Give Us Rating   — there is no store listing to rate until the first
+   *                      release is approved. Add it with the listing's ids.
+   *   Check for Updates — expo-updates already checks on every launch
+   *                      (`checkAutomatically: ON_LOAD`), so a button would
+   *                      only repeat what happens anyway.
    *
-   * Both would ship as rows that look live and do nothing. They belong here the
-   * day there is a store listing and an update channel.
+   * A rating row before the listing exists would ship as a row that looks live
+   * and does nothing.
    */
   const rows: MenuRow[] = useMemo(
     () => [

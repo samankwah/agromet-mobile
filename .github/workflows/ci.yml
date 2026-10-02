@@ -1,0 +1,26 @@
+name: CI
+
+# Lives in this repo because the parent agromet repo ignores mobile/, so its
+# path-filtered workflow never saw a change here.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm test -- --maxWorkers=2
+      # Proves the release bundle still builds, without spending an EAS build.
+      - run: npx expo export --platform android
