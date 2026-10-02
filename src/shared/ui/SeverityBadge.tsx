@@ -14,7 +14,7 @@ type Props = {
 
 /**
  * The one severity-rendering component in the app — used by AlertBanner,
- * AlertDetailsScreen, Home's AdvisoryTeaserCard, and (going forward)
+ * AlertDetailsScreen, and (going forward)
  * crop-advisory/flood-drought sections in the Advisories tab. Promoted
  * from the weather-alerts feature to shared/ui once a second, unrelated
  * consumer needed it — one implementation, not several near-identical

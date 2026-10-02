@@ -22,7 +22,8 @@ type Props = {
 };
 
 /**
- * The shared chrome behind Home's three teaser cards.
+ * The shared chrome behind Home's teaser card (once three: the advisory and
+ * news teasers were removed because their content was invented).
  *
  * They had drifted into three near-copies of the same layout with three
  * different sets of mistakes: the forecast card put its timestamp top-right,

@@ -8,6 +8,10 @@ import { formatCedi } from './marketInsights';
  * orders go to a person, which is how these commodities actually trade. The
  * desk number comes from EXPO_PUBLIC_MARKET_WHATSAPP; without it the app says
  * so rather than opening an empty compose window addressed to nobody.
+ *
+ * The prices are the app's example figures, not quotes, so the message says so
+ * twice over: the total is labelled an example, and the closing line asks the
+ * desk for the real price. A farmer must not read the sum as an agreed cost.
  */
 
 /** Digits only — wa.me rejects spaces, dashes and a leading plus. */
@@ -31,10 +35,11 @@ export function buildMarketOrderText(items: CartItem[], region: string): string 
     '',
     ...items.map((item) => `- ${item.name} x${item.qty} (${item.unit}) = ${formatCedi(item.price * item.qty)}`),
     '',
-    `Total: ${formatCedi(total)}`,
+    `Example total: ${formatCedi(total)}`,
     region ? `Region: ${region}` : undefined,
     '',
-    'Please confirm availability.',
+    'These are example prices from the AgroMet app, not a quote.',
+    'Please confirm availability and the real price.',
   ]
     .filter((line): line is string => line !== undefined)
     .join('\n');

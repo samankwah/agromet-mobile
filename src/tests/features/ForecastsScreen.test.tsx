@@ -23,9 +23,7 @@ let client: QueryClient;
 
 beforeEach(() => {
   client = createTestQueryClient();
-  globalThis.fetch = jest.fn(() =>
-    Promise.reject(new TypeError('Network request failed')),
-  ) as unknown as typeof fetch;
+  globalThis.fetch = jest.fn(() => Promise.reject(new TypeError('Network request failed'))) as unknown as typeof fetch;
 });
 
 afterEach(() => {
@@ -85,6 +83,18 @@ describe('ForecastsScreen', () => {
       renderScreen('weekly');
 
       expect(selected()).toBe('Weekly');
+    });
+
+    /* There is no seasonal source yet. The segment stays, because deep links
+       name it, but it must say so rather than draw a made-up outlook. */
+    it('says the seasonal outlook is not published yet, rather than showing placeholder figures', () => {
+      renderScreen('seasonal');
+
+      expect(selected()).toBe('Seasonal');
+      expect(screen.getByText('Seasonal outlook coming soon')).toBeTruthy();
+      expect(screen.getByText('The seasonal outlook for the rainy season will show here when it is published.')).toBeTruthy();
+      // The spatial map's controls are not mounted.
+      expect(screen.queryByText('Probability')).toBeNull();
     });
 
     it('opens on Daily when asked for nothing', () => {

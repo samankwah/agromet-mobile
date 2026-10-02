@@ -373,12 +373,24 @@ describe('CalendarDetailScreen', () => {
     expect(screen.queryByText(/^\d{2}-\d{2}$/)).toBeNull();
   });
 
-  it('shows no sample or mock-data tag on a calendar', async () => {
-    // Product decision: seeded calendars carry no "sample" label. What is still
-    // said is the one thing a farmer can act on, a lost connection.
+  /* Product decision for the store release: the reference calendars stay,
+     but each says what it is. The schedules are real, written for another
+     district, and a farmer should know that before following one. */
+  it('labels a reference calendar as not yet published for the district', async () => {
     renderScreen(<CalendarDetailScreen id="sample-broiler-cycle" />);
 
     expect(await screen.findByText('Broiler Production Cycle')).toBeTruthy();
-    expect(screen.queryByText(/mock data|samples?/i)).toBeNull();
+    expect(screen.getByText('Reference calendar. Not yet published for your district.')).toBeTruthy();
+    expect(screen.queryByText(/mock data/i)).toBeNull();
+  });
+
+  /* A reference calendar has no row on the server, so starting a cycle would
+     post Number('sample-...') and fail. The action is not offered. */
+  it('offers no way to start a cycle on a reference calendar', async () => {
+    renderScreen(<CalendarDetailScreen id="sample-broiler-cycle" />);
+    await screen.findByText('Broiler Production Cycle');
+
+    expect(screen.queryByText('Start a flock cycle')).toBeNull();
+    expect(screen.queryByText(/Start a cycle to see them as dates/)).toBeNull();
   });
 });

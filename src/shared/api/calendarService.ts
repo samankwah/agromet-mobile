@@ -39,6 +39,16 @@ export type CalendarResult<T> = { data: T; fallback: FallbackReason };
  */
 export type CalendarListResult = { data: Calendar[]; samples: Calendar[]; fallback: FallbackReason };
 
+/**
+ * Whether a calendar is one of the bundled reference calendars rather than one
+ * a district has published. Every seeded id starts `sample-`, and none can
+ * exist server-side, so nothing that writes to the backend (starting a cycle
+ * posts `Number(calendarId)`) may be offered against one.
+ */
+export function isSampleCalendarId(id: string): boolean {
+  return id.startsWith('sample-');
+}
+
 export type CalendarFilter = {
   kind: CalendarKind;
   commodity?: string;

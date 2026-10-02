@@ -1,5 +1,4 @@
-import { getWeeklyAdvisory, listAdvisoryActivities } from '../../shared/api/weeklyAdvisoryService';
-import { MOCK_CROP_ADVISORY } from '../../shared/data/mockWeeklyAdvisory';
+import { getWeeklyAdvisory, listAdvisoryActivities, listArchivedAdvisories } from '../../shared/api/weeklyAdvisoryService';
 
 /**
  * The service's job is turning what the spreadsheet parser happens to emit into
@@ -8,15 +7,18 @@ import { MOCK_CROP_ADVISORY } from '../../shared/data/mockWeeklyAdvisory';
  */
 
 function respondWith(body: unknown) {
-  globalThis.fetch = jest.fn(() =>
-    Promise.resolve({ ok: true, json: () => Promise.resolve(body) } as Response),
-  ) as unknown as typeof fetch;
+  globalThis.fetch = jest.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve(body) } as Response)) as unknown as typeof fetch;
+}
+
+/** A bulletin the test expects the server to have returned. */
+async function bulletin(advisoryId: number) {
+  const { data } = await getWeeklyAdvisory(advisoryId);
+  if (!data) throw new Error(`expected advisory ${advisoryId} to load`);
+  return data;
 }
 
 function rejectNetwork() {
-  globalThis.fetch = jest.fn(() =>
-    Promise.reject(new TypeError('Network request failed')),
-  ) as unknown as typeof fetch;
+  globalThis.fetch = jest.fn(() => Promise.reject(new TypeError('Network request failed'))) as unknown as typeof fetch;
 }
 
 const FILTER = { zone: '', region: 'Ashanti Region', district: 'Ejisu', subject: 'Maize' };
@@ -48,7 +50,7 @@ describe('reshaping a crop advisory', () => {
   it('zips the three parallel maps into one row per parameter, in the sheet order', async () => {
     respondWith({ success: true, data: { id: 7, advisoryType: 'agromet-advisory', advisories: [CROP_SHEET] } });
 
-    const { data } = await getWeeklyAdvisory(7, 'crop');
+    const data = await bulletin(7);
     const [activity] = data.activities;
 
     expect(activity.rows.map((row) => row.parameter)).toEqual(['RAINFALL', 'TEMP', 'HUMIDITY']);
@@ -65,7 +67,7 @@ describe('reshaping a crop advisory', () => {
   it('fills a missing cell with a dash rather than undefined', async () => {
     respondWith({ success: true, data: { id: 7, advisoryType: 'agromet-advisory', advisories: [CROP_SHEET] } });
 
-    const { data } = await getWeeklyAdvisory(7, 'crop');
+    const data = await bulletin(7);
     const humidity = data.activities[0].rows.find((row) => row.parameter === 'HUMIDITY')!;
 
     expect(humidity.forecast).toBe('-');
@@ -76,7 +78,7 @@ describe('reshaping a crop advisory', () => {
   it('keeps only the readable half of a CODE/Name metadata value', async () => {
     respondWith({ success: true, data: { id: 7, advisoryType: 'agromet-advisory', advisories: [CROP_SHEET] } });
 
-    const { metadata } = (await getWeeklyAdvisory(7, 'crop')).data.activities[0];
+    const { metadata } = (await bulletin(7)).activities[0];
 
     expect(metadata.region).toBe('Ashanti Region');
     expect(metadata.district).toBe('Ejisu');
@@ -91,7 +93,7 @@ describe('reshaping a crop advisory', () => {
       data: { id: 7, advisoryType: 'agromet-advisory', summary: 'Parsed 1 advisory activity', advisories: [CROP_SHEET] },
     });
 
-    const { data } = await getWeeklyAdvisory(7, 'crop');
+    const data = await bulletin(7);
 
     expect(data.activities[0].summaryBody).toBe('Moderate rainfall is expected this week.');
     // The top-level summary is the uploader's note, kept but never shown as advice.
@@ -111,7 +113,7 @@ describe('reshaping a poultry advisory', () => {
       },
     });
 
-    const { data } = await getWeeklyAdvisory(9, 'poultry');
+    const data = await bulletin(9);
 
     expect(data.kind).toBe('poultry');
     expect(data.recommendations).toEqual(['Vaccinate at day 7', 'Increase midday ventilation']);
@@ -131,7 +133,7 @@ describe('a crop advisory that degraded to plain strings', () => {
       data: { id: 7, advisoryType: 'agromet-advisory', advisories: ['Monitor drainage', 'Inspect fields'] },
     });
 
-    const { data } = await getWeeklyAdvisory(7, 'crop');
+    const data = await bulletin(7);
 
     expect(data.activities).toEqual([]);
     expect(data.recommendations).toHaveLength(2);
@@ -154,22 +156,44 @@ describe('when there is nothing to show', () => {
     rejectNetwork();
 
     expect((await listAdvisoryActivities(FILTER)).fallback).toBe('offline');
-    expect((await getWeeklyAdvisory(1, 'crop')).fallback).toBe('offline');
+    expect((await getWeeklyAdvisory(1)).fallback).toBe('offline');
   });
 
-  it('falls back to the seeded bulletin rather than nothing at all', async () => {
+  /* No invented stand-in, ever: a farmer could act on one believing it was
+     written for them. */
+  it('returns no bulletin when the server cannot be reached', async () => {
     rejectNetwork();
 
-    const { data } = await getWeeklyAdvisory(1, 'crop');
+    expect((await getWeeklyAdvisory(1)).data).toBeNull();
+  });
 
-    expect(data.id).toBe(MOCK_CROP_ADVISORY.id);
-    expect(data.activities.length).toBeGreaterThan(0);
+  it('returns an empty archive, not samples, when the server cannot be reached', async () => {
+    rejectNetwork();
+
+    expect(await listArchivedAdvisories()).toEqual({ data: [], fallback: 'offline' });
+  });
+
+  it('returns an empty archive, not samples, when nothing is published', async () => {
+    respondWith({ success: true, data: [] });
+
+    expect(await listArchivedAdvisories()).toEqual({ data: [], fallback: 'empty' });
   });
 
   it('maps the activities list out of its snake_case shape', async () => {
     respondWith({
       success: true,
-      data: [{ id: 5, advisory_id: 2, activity: 'MAIZE', week_label: 'Week 32', region: 'Ashanti Region', district: 'Ejisu', crop: 'maize', year: 2026 }],
+      data: [
+        {
+          id: 5,
+          advisory_id: 2,
+          activity: 'MAIZE',
+          week_label: 'Week 32',
+          region: 'Ashanti Region',
+          district: 'Ejisu',
+          crop: 'maize',
+          year: 2026,
+        },
+      ],
     });
 
     const [ref] = (await listAdvisoryActivities(FILTER)).data;

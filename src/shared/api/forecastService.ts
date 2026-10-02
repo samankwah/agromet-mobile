@@ -1,11 +1,8 @@
 import { HOME_LOCATIONS } from '../data/mockWeather';
 import type { DailyForecast, HourlyForecast, WeeklyForecast } from '../domain/forecast';
-import type { ForecastMapLayer } from '../domain/forecastMap';
-import type { SeasonalOutlook } from '../domain/seasonalOutlook';
 import { synthesiseWeatherAlerts } from '../domain/weatherHazards';
-import { mockDelay, ServiceError } from './mockDelay';
+import { ServiceError } from './mockDelay';
 import { fetchWeatherBundle, toHourlyForecasts, toWeeklyForecast } from './openMeteo';
-import { MOCK_MAP_LAYERS } from '../data/mockMapLayers';
 
 /**
  * Deterministic forecasts, from Open-Meteo.
@@ -17,9 +14,10 @@ import { MOCK_MAP_LAYERS } from '../data/mockMapLayers';
  *
  * The probabilistic end of the timescale has split. `getSubseasonalOutlook` is
  * real now and lives in `subseasonalService.ts`, backed by NOAA's GEFS ensemble
- * through `/api/outlook/subseasonal`. `getSeasonalOutlook` below is still
- * placeholder data: seasonal forecasts are issued monthly by the Copernicus
- * multi-model service, which needs a CDS key and a different pipeline.
+ * through `/api/outlook/subseasonal`. There is no seasonal outlook yet: seasonal
+ * forecasts are issued monthly by the Copernicus multi-model service, which
+ * needs a CDS key and a different pipeline. The placeholder that stood in for
+ * it was removed so the app never shows invented figures as an outlook.
  */
 
 function placeFor(locationId: string) {
@@ -111,32 +109,4 @@ export async function getHourlyForecast(locationId: string): Promise<HourlyForec
     throw new ServiceError(`No hourly forecast available for location "${locationId}"`);
   }
   return upcoming.slice(0, 6);
-}
-
-// --- Tier B: signature + placeholder only, no real source yet ---
-
-const PLACEHOLDER_SEASONAL: SeasonalOutlook = {
-  regionId: 'northern',
-  issuedAt: new Date().toISOString(),
-  seasonLabel: '2026 Major Season',
-  onset: { expectedWindowStart: '2026-04-10', expectedWindowEnd: '2026-04-25', probabilityPct: 60 },
-  cessation: { expectedWindowStart: '2026-10-05', expectedWindowEnd: '2026-10-20', probabilityPct: 55 },
-  rainfallProbability: { belowNormalPct: 25, normalPct: 40, aboveNormalPct: 35 },
-  drySpellRisk: { category: 'moderate', description: 'A moderate chance of a dry spell during the mid-season period.' },
-  temperatureOutlook: { category: 'above-normal', probabilityPct: 50 },
-  confidenceLevel: 'moderate',
-  plainLanguageSummary:
-    'This is a probabilistic climate outlook for the whole season, not a weather forecast. Treat it as a planning guide, and follow shorter-range forecasts for day-to-day decisions.',
-  farmerActionCard: {
-    headline: 'Plan the season with contingencies',
-    actions: ['Prepare drought-tolerant seed varieties as a backup.', 'Review seasonal advisories before committing to a planting date.'],
-  },
-};
-
-export async function getSeasonalOutlook(regionId: string): Promise<SeasonalOutlook> {
-  return mockDelay({ ...PLACEHOLDER_SEASONAL, regionId });
-}
-
-export async function getForecastMapLayers(): Promise<ForecastMapLayer[]> {
-  return mockDelay(MOCK_MAP_LAYERS);
 }

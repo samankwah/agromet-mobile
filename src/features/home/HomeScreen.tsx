@@ -4,12 +4,10 @@ import { Screen } from '../../shared/ui/Screen';
 import { AlertBanner } from '../advisories/weather-alerts/components/AlertBanner';
 import { AlertPopup } from '../advisories/weather-alerts/components/AlertPopup';
 import { useAlertPopup } from '../advisories/weather-alerts/useAlertPopup';
-import { AdvisoryTeaserCard } from './components/AdvisoryTeaserCard';
 import { CityCarousel } from './components/CityCarousel';
 import { CurrentConditionsCard } from './components/CurrentConditionsCard';
 import { FeaturedForecastCard } from './components/FeaturedForecastCard';
 import { HomeHeader } from './components/HomeHeader';
-import { NewsTeaserCard } from './components/NewsTeaserCard';
 import { QuickActionsRow } from './components/QuickActionsRow';
 import { useHomeData } from './useHomeData';
 
@@ -20,9 +18,14 @@ import { useHomeData } from './useHomeData';
  * re-implemented here. City selection is CityCarousel (replaces the
  * previous increment's LocationSelector — see that component's header
  * comment).
+ *
+ * There is no advisory or news teaser. Both cards read invented records and
+ * nothing real stood behind them, so they were removed rather than shipped as
+ * if published. The weekly advisories a farmer can rely on live on the
+ * Advisories tab.
  */
 export function HomeScreen() {
-  const { weather, advisory, forecast, news, alerts, locationPrompt, locationPermission } = useHomeData();
+  const { weather, forecast, alerts, locationPrompt, locationPermission } = useHomeData();
   // Reads the severe-weather alerts Home already has — no extra request, and it
   // inherits the lapse check `useWeatherAlerts` applied.
   const popup = useAlertPopup(alerts.alerts);
@@ -51,10 +54,6 @@ export function HomeScreen() {
       <QuickActionsRow />
 
       <FeaturedForecastCard forecast={forecast.data} status={forecast.status} error={forecast.error} onRetry={forecast.refetch} />
-
-      <AdvisoryTeaserCard advisory={advisory.data} status={advisory.status} error={advisory.error} onRetry={advisory.refetch} />
-
-      <NewsTeaserCard news={news.data} status={news.status} error={news.error} onRetry={news.refetch} />
 
       {/* Mounted on Home alone. Advisories renders the same banner, but a modal
           that can appear on two tabs would show twice to anyone who visits

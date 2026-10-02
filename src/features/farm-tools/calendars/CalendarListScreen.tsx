@@ -25,7 +25,8 @@ const COPY: Record<CalendarKind, { title: string; subject: string; empty: string
   poultry: {
     title: 'Poultry Calendars',
     subject: 'Bird',
-    empty: 'Nothing has been published for this bird and district yet. Check back later. District officers add calendars as they are prepared.',
+    empty:
+      'Nothing has been published for this bird and district yet. Check back later. District officers add calendars as they are prepared.',
   },
 };
 
@@ -123,9 +124,7 @@ export function CalendarListScreen({ kind }: Props) {
             )
           ) : null}
 
-          {ready && visible.length > 0 && isSample ? (
-            <SampleDataNotice reason={fallback ?? 'empty'} />
-          ) : null}
+          {ready && visible.length > 0 && isSample ? <SampleDataNotice reason={fallback ?? 'empty'} isReference /> : null}
         </View>
       </AsyncStateView>
     </Screen>
@@ -144,31 +143,31 @@ function CalendarRow({ calendar }: { calendar: Calendar }) {
       accessibilityLabel={`${calendar.title}. ${weeks} weeks. ${place}. Opens the full calendar.`}
     >
       {({ pressed }) => (
-      <Card pressed={pressed} style={{ gap: theme.spacing.sm }}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md }}>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text variant="h3">{calendar.title}</Text>
+        <Card pressed={pressed} style={{ gap: theme.spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md }}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text variant="h3">{calendar.title}</Text>
+              <Text variant="caption" muted>
+                {place}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+            <Ionicons name="time-outline" size={14} color={theme.colors.muted} />
             <Text variant="caption" muted>
-              {place}
+              {weeks} week{weeks === 1 ? '' : 's'}
+              {calendar.breedType ? ` · ${calendar.breedType}` : ''}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
-        </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-          <Ionicons name="time-outline" size={14} color={theme.colors.muted} />
-          <Text variant="caption" muted>
-            {weeks} week{weeks === 1 ? '' : 's'}
-            {calendar.breedType ? ` · ${calendar.breedType}` : ''}
-          </Text>
-        </View>
-
-        {calendar.sampleActivities.length > 0 ? (
-          <Text variant="caption" muted numberOfLines={2}>
-            {calendar.sampleActivities.slice(0, 4).join(' · ')}
-          </Text>
-        ) : null}
-      </Card>
+          {calendar.sampleActivities.length > 0 ? (
+            <Text variant="caption" muted numberOfLines={2}>
+              {calendar.sampleActivities.slice(0, 4).join(' · ')}
+            </Text>
+          ) : null}
+        </Card>
       )}
     </Pressable>
   );

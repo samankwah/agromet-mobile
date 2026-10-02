@@ -28,7 +28,7 @@ const TEST_SAFE_AREA_METRICS = {
 /**
  * A smoke test, not a behavior test — confirms the full Home composition
  * (CityCarousel/AlertBanner/CurrentConditionsCard/QuickActionsRow/
- * FeaturedForecastCard/AdvisoryTeaserCard/NewsTeaserCard, all wired
+ * FeaturedForecastCard, all wired
  * through useHomeData's queries and the Zustand stores) mounts without
  * throwing, in the same provider order as the real app/_layout.tsx.
  * Queries are gated on `hasHydrated` (false at first render, before the
@@ -43,9 +43,7 @@ let client: QueryClient;
 
 beforeEach(() => {
   client = createTestQueryClient();
-  globalThis.fetch = jest.fn(() =>
-    Promise.reject(new TypeError('Network request failed')),
-  ) as unknown as typeof fetch;
+  globalThis.fetch = jest.fn(() => Promise.reject(new TypeError('Network request failed'))) as unknown as typeof fetch;
 });
 
 afterEach(() => {

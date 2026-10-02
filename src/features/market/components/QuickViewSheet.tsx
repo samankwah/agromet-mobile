@@ -9,6 +9,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Button } from '../../../shared/ui/Button';
 import { Text } from '../../../shared/ui/Text';
 import { formatCedi, getTimingSignal, type ResolvedCommodity } from '../../../shared/utils/marketInsights';
+import { ExamplePricesNotice } from './ExamplePricesNotice';
 import { DemandRow, TrendBadge, timingColor, timingIcon } from './MarketBadges';
 import { Sparkline } from './Sparkline';
 
@@ -92,7 +93,7 @@ export function QuickViewSheet({ resolved, region, onClose, onAddToCart }: Props
           <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
             <View style={{ flex: 1, backgroundColor: theme.colors.surface, borderRadius: theme.radii.sm, padding: theme.spacing.md }}>
               <Text variant="caption" muted>
-                National
+                National example
               </Text>
               <Text variant="h2">{formatCedi(basePrice)}</Text>
               <Text variant="caption" muted>
@@ -119,6 +120,8 @@ export function QuickViewSheet({ resolved, region, onClose, onAddToCart }: Props
               </View>
             ) : null}
           </View>
+
+          <ExamplePricesNotice inline />
 
           {/* Six-month movement */}
           {series && change ? (

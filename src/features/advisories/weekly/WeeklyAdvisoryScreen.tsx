@@ -2,11 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import {
-  EMPTY_ADVISORY_FILTERS,
-  type AdvisoryFilterState,
-  type AdvisoryKind,
-} from '../../../shared/domain/weeklyAdvisory';
+import { EMPTY_ADVISORY_FILTERS, type AdvisoryFilterState, type AdvisoryKind } from '../../../shared/domain/weeklyAdvisory';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../../shared/ui/AsyncStateView';
 import { Card } from '../../../shared/ui/Card';
@@ -53,8 +49,7 @@ export function WeeklyAdvisoryScreen({ kind, advisoryId }: Props) {
   const [filter, setFilter] = useState<AdvisoryFilterState>(EMPTY_ADVISORY_FILTERS);
   const [activityIndex, setActivityIndex] = useState(0);
 
-  const { status, error, refetch, advisory, activities, fallback, usingCachedFallback } =
-    useWeeklyAdvisory(kind, filter, advisoryId);
+  const { status, error, refetch, advisory, activities, fallback, usingCachedFallback } = useWeeklyAdvisory(kind, filter, advisoryId);
 
   /* Nothing narrowed yet, so what is on screen is whatever was published most
      recently anywhere in the country. */
@@ -66,9 +61,7 @@ export function WeeklyAdvisoryScreen({ kind, advisoryId }: Props) {
 
   const copy = COPY[kind];
   // The fallback path has content only if the older template produced some.
-  const hasGuidance =
-    (advisory?.recommendations.length ?? 0) > 0 ||
-    Object.keys(advisory?.managementMetrics ?? {}).length > 0;
+  const hasGuidance = (advisory?.recommendations.length ?? 0) > 0 || Object.keys(advisory?.managementMetrics ?? {}).length > 0;
 
   const activity = activities[Math.min(activityIndex, Math.max(activities.length - 1, 0))] ?? null;
 
@@ -90,10 +83,9 @@ export function WeeklyAdvisoryScreen({ kind, advisoryId }: Props) {
         onActivityChange={setActivityIndex}
       />
 
-      {isNational ? (
+      {isNational && advisory ? (
         <Text variant="caption" muted>
-          Showing the latest bulletin published anywhere in Ghana. Tap any field above to narrow it to your own
-          district.
+          Showing the latest bulletin published anywhere in Ghana. Tap any field above to narrow it to your own district.
         </Text>
       ) : null}
 
@@ -111,12 +103,7 @@ export function WeeklyAdvisoryScreen({ kind, advisoryId }: Props) {
       >
         {advisory ? (
           <View style={{ gap: theme.spacing.lg }}>
-            <FallbackNotice
-              fallback={fallback}
-              usingCache={usingCachedFallback}
-              filter={filter}
-              sampleFrom={advisory.district}
-            />
+            {usingCachedFallback ? <SavedCopyNotice /> : null}
 
             {/* What was uploaded decides the layout, not which kind of bulletin
                 this is. Crop and poultry advisories are authored on the same
@@ -127,11 +114,7 @@ export function WeeklyAdvisoryScreen({ kind, advisoryId }: Props) {
                 even when it had a full set of worksheets behind it. */}
             {activities.length > 0 ? (
               <>
-                <ActivityPicker
-                  activities={activities}
-                  selectedIndex={activityIndex}
-                  onSelect={setActivityIndex}
-                />
+                <ActivityPicker activities={activities} selectedIndex={activityIndex} onSelect={setActivityIndex} />
                 {activity ? (
                   <>
                     <ForecastTable rows={activity.rows} />
@@ -154,6 +137,17 @@ export function WeeklyAdvisoryScreen({ kind, advisoryId }: Props) {
               />
             )}
           </View>
+        ) : fallback === 'empty' ? (
+          /* The server answered and has nothing here. Offline never reaches
+             this branch: it fails the query, so AsyncStateView shows the saved
+             copy or "Could not reach the AgroMet server" with a Retry. */
+          <Card>
+            <EmptyState
+              icon="document-outline"
+              title="No advisory yet"
+              message={`No advisory has been published ${scopeFor(filter)} yet.`}
+            />
+          </Card>
         ) : null}
       </AsyncStateView>
     </Screen>
@@ -161,51 +155,26 @@ export function WeeklyAdvisoryScreen({ kind, advisoryId }: Props) {
 }
 
 /**
- * Says where what is on screen came from.
+ * Where an empty search looked, in the words the empty state uses.
  *
- * The three cases are genuinely different and a farmer acts differently on
- * each: nothing has ever been published for their district, the phone is
- * offline, or this is a saved copy from earlier. Collapsing them into one
- * "sample data" line would hide, permanently, the fact that no bulletin has
- * ever been uploaded.
+ * With nothing narrowed there is no district to name, and saying "published
+ * for  in  yet" would read as a bug.
  */
-function FallbackNotice({
-  fallback,
-  usingCache,
-  filter,
-  sampleFrom,
-}: {
-  fallback: 'empty' | 'offline' | null;
-  usingCache: boolean;
-  filter: AdvisoryFilterState;
-  /** The district the sample bulletin was written for. */
-  sampleFrom: string;
-}) {
+function scopeFor(filter: AdvisoryFilterState): string {
+  return filter.district === '' && filter.subject === ''
+    ? 'anywhere in Ghana'
+    : `for ${filter.subject || 'your crop'} in ${filter.district || 'your district'}`;
+}
+
+/**
+ * Says the bulletin on screen is the copy saved on this phone, not a fresh one.
+ *
+ * The only notice left. "Nothing published" and "offline with nothing saved"
+ * no longer sit above a stand-in bulletin: there is no stand-in, so each is the
+ * whole of what the screen shows.
+ */
+function SavedCopyNotice() {
   const theme = useTheme();
-
-  if (!fallback && !usingCache) return null;
-
-  /* The sample is written for somewhere else, and the weeks and dates in the
-     panel above are its own. Naming the district it came from is the
-     difference between an honest stand-in and a bulletin a farmer might act
-     on believing it was written for them. */
-  const origin = sampleFrom.trim() === '' ? 'another district' : sampleFrom;
-
-  /* With nothing narrowed there is no district to name, and saying "published
-     for  in  yet" would read as a bug. */
-  const scope =
-    filter.district === '' && filter.subject === ''
-      ? 'anywhere in Ghana'
-      : `for ${filter.subject || 'your crop'} in ${filter.district || 'your district'}`;
-
-  // No "sample" wording (the product decision), but the bulletin below was
-  // written for another district, and saying which one stays: that is a fact
-  // about where the advice applies, not a label on its quality.
-  const message = usingCache
-    ? 'Showing the copy saved on this phone. The server could not be reached.'
-    : fallback === 'offline'
-      ? `Could not reach the AgroMet server. Check your connection. The bulletin below was written for ${origin}.`
-      : `No advisory has been published ${scope} yet. The bulletin below was written for ${origin}.`;
 
   return (
     <Card
@@ -217,14 +186,9 @@ function FallbackNotice({
         borderLeftColor: theme.colors.warning,
       }}
     >
-      <Ionicons
-        name={fallback === 'empty' ? 'document-outline' : 'cloud-offline-outline'}
-        size={18}
-        color={theme.colors.warning}
-        style={{ marginTop: 2 }}
-      />
+      <Ionicons name="cloud-offline-outline" size={18} color={theme.colors.warning} style={{ marginTop: 2 }} />
       <Text variant="caption" muted style={{ flex: 1 }}>
-        {message}
+        Showing the copy saved on this phone. The server could not be reached.
       </Text>
     </Card>
   );

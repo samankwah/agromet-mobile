@@ -37,6 +37,11 @@ type Props = {
  *
  * Embedded directly in the Forecasts tab (not a pushed full-screen
  * route), so the tab bar and timescale segments stay reachable.
+ *
+ * NOT MOUNTED in the release build. Its grid values come from
+ * `buildMockSpatialCells`, so the Seasonal segment shows a "coming soon"
+ * empty state instead (ForecastsScreen). Mount it again once
+ * `getSpatialOutlookGrid` reads a real seasonal dataset.
  */
 export function SpatialOutlookView({ seasonal }: Props) {
   const theme = useTheme();
@@ -169,7 +174,6 @@ export function SpatialOutlookView({ seasonal }: Props) {
               <BulletList items={seasonal.farmerActionCard.actions} accent />
             </View>
           ) : null}
-
         </View>
       </Drawer>
     </View>

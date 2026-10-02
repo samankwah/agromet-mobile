@@ -1,11 +1,9 @@
 /**
  * A published weekly agrometeorological advisory.
  *
- * Distinct from `AgroAdvisory` in domain/advisory.ts, which is a one-paragraph
- * teaser for the Home screen. This is the full bulletin an extension officer
- * uploads as a spreadsheet: one worksheet per activity, each carrying a week's
- * forecast for nine weather parameters, what each implies, and what to do about
- * it.
+ * This is the full bulletin an extension officer uploads as a spreadsheet: one
+ * worksheet per activity, each carrying a week's forecast for nine weather
+ * parameters, what each implies, and what to do about it.
  *
  * Mirrors what `backend/app/spreadsheet_parser.py` actually emits, not what the
  * table columns suggest. Two things are easy to get wrong there:
