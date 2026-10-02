@@ -28,7 +28,8 @@
         "EXPO_PUBLIC_API_URL": "https://agromet-backend.vercel.app",
         "EXPO_PUBLIC_MARKET_WHATSAPP": "233243999631",
         "EXPO_PUBLIC_CONTACT_PHONE": "+233243999631",
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "AGROMET_ARM_ONLY": "1"
       }
     },
     "production": {

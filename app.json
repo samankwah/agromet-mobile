@@ -85,7 +85,8 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "AgroMet Ghana uses the camera to photograph crops for diagnosis."
+          "cameraPermission": "AgroMet Ghana uses the camera to photograph crops for diagnosis.",
+          "barcodeScannerEnabled": false
         }
       ],
       [
@@ -122,7 +123,8 @@
       "expo-sharing",
       "expo-status-bar",
       "expo-asset",
-      "@sentry/react-native"
+      "@sentry/react-native",
+      "./plugins/withArmOnlyAbis"
     ],
     "extra": {
       "router": {},
