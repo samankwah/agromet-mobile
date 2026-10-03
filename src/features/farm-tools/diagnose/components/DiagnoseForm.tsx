@@ -120,7 +120,11 @@ function ChipGrid({
                   // Chrome on a View, never on the Pressable — Button.tsx
                   // documents why: Android drops a Pressable's own background
                   // and border while still drawing its children.
+                  // The chosen option is the app's glass selection, the flat
+                  // grey fill a selected switch or tab shows, with no rim or
+                  // shadow. Keyed on the state so Android redraws its corners.
                   <View
+                    key={isSelected ? 'selected' : 'idle'}
                     style={{
                       minHeight: theme.minTouchTarget,
                       paddingHorizontal: theme.spacing.sm,
@@ -128,21 +132,12 @@ function ChipGrid({
                       justifyContent: 'center',
                       borderRadius: theme.radii.md,
                       borderWidth: 1,
-                      borderColor: isSelected ? theme.colors.focusRim : theme.colors.border,
-                      backgroundColor: isSelected ? theme.colors.focus : theme.colors.surface,
-                      // The chosen option stays pressed in, and keeps its
-                      // highlight fill and rim, so the state is never carried
-                      // by the shadow alone. The fill no longer needs an alpha
-                      // suffix — `focus` is already a pale wash at full
-                      // strength, and tinting it further erased it.
-                      boxShadow: isSelected || pressed ? theme.sunken('sm') : theme.raised('sm'),
+                      borderColor: isSelected ? 'transparent' : theme.colors.border,
+                      backgroundColor: isSelected ? theme.colors.text + '3D' : theme.colors.surface,
+                      boxShadow: isSelected ? undefined : pressed ? theme.sunken('sm') : theme.raised('sm'),
                     }}
                   >
-                    <Text
-                      variant={isSelected ? 'bodyStrong' : 'body'}
-                      color={isSelected ? theme.colors.focusRim : theme.colors.text}
-                      numberOfLines={1}
-                    >
+                    <Text variant={isSelected ? 'bodyStrong' : 'body'} color={theme.colors.text} numberOfLines={1}>
                       {option}
                     </Text>
                   </View>

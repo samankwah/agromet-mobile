@@ -39,24 +39,21 @@ export function DayStrip({ days, selectedDate, onSelect }: Props) {
             <Text variant="caption" muted>
               {WEEKDAY_INITIALS[date.getDay()]}
             </Text>
+            {/* The day you are reading wears the app's glass selection, the
+                flat grey circle a selected switch or tab shows. Keyed on the
+                state so Android redraws its rounded corners. */}
             <View
+              key={isSelected ? 'selected' : 'idle'}
               style={{
                 width: 34,
                 height: 34,
                 borderRadius: 17,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: isSelected ? theme.colors.focus : 'transparent',
-                borderWidth: isSelected ? 1 : 0,
-                borderColor: theme.colors.focusRim,
-                // The day you are reading is set into the strip, the way the
-                // reference designs mark the selected day. The fill and its rim
-                // carry the state between them, so the shadow is never the only
-                // thing saying which day you are on.
-                ...(isSelected ? { boxShadow: theme.sunken('sm') } : null),
+                backgroundColor: isSelected ? theme.colors.text + '3D' : 'transparent',
               }}
             >
-              <Text variant="bodyStrong" color={isSelected ? theme.colors.onFocus : theme.colors.text}>
+              <Text variant="bodyStrong" color={theme.colors.text}>
                 {date.getDate()}
               </Text>
             </View>

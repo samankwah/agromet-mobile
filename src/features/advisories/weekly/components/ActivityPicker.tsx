@@ -52,27 +52,23 @@ export function ActivityPicker({ activities, selectedIndex, onSelect }: Props) {
                 // Chrome on a View, never on the Pressable — Button.tsx
                 // documents why: Android drops a Pressable's own background
                 // and border while still drawing its children.
+                // The chosen activity is the app's glass selection, the same
+                // flat grey pill a selected switch or tab shows, with no rim or
+                // shadow. Keyed on the state so Android redraws its corners.
                 <View
+                  key={isSelected ? 'selected' : 'idle'}
                   style={{
                     minHeight: theme.minTouchTarget,
                     justifyContent: 'center',
                     paddingHorizontal: theme.spacing.md,
                     borderRadius: theme.radii.pill,
                     borderWidth: 1,
-                    borderColor: isSelected ? theme.colors.focusRim : theme.colors.border,
-                    backgroundColor: isSelected ? theme.colors.focus : theme.colors.surface,
-                    // The chosen activity stays pressed in and keeps its
-                    // highlight fill and rim, so the state never rests on the
-                    // shadow. The rim does the real work here: the fill is a
-                    // pale ice blue that barely separates from `surface`.
-                    boxShadow: isSelected || pressed ? theme.sunken('sm') : theme.raised('sm'),
+                    borderColor: isSelected ? 'transparent' : theme.colors.border,
+                    backgroundColor: isSelected ? theme.colors.text + '3D' : theme.colors.surface,
+                    boxShadow: isSelected ? undefined : pressed ? theme.sunken('sm') : theme.raised('sm'),
                   }}
                 >
-                  <Text
-                    variant={isSelected ? 'bodyStrong' : 'body'}
-                    color={isSelected ? theme.colors.onFocus : theme.colors.text}
-                    numberOfLines={1}
-                  >
+                  <Text variant={isSelected ? 'bodyStrong' : 'body'} color={theme.colors.text} numberOfLines={1}>
                     {activity.activity}
                   </Text>
                 </View>
