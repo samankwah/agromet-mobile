@@ -8,7 +8,7 @@ import { router } from 'expo-router';
 import { AdvisoryArchiveScreen } from '../../features/advisories/archive/AdvisoryArchiveScreen';
 import * as advisoryService from '../../shared/api/weeklyAdvisoryService';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
-import { MOCK_ADVISORY_ARCHIVE } from '../fixtures/weeklyAdvisory';
+import { MOCK_ADVISORY_ARCHIVE } from '../../shared/data/exampleWeeklyAdvisory';
 
 jest.mock('expo-router', () => ({ router: { back: jest.fn(), push: jest.fn() } }));
 

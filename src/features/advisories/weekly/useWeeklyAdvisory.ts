@@ -3,11 +3,13 @@ import { useMemo } from 'react';
 import { useCachedQuery } from '../../../shared/api/useCachedQuery';
 import { NetworkError } from '../../../shared/api/http';
 import { getWeeklyAdvisory, listAdvisoryActivities, type AdvisoryFallback } from '../../../shared/api/weeklyAdvisoryService';
+import { exampleAdvisory } from '../../../shared/data/exampleWeeklyAdvisory';
 import { type AdvisoryFilterState, type AdvisoryKind, type WeeklyAdvisory } from '../../../shared/domain/weeklyAdvisory';
 
 const HOUR = 60 * 60 * 1000;
 
-type Snapshot = { advisory: WeeklyAdvisory | null; fallback: AdvisoryFallback };
+/** `example` marks the labelled sample shown while nothing is published. */
+type Snapshot = { advisory: WeeklyAdvisory | null; fallback: AdvisoryFallback; example?: boolean };
 
 /** The words the screen shows when the server cannot be reached and nothing
  * is saved on the phone. */
@@ -37,7 +39,7 @@ function settle(snapshot: Snapshot): Snapshot {
  * activity — so paying for a round trip per tap would buy nothing, and would
  * stop working the moment the signal did.
  */
-async function fetchSnapshot(filter: AdvisoryFilterState, advisoryId?: number): Promise<Snapshot> {
+async function fetchSnapshot(kind: AdvisoryKind, filter: AdvisoryFilterState, advisoryId?: number): Promise<Snapshot> {
   // Opened from the archive: the record is already chosen, so skip the lookup
   // entirely. Without this the screen would search by filter and land on the
   // newest bulletin for the district rather than the one that was tapped.
@@ -51,15 +53,22 @@ async function fetchSnapshot(filter: AdvisoryFilterState, advisoryId?: number): 
   // on, before the farmer has narrowed it to their own district.
   const list = await listAdvisoryActivities(filter);
 
-  // Nothing to fetch: either the server is unreachable or it has published
-  // nothing here. Neither puts a bulletin on screen. No invented stand-in is
-  // shown, because a farmer could act on it believing it was written for them.
+  // The server answered and has published nothing here: show the example, which
+  // the screen labels as one. Offline is different and still fails the query,
+  // so a real bulletin saved on the phone is shown instead and never replaced
+  // by a sample.
+  if (list.fallback === 'empty') return withExample(kind, filter);
   if (list.fallback !== null) {
     return settle({ advisory: null, fallback: list.fallback });
   }
 
   const detail = await getWeeklyAdvisory(list.data[0].advisoryId);
+  if (detail.fallback === 'empty') return withExample(kind, filter);
   return settle({ advisory: detail.data, fallback: detail.fallback });
+}
+
+function withExample(kind: AdvisoryKind, filter: AdvisoryFilterState): Snapshot {
+  return { advisory: exampleAdvisory(kind, filter.subject), fallback: 'empty', example: true };
 }
 
 /** A stable, order-independent cache key, per useCalendars' convention.
@@ -82,15 +91,16 @@ export function useWeeklyAdvisory(kind: AdvisoryKind, filter: AdvisoryFilterStat
 
   const query = useCachedQuery<Snapshot>({
     queryKey: ['weekly-advisory', key],
-    queryFn: () => fetchSnapshot(filter, advisoryId),
+    queryFn: () => fetchSnapshot(kind, filter, advisoryId),
     cacheKey: `weekly-advisory:${key}`,
     staleTime: 6 * HOUR,
     gcTime: 7 * 24 * HOUR,
   });
 
-  // A snapshot saved by an older build may still hold the seeded stand-in it
-  // used to fall back to; anything flagged as a fallback is never shown.
-  const advisory = query.data && query.data.fallback === null ? query.data.advisory : null;
+  // A real bulletin, or the labelled example. A snapshot saved by an older build
+  // may hold an unlabelled stand-in flagged as a fallback; that is never shown.
+  const isExample = query.data?.example === true;
+  const advisory = query.data && (query.data.fallback === null || isExample) ? query.data.advisory : null;
 
   // A bulletin can hold several activities; a poultry one holds none.
   const activities = useMemo(() => advisory?.activities ?? [], [advisory]);
@@ -100,5 +110,6 @@ export function useWeeklyAdvisory(kind: AdvisoryKind, filter: AdvisoryFilterStat
     advisory,
     activities,
     fallback: query.data?.fallback ?? null,
+    isExample,
   };
 }

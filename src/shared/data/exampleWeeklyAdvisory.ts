@@ -1,12 +1,15 @@
-import { POULTRY_OMITTED_PARAMETERS } from '../../shared/domain/weeklyAdvisory';
-import type { AdvisoryActivity, ArchivedAdvisory, WeeklyAdvisory } from '../../shared/domain/weeklyAdvisory';
+import { POULTRY_OMITTED_PARAMETERS } from '../domain/weeklyAdvisory';
+import type { AdvisoryActivity, AdvisoryKind, ArchivedAdvisory, WeeklyAdvisory } from '../domain/weeklyAdvisory';
 
 /**
- * Weekly advisory fixtures, for tests only.
+ * Example weekly advisories, shown while nothing is published for a district.
  *
- * These used to ship as the app's seeded fallback, shown when the backend had
- * nothing. The release build never shows invented bulletins, so they now live
- * here and feed the screen tests the full shapes a real upload produces.
+ * Clients asked that the crop and poultry advisory screens always show what an
+ * advisory looks like, even before the first upload. These are that example,
+ * and the screen labels them as one every time they appear (see
+ * `ExampleAdvisoryNotice` in WeeklyAdvisoryScreen): a farmer must never take a
+ * sample for advice written for their district. They also feed the screen
+ * tests the full shapes a real upload produces.
  *
  * The values are modelled on the parser's documented template
  * (`backend/app/spreadsheet_parser.py`), with parameter names spelled exactly
@@ -1125,3 +1128,16 @@ export const MOCK_ADVISORY_ARCHIVE: ArchivedAdvisory[] = [
     weekLabels: ['Weeks 1-4', 'Weeks 5-9'],
   },
 ];
+
+/**
+ * The example for a kind of advisory and, for poultry, the bird chosen.
+ *
+ * Broiler and layer are different programmes (4 stages against 16, eight weeks
+ * against a year), so one poultry example cannot stand for both. A farmer who
+ * picked Layer and saw a broiler cycle would conclude the app does not know the
+ * difference.
+ */
+export function exampleAdvisory(kind: AdvisoryKind, subject?: string): WeeklyAdvisory {
+  if (kind !== 'poultry') return MOCK_CROP_ADVISORY;
+  return subject?.trim().toLowerCase() === 'layer' ? MOCK_LAYER_ADVISORY : MOCK_POULTRY_ADVISORY;
+}

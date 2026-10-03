@@ -49,7 +49,11 @@ export function WeeklyAdvisoryScreen({ kind, advisoryId }: Props) {
   const [filter, setFilter] = useState<AdvisoryFilterState>(EMPTY_ADVISORY_FILTERS);
   const [activityIndex, setActivityIndex] = useState(0);
 
-  const { status, error, refetch, advisory, activities, fallback, usingCachedFallback } = useWeeklyAdvisory(kind, filter, advisoryId);
+  const { status, error, refetch, advisory, activities, fallback, usingCachedFallback, isExample } = useWeeklyAdvisory(
+    kind,
+    filter,
+    advisoryId,
+  );
 
   /* Nothing narrowed yet, so what is on screen is whatever was published most
      recently anywhere in the country. */
@@ -83,7 +87,7 @@ export function WeeklyAdvisoryScreen({ kind, advisoryId }: Props) {
         onActivityChange={setActivityIndex}
       />
 
-      {isNational && advisory ? (
+      {isNational && advisory && !isExample ? (
         <Text variant="caption" muted>
           Showing the latest bulletin published anywhere in Ghana. Tap any field above to narrow it to your own district.
         </Text>
@@ -104,6 +108,7 @@ export function WeeklyAdvisoryScreen({ kind, advisoryId }: Props) {
         {advisory ? (
           <View style={{ gap: theme.spacing.lg }}>
             {usingCachedFallback ? <SavedCopyNotice /> : null}
+            {isExample ? <ExampleAdvisoryNotice kind={kind} scope={scopeFor(filter)} /> : null}
 
             {/* What was uploaded decides the layout, not which kind of bulletin
                 this is. Crop and poultry advisories are authored on the same
@@ -164,6 +169,38 @@ function scopeFor(filter: AdvisoryFilterState): string {
   return filter.district === '' && filter.subject === ''
     ? 'anywhere in Ghana'
     : `for ${filter.subject || 'your crop'} in ${filter.district || 'your district'}`;
+}
+
+/**
+ * Says the advisory on screen is an example, every time one is shown.
+ *
+ * Clients asked for the screen never to be empty before the first upload, so
+ * the example appears instead. A farmer must not plan work from it, so the
+ * notice sits above it in the warning colour and says so in plain words.
+ */
+function ExampleAdvisoryNotice({ kind, scope }: { kind: AdvisoryKind; scope: string }) {
+  const theme = useTheme();
+  const noun = kind === 'poultry' ? 'poultry' : 'crop';
+
+  return (
+    <Card
+      style={{
+        flexDirection: 'row',
+        gap: theme.spacing.md,
+        alignItems: 'flex-start',
+        borderLeftWidth: 4,
+        borderLeftColor: theme.colors.warning,
+      }}
+    >
+      <Ionicons name="information-circle-outline" size={18} color={theme.colors.warning} style={{ marginTop: 2 }} />
+      <View style={{ flex: 1, gap: theme.spacing.xs }}>
+        <Text variant="bodyStrong">Example advisory</Text>
+        <Text variant="caption" muted>
+          {`No ${noun} advisory has been published ${scope} yet. This example shows what a weekly advisory looks like. Do not plan your farm work from it.`}
+        </Text>
+      </View>
+    </Card>
+  );
 }
 
 /**

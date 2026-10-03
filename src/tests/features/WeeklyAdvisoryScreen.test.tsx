@@ -9,7 +9,7 @@ import { queryClient } from '../../shared/api/queryClient';
 import * as advisoryService from '../../shared/api/weeklyAdvisoryService';
 import type { WeeklyAdvisory } from '../../shared/domain/weeklyAdvisory';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
-import { MOCK_CROP_ADVISORY, MOCK_LAYER_ADVISORY, MOCK_POULTRY_ADVISORY } from '../fixtures/weeklyAdvisory';
+import { MOCK_CROP_ADVISORY, MOCK_LAYER_ADVISORY, MOCK_POULTRY_ADVISORY } from '../../shared/data/exampleWeeklyAdvisory';
 
 jest.mock('expo-router', () => ({ router: { back: jest.fn(), push: jest.fn() } }));
 
@@ -413,27 +413,38 @@ describe('WeeklyAdvisoryScreen — every field is its own control', () => {
 });
 
 describe('WeeklyAdvisoryScreen — when there is nothing published to show', () => {
-  /* There is no stand-in bulletin any more. A farmer could act on one believing
-     it was written for them, so an empty answer is shown as empty. */
-  it('says nothing has been published, and shows no bulletin', async () => {
+  /* Clients asked that the screen never be empty before the first upload, so a
+     labelled example is shown. The label is the whole point: a farmer must
+     never take the example for advice written for their district. */
+  it('shows the example crop advisory, labelled as an example', async () => {
     listMock.mockResolvedValue({ data: [], fallback: 'empty' });
     renderScreen('crop');
 
-    expect(await screen.findByText('No advisory has been published anywhere in Ghana yet.')).toBeTruthy();
-    expect(screen.queryByText('DETAILED FORECAST')).toBeNull();
-    expect(screen.queryByText(/written for/)).toBeNull();
-    // Nothing is on screen, so there is no "latest bulletin" to describe.
+    expect(await screen.findByText('Example advisory')).toBeTruthy();
+    expect(
+      screen.getByText(/No crop advisory has been published anywhere in Ghana yet\..*Do not plan your farm work from it\./),
+    ).toBeTruthy();
+    expect(screen.getByText('DETAILED FORECAST')).toBeTruthy();
+    // It is not a real bulletin, so it is never described as the latest one.
     expect(screen.queryByText(/latest bulletin published anywhere in Ghana/)).toBeNull();
   });
 
-  it('names the crop and district that were searched', async () => {
+  it('names the crop and district that were searched in the example notice', async () => {
     listMock.mockResolvedValue({ data: [], fallback: 'empty' });
     renderScreen('crop');
     choose('Region', 'All regions', 'Ashanti Region');
     choose('District', 'Select district', 'Adansi Akrofuom');
     choose('Commodity', 'All commodities', 'Maize');
 
-    expect(await screen.findByText('No advisory has been published for Maize in Adansi Akrofuom yet.')).toBeTruthy();
+    expect(await screen.findByText(/No crop advisory has been published for Maize in Adansi Akrofuom yet\./)).toBeTruthy();
+  });
+
+  it('shows the poultry example, labelled, for the poultry advisory', async () => {
+    listMock.mockResolvedValue({ data: [], fallback: 'empty' });
+    renderScreen('poultry');
+
+    expect(await screen.findByText('Example advisory')).toBeTruthy();
+    expect(screen.getByText(/No poultry advisory has been published/)).toBeTruthy();
   });
 
   it('says the server could not be reached, offers a retry, and shows no bulletin', async () => {
