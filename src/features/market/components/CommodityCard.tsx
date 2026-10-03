@@ -80,10 +80,17 @@ export function CommodityCard({ resolved, width, onQuickView }: Props) {
               {price != null ? (
                 <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: theme.spacing.xs }}>
                   <View style={{ flexShrink: 1 }}>
-                    <Text variant="h3">{formatCedi(price)}</Text>
+                    {/* One line always: beside the sparkline a narrow card left
+                        "GH₵299.99" breaking after "299.9", which reads as two
+                        numbers. A slight shrink is better than a split. */}
+                    <Text variant="h3" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                      {formatCedi(price)}
+                    </Text>
                     {/* "Example price per bag": the figure is an example, and the
                     word sits on the card itself so it survives a glance. */}
-                    <Text variant="caption" muted numberOfLines={1}>
+                    {/* Two lines allowed: on a narrow card one line cut it to
+                        "Example pri…", losing both the word and the unit. */}
+                    <Text variant="caption" muted numberOfLines={2}>
                       Example price {market?.unit ?? 'per bag'}
                     </Text>
                   </View>
