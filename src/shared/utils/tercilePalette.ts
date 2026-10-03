@@ -12,11 +12,10 @@ import type { SubseasonalVariable, TercileCategory } from '../domain/subseasonal
  * what IRI and WMO tercile products use. Both are colourblind-safe at this class
  * count, which a bare red/green pairing would not be.
  *
- * Distinct from `TERCILE_CATEGORIES` in `colorScale.ts`, which stays neutral and
- * is still what the Seasonal map uses. That view carries variables like dry-spell
- * length where "above" is not a direction with an agreed colour, and its own
- * docblock explains why it refuses to imply one. Rainfall and temperature do have
- * agreed colours, so this map uses them.
+ * Distinct from `TERCILE_CATEGORIES` in `colorScale.ts`, which stays neutral for
+ * variables like dry-spell length where "above" is not a direction with an agreed
+ * colour, and its own docblock explains why it refuses to imply one. Rainfall and
+ * temperature do have agreed colours, so both outlook maps use these.
  */
 
 /**

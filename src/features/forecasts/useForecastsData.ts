@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { getHourlyForecast, getWeeklyForecast } from '../../shared/api/forecastService';
+import { getSeasonalOutlookSet } from '../../shared/api/seasonalService';
 import { getSubseasonalOutlook, getSubseasonalOutlookSet } from '../../shared/api/subseasonalService';
 import { getCurrentConditions } from '../../shared/api/weatherService';
 import { HOME_LOCATIONS } from '../../shared/data/mockWeather';
@@ -13,8 +14,9 @@ import { useLocationStore } from '../../shared/state/locationStore';
  * All queries fire eagerly regardless of which segment (Daily/Weekly/
  * Subseasonal) is active, so switching segments feels instant once the first
  * load completes — the same pattern useHomeData already uses for its cards.
- * Seasonal has no query: there is no seasonal source yet, and the screen says
- * so instead of showing placeholder figures.
+ * Seasonal has one query, the national set: the reader's own town card is a
+ * slice of it, worked out in the section so it can follow the chosen season
+ * without a second request.
  */
 export function useForecastsData() {
   const locationId = useLocationStore((state) => state.selectedLocationId);
@@ -63,12 +65,23 @@ export function useForecastsData() {
     refetchInterval: (query) => (query.state.data?.computing ? 4000 : false),
   });
 
+  // Sixteen regions, three windows, the same wherever the reader stands. Polls
+  // while the server is still building it, exactly like the subseasonal set.
+  const seasonalSet = useQuery({
+    queryKey: ['seasonalOutlookSet'],
+    queryFn: getSeasonalOutlookSet,
+    enabled: hasHydrated,
+    refetchInterval: (query) => (query.state.data?.computing ? 4000 : false),
+  });
+
   return {
+    locationId,
     locationName: location?.name ?? '',
     conditions,
     hourly,
     weekly,
     subseasonal,
     subseasonalSet,
+    seasonalSet,
   };
 }

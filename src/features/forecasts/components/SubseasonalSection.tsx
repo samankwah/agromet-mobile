@@ -296,7 +296,7 @@ export function SubseasonalSection({
               )}
 
               {/* Matches the Seasonal segment's own selector style
-                  (SpatialOutlookView) — a caps FieldLabel over a pill, one
+                  (SeasonalSection) — a caps FieldLabel over a pill, one
                   full-width row each, no grid or card grouping them. Geography
                   and Variable used to share a row, which left "Temperature"
                   about 60px and shrank it below every other label in the

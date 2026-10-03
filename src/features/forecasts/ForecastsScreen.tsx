@@ -5,12 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from '../../shared/theme/ThemeProvider';
 import { AppHeader } from '../../shared/ui/AppHeader';
 import { AsyncStateView } from '../../shared/ui/AsyncStateView';
-import { Card } from '../../shared/ui/Card';
-import { EmptyState } from '../../shared/ui/EmptyState';
 import { useTabBarClearance } from '../../shared/ui/tabBarLayout';
 import { Screen } from '../../shared/ui/Screen';
 import { SegmentedControl } from '../../shared/ui/SegmentedControl';
 import { ON_BACKDROP_COLOR, ON_BACKDROP_MUTED, WeatherBackdrop } from '../../shared/ui/WeatherBackdrop';
+import { SeasonalSection } from './components/SeasonalSection';
 import { SubseasonalSection } from './components/SubseasonalSection';
 import { TodaySection } from './components/TodaySection';
 import { WeekSection } from './components/WeekSection';
@@ -75,7 +74,7 @@ export function ForecastsScreen({ requestedSegment }: Props = {}) {
     if (requestedSegment) setSegmentIndex(forecastSegmentIndex(requestedSegment));
   }, [requestedSegment]);
 
-  const { locationName, conditions, hourly, weekly, subseasonal, subseasonalSet } = useForecastsData();
+  const { locationId, locationName, conditions, hourly, weekly, subseasonal, subseasonalSet, seasonalSet } = useForecastsData();
 
   const todayStatus = combineStatus(conditions.status, hourly.status, weekly.status);
   const todayError = conditions.error ?? hourly.error ?? weekly.error;
@@ -105,9 +104,9 @@ export function ForecastsScreen({ requestedSegment }: Props = {}) {
   );
   const header = renderHeader(false);
 
-  // Subseasonal is a full-bleed spatial view with its own bottom drawer, so it
-  // manages its own layout instead of sitting inside the shared scroll
-  // container Daily and Weekly use.
+  // Subseasonal and Seasonal are full-bleed spatial views with their own bottom
+  // drawer, so they manage their own layout instead of sitting inside the
+  // shared scroll container Daily and Weekly use.
   if (isSubseasonal) {
     return (
       <Screen scroll={false} padded={false}>
@@ -199,29 +198,19 @@ export function ForecastsScreen({ requestedSegment }: Props = {}) {
     );
   }
 
-  // Seasonal. There is no seasonal source yet: the map that used to sit here
-  // drew a made-up grid, and a farmer cannot tell a made-up outlook from a real
-  // one. So the segment stays (deep links name it, and it is where the outlook
-  // will land) but says plainly that nothing has been published.
-  // SpatialOutlookView is kept for when a real feed exists; it is not mounted.
+  // Seasonal, the same full-bleed map-and-drawer layout as Subseasonal.
   return (
     <Screen scroll={false} padded={false}>
-      <ScrollView
-        contentContainerStyle={{
-          padding: theme.spacing.lg,
-          paddingBottom: theme.spacing.lg + tabBarClearance,
-          gap: theme.spacing.lg,
-        }}
-      >
-        {header}
-        <Card>
-          <EmptyState
-            icon="calendar-outline"
-            title="Seasonal outlook coming soon"
-            message="The seasonal outlook for the rainy season will show here when it is published."
-          />
-        </Card>
-      </ScrollView>
+      <View style={{ paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.lg, gap: theme.spacing.lg }}>{header}</View>
+      <View style={{ flex: 1, marginTop: theme.spacing.lg, paddingBottom: tabBarClearance }}>
+        <SeasonalSection
+          set={seasonalSet.data}
+          status={seasonalSet.status}
+          error={seasonalSet.error}
+          onRetry={seasonalSet.refetch}
+          locationId={locationId}
+        />
+      </View>
     </Screen>
   );
 }

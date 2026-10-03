@@ -20,8 +20,8 @@
  *      unions everything into one national outline.
  *   4. Lays a coarse lat/lng grid over the country, keeps only cells whose
  *      center falls inside the national outline, and tags each cell with
- *      its region/district — this is the exact grid a real gridded
- *      forecast dataset will map onto later (see spatialOutlookService.ts).
+ *      its region/district — this is the exact grid the gridded
+ *      outlooks are painted onto (see the cells.ts helpers under features/forecasts).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

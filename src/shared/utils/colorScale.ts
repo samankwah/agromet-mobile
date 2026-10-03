@@ -188,7 +188,7 @@ export function buildFixedClasses(breaks: number[], stops: ColorStops): ColorCla
  * instead of a numeric ramp.
  *
  * Index order is meaningful (0 = below, 1 = normal, 2 = above) and is what
- * the mock/service writes into `cell.value` in that mode.
+ * a caller writes into `cell.value` in that mode.
  *
  * The palette is a neutral ordered diverging scheme rather than the
  * wet-blue/dry-brown convention, because the "good" direction flips by

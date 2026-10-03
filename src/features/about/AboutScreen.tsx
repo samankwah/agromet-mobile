@@ -28,6 +28,7 @@ function appVersion(): string {
 const SOURCES = [
   'Daily and weekly forecasts from Open-Meteo, a free public weather service.',
   'Outlooks for the coming weeks from NOAA, the United States weather service.',
+  'Seasonal outlooks from ECMWF, through Open-Meteo.',
   'Crop and poultry advisories, when they are published for your district.',
   'Flood and drought readings from the AgroMet hazard model.',
   "Market prices are examples, not today's prices.",
