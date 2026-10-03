@@ -62,17 +62,63 @@ function renderWithControls(overrides: Overrides = {}) {
   return view;
 }
 
-describe('SeasonalSection controls', () => {
-  it('offers view, variable and season, with the seasons named from the data', () => {
-    const { getByText, getByLabelText } = renderWithControls();
+function chooseVariable(view: ReturnType<typeof render>, label: string) {
+  fireEvent.press(view.getByLabelText(/^VARIABLE: /));
+  fireEvent.press(view.getByText(label));
+}
 
-    expect(getByText('VIEW')).toBeTruthy();
-    expect(getByText('VARIABLE')).toBeTruthy();
-    expect(getByText('SEASON')).toBeTruthy();
-    const seasons = getByLabelText('Season');
-    for (const label of ['Nov to Jan', 'Dec to Feb', 'Jan to Mar']) {
-      expect(seasons.findByProps({ accessibilityLabel: label })).toBeTruthy();
+function chooseSeason(view: ReturnType<typeof render>, label: string) {
+  fireEvent.press(view.getByLabelText(/^SEASON: /));
+  fireEvent.press(view.getByText(label));
+}
+
+describe('SeasonalSection controls', () => {
+  it('offers Probability and Deterministic, never Average', () => {
+    const { getByLabelText, queryByText } = renderWithControls();
+    const views = getByLabelText('Forecast view');
+
+    expect(views.findByProps({ accessibilityLabel: 'Probability' })).toBeTruthy();
+    expect(views.findByProps({ accessibilityLabel: 'Deterministic' })).toBeTruthy();
+    expect(queryByText('Average')).toBeNull();
+  });
+
+  it('lists the seven variables exactly as named', () => {
+    const view = renderWithControls();
+    fireEvent.press(view.getByLabelText('VARIABLE: Onset Date'));
+
+    for (const label of [
+      'Early-Season Dry Spell',
+      'Late-Season Dry Spell',
+      'Cessation Date',
+      'Rainfall Total (mm)',
+      'Number of Rainy Days (days)',
+      'Temperature (°C)',
+    ]) {
+      expect(view.getByText(label)).toBeTruthy();
     }
+  });
+
+  it('offers the three rainy seasons for onset, and opens on the reader’s own half of the country', () => {
+    const south = renderWithControls();
+    expect(south.getByLabelText('SEASON: Southern Major Season')).toBeTruthy();
+    south.unmount();
+
+    const north = renderWithControls({ locationId: 'tamale' });
+    expect(north.getByLabelText('SEASON: Northern Single Season')).toBeTruthy();
+    fireEvent.press(north.getByLabelText('SEASON: Northern Single Season'));
+    expect(north.getByText('Southern Minor Season')).toBeTruthy();
+  });
+
+  it('swaps the season list for MAM, MJJ and JAS on rainfall totals', () => {
+    const view = renderWithControls();
+    chooseVariable(view, 'Rainfall Total (mm)');
+
+    const windows = view.getByLabelText('Three-month window');
+    for (const label of ['MAM', 'MJJ', 'JAS']) {
+      expect(windows.findByProps({ accessibilityLabel: label })).toBeTruthy();
+    }
+    expect(view.queryByLabelText(/^SEASON: /)).toBeNull();
+    expect(view.getByText('March to May 2027, all regions.')).toBeTruthy();
   });
 
   it('has no district control, and says why', () => {
@@ -96,27 +142,42 @@ describe('SeasonalSection controls', () => {
   });
 });
 
+describe('a season beyond the model reach', () => {
+  it('says the map is the normal and when the forecast will be ready', () => {
+    const view = renderWithControls();
+    expect(view.queryByText(/Normal, not a forecast/)).toBeNull();
+
+    chooseSeason(view, 'Southern Minor Season');
+
+    expect(view.getByText(/The forecast for this season will be ready from May 2027\./)).toBeTruthy();
+    expect(view.getByText(/The forecast for the Southern Minor Season will be ready from May 2027/)).toBeTruthy();
+  });
+});
+
 describe("the reader's own town card", () => {
-  it('shows the region, the badge and the plain sentence', () => {
+  it('shows the town, the badge and the plain sentence', () => {
     const { getByText } = renderWithControls();
 
-    expect(getByText('Greater Accra')).toBeTruthy();
+    expect(getByText('Accra, Greater Accra')).toBeTruthy();
     expect(getByText('High confidence')).toBeTruthy();
-    expect(getByText(/72% chance of a drier than normal season from Nov to Jan/)).toBeTruthy();
+    expect(getByText(/72% chance the start of the rains in Greater Accra is earlier than usual, around Week 2 of March/)).toBeTruthy();
   });
 
-  it('follows the season control', () => {
-    const { getByLabelText, getByText } = renderWithControls();
-    fireEvent.press(getByLabelText('Season').findByProps({ accessibilityLabel: 'Dec to Feb' }));
+  it('follows the variable control', () => {
+    const view = renderWithControls();
+    chooseVariable(view, 'Late-Season Dry Spell');
 
-    expect(getByText('The forecasts for Greater Accra do not agree, so treat this season as normal.')).toBeTruthy();
+    expect(
+      view.getByText(/65% chance the longest dry spell late in the season in Greater Accra is longer than usual, about 9 days/),
+    ).toBeTruthy();
   });
 
   it('notes the dry season in the legend when a region is in it', () => {
-    const { getByText } = renderWithControls({ locationId: 'tamale' });
+    const view = renderWithControls({ locationId: 'tamale' });
+    chooseVariable(view, 'Rainfall Total (mm)');
 
-    expect(getByText(/Regions in their dry season show as No signal/)).toBeTruthy();
-    expect(getByText(/This is the dry season in Northern/)).toBeTruthy();
+    expect(view.getByText(/Regions in their dry season show as No signal/)).toBeTruthy();
+    expect(view.getByText(/This is the dry season in Northern/)).toBeTruthy();
   });
 });
 
@@ -140,7 +201,7 @@ describe('a published forecast', () => {
 describe('the empty states', () => {
   it('waits without a button while the outlook is being prepared', () => {
     const { getByText, queryByText } = renderWithControls({
-      set: makeSet({ windows: [], unavailable: true, computing: true, fetchFailed: true }),
+      set: makeSet({ seasons: {}, windows: {}, unavailable: true, computing: true, fetchFailed: true }),
     });
 
     expect(getByText('Getting the outlook ready')).toBeTruthy();
@@ -152,7 +213,7 @@ describe('the empty states', () => {
 
   it('offers a retry when the fetch failed', () => {
     const onRetry = jest.fn();
-    const { getByText } = renderWithControls({ set: makeSet({ windows: [], unavailable: true, fetchFailed: true }), onRetry });
+    const { getByText } = renderWithControls({ set: makeSet({ seasons: {}, windows: {}, unavailable: true, fetchFailed: true }), onRetry });
 
     expect(getByText('The weather service did not answer')).toBeTruthy();
     fireEvent.press(getByText('Try again'));
@@ -161,7 +222,7 @@ describe('the empty states', () => {
   });
 
   it('says nothing has been computed when the store is empty', () => {
-    const { getByText, queryByText } = renderWithControls({ set: makeSet({ windows: [], unavailable: true }) });
+    const { getByText, queryByText } = renderWithControls({ set: makeSet({ seasons: {}, windows: {}, unavailable: true }) });
 
     expect(getByText('No seasonal outlook has been computed yet')).toBeTruthy();
     expect(queryByText('Try again')).toBeNull();

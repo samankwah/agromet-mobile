@@ -1,80 +1,86 @@
-import { buildSeasonalCells, hasDryWindow, hasProbabilities } from '../../features/forecasts/seasonal/cells';
+import {
+  buildSeasonalCells,
+  categoryLabels,
+  hasDryWindow,
+  hasProbabilities,
+  paletteForVariable,
+  stopsFor,
+  valueFormatFor,
+} from '../../features/forecasts/seasonal/cells';
 import { GHANA_BOUNDARIES } from '../../shared/data/ghanaBoundaries';
-import { seasonalCell, seasonalReading } from '../fixtures/seasonal';
+import { DRY_SPELL_STOPS, RAINFALL_STOPS } from '../../shared/utils/colorScale';
+import { normalOnly, seasonalCell, seasonalReading } from '../fixtures/seasonal';
 
 const accraGrid = GHANA_BOUNDARIES.grid.filter((cell) => cell.regionName === 'Greater Accra');
 
-/* The payload is one reading per region, so every display cell in a region takes
-   that region's reading and the map comes out as flat regional blocks. */
+/* One reading per region, so every display cell in a region takes that region's
+   reading and the map comes out as flat regional blocks. */
 describe('buildSeasonalCells', () => {
   it("paints every display cell in a region with that region's band", () => {
-    const cells = buildSeasonalCells([seasonalCell('Greater Accra')], 'rainfall', 'probability');
+    const cells = buildSeasonalCells([seasonalCell('Greater Accra', { onset: seasonalReading() })], 'onset', 'probability');
 
     expect(cells).toHaveLength(accraGrid.length);
     expect(cells.every((cell) => cell.regionName === 'Greater Accra')).toBe(true);
-    // 72% drier is a strong lean: the driest band.
+    // 72% earlier is a strong lean: the first band.
     expect(new Set(cells.map((cell) => cell.value))).toEqual(new Set([0]));
   });
 
-  it('writes the ensemble value in the average view', () => {
-    const cells = buildSeasonalCells([seasonalCell('Greater Accra')], 'temperature', 'average');
+  it('writes the ensemble median in the deterministic view', () => {
+    const cells = buildSeasonalCells([seasonalCell('Greater Accra', { onset: seasonalReading() })], 'onset', 'deterministic');
 
-    expect(new Set(cells.map((cell) => cell.value))).toEqual(new Set([33.4]));
+    expect(new Set(cells.map((cell) => cell.value))).toEqual(new Set([70]));
   });
 
-  it('matches region names whatever their spelling', () => {
-    const cells = buildSeasonalCells([seasonalCell('GREATER ACCRA Region')], 'rainfall', 'probability');
+  it('paints a season beyond reach by its normal, whatever the view', () => {
+    const cells = buildSeasonalCells([seasonalCell('Greater Accra', { cessation: normalOnly() })], 'cessation', 'probability');
 
-    expect(cells).toHaveLength(accraGrid.length);
+    expect(new Set(cells.map((cell) => cell.value))).toEqual(new Set([280]));
+  });
+
+  it('leaves regions outside the season unpainted', () => {
+    const cells = buildSeasonalCells([seasonalCell('Northern', { onset: seasonalReading() })], 'onset', 'probability');
+
+    expect(cells.some((cell) => cell.regionName === 'Greater Accra')).toBe(false);
+    expect(cells.every((cell) => cell.regionName === 'Northern')).toBe(true);
   });
 
   it('drops a region with no reading rather than painting it neutral', () => {
-    const cells = buildSeasonalCells([seasonalCell('Greater Accra', { rainfall: null })], 'rainfall', 'probability');
-
-    expect(cells).toEqual([]);
+    expect(buildSeasonalCells([seasonalCell('Greater Accra')], 'rainyDays', 'probability')).toEqual([]);
   });
 
-  it('drops a region with no split in the probability view, but keeps it in the average view', () => {
-    const noRecord = seasonalCell('Greater Accra', { rainfall: seasonalReading({ probabilities: undefined, category: undefined }) });
+  it('paints a dry window as no signal in the probability view', () => {
+    const dry = seasonalCell('Greater Accra', { rainfallTotal: seasonalReading({ dryWindow: true }) });
 
-    expect(buildSeasonalCells([noRecord], 'rainfall', 'probability')).toEqual([]);
-    expect(buildSeasonalCells([noRecord], 'rainfall', 'average')).toHaveLength(accraGrid.length);
-  });
-
-  it('paints a dry-season region as no signal, never as a lean', () => {
-    const dry = seasonalCell('Greater Accra', { rainfall: seasonalReading({ dryWindow: true }) });
-    const cells = buildSeasonalCells([dry], 'rainfall', 'probability');
-
-    expect(new Set(cells.map((cell) => cell.value))).toEqual(new Set([2]));
-  });
-
-  it('draws nothing for an empty window', () => {
-    expect(buildSeasonalCells([], 'rainfall', 'probability')).toEqual([]);
-  });
-
-  it('covers all sixteen regions when all sixteen are present', () => {
-    const regions = [...new Set(GHANA_BOUNDARIES.grid.map((cell) => cell.regionName).filter(Boolean))] as string[];
-    const cells = buildSeasonalCells(
-      regions.map((region) => seasonalCell(region)),
-      'rainfall',
-      'probability',
-    );
-
-    expect(regions).toHaveLength(16);
-    expect(new Set(cells.map((cell) => cell.regionName)).size).toBe(16);
+    expect(new Set(buildSeasonalCells([dry], 'rainfallTotal', 'probability').map((cell) => cell.value))).toEqual(new Set([2]));
+    expect(hasDryWindow([dry], 'rainfallTotal')).toBe(true);
+    expect(hasDryWindow([dry], 'rainyDays')).toBe(false);
   });
 });
 
-describe('hasDryWindow and hasProbabilities', () => {
-  it('spot a dry-season region', () => {
-    expect(hasDryWindow([seasonalCell('Northern', { rainfall: seasonalReading({ dryWindow: true }) })])).toBe(true);
-    expect(hasDryWindow([seasonalCell('Northern')])).toBe(false);
+describe('hasProbabilities', () => {
+  it('counts only real forecast splits', () => {
+    expect(hasProbabilities([seasonalCell('Ashanti', { onset: seasonalReading() })], 'onset')).toBe(true);
+    expect(hasProbabilities([seasonalCell('Ashanti', { onset: normalOnly() })], 'onset')).toBe(false);
+  });
+});
+
+describe('legends and keys', () => {
+  it('writes dates as weeks and picks a ramp that fits each variable', () => {
+    expect(valueFormatFor('onset')).toBe('day-of-year');
+    expect(valueFormatFor('rainyDays')).toBe('number');
+    expect(stopsFor('lateDrySpell')).toBe(DRY_SPELL_STOPS);
+    expect(stopsFor('rainfallTotal')).toBe(RAINFALL_STOPS);
   });
 
-  it('do not count a dry-season split as a real one', () => {
-    const dryOnly = seasonalCell('Northern', { rainfall: seasonalReading({ dryWindow: true }), temperature: null });
+  it('names the bands in the words of each variable', () => {
+    expect(paletteForVariable('onset').map((band) => band.label)).toEqual(['Much earlier', 'Earlier', 'No signal', 'Later', 'Much later']);
+    expect(paletteForVariable('earlyDrySpell')[4].label).toBe('Much longer');
+    expect(categoryLabels('cessation')).toEqual(['Earlier end', 'Usual time', 'Later end']);
+  });
 
-    expect(hasProbabilities([dryOnly])).toBe(false);
-    expect(hasProbabilities([seasonalCell('Northern')])).toBe(true);
+  it('keeps good news in wet colours: an early onset looks like a wet season, a long dry spell like a dry one', () => {
+    const rain = paletteForVariable('rainfallTotal');
+    expect(paletteForVariable('onset')[0].color).toBe(rain[4].color);
+    expect(paletteForVariable('lateDrySpell')[4].color).toBe(rain[0].color);
   });
 });

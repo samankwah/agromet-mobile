@@ -45,6 +45,15 @@ export const TEMPERATURE_STOPS: ColorStops = [
   [1, [189, 0, 38]],
 ];
 
+/** ColorBrewer YlOrBr: dry-spell length, pale for short to deep brown for long. */
+export const DRY_SPELL_STOPS: ColorStops = [
+  [0, [255, 255, 212]],
+  [0.25, [254, 217, 142]],
+  [0.5, [254, 153, 41]],
+  [0.75, [217, 95, 14]],
+  [1, [153, 52, 4]],
+];
+
 /**
  * The rain-rate ramp NASA GIBS bakes into its IMERG tiles, sampled from the
  * live tiles themselves.

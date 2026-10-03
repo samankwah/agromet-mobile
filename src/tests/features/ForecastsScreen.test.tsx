@@ -103,7 +103,7 @@ describe('ForecastsScreen', () => {
 
         expect(selected()).toBe('Seasonal');
         expect(await screen.findByText('SEASON')).toBeTruthy();
-        expect(screen.getByText(/72% chance of a drier than normal season from Nov to Jan/)).toBeTruthy();
+        expect(screen.getByText(/72% chance the start of the rains in Greater Accra is earlier than usual/)).toBeTruthy();
         expect(screen.queryByText('Seasonal outlook coming soon')).toBeNull();
       } finally {
         useLocationStore.setState({ selectedLocationId: previous.selectedLocationId, hasHydrated: previous.hasHydrated });

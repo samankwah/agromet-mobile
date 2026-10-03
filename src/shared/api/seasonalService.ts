@@ -1,25 +1,28 @@
 import { HOME_LOCATIONS } from '../data/mockWeather';
 import type {
+  SeasonKey,
+  SeasonalBlock,
   SeasonalCell,
   SeasonalOutlook,
   SeasonalOutlookSet,
+  SeasonalReading,
   SeasonalSourceRef,
-  SeasonalVariable,
   SeasonalVariableId,
-  SeasonalWindow,
+  WindowKey,
 } from '../domain/seasonalOutlook';
-import { normaliseRegion } from '../domain/seasonalOutlook';
-import { leadingProbabilityPct } from '../domain/subseasonalOutlook';
+import { SEASON_LABELS, VARIABLE_INFO, formatYearMonth, isSeasonVariable, normaliseRegion, sectorOf } from '../domain/seasonalOutlook';
 import { getJson } from './http';
 import { ServiceError } from './mockDelay';
 
 /**
  * The seasonal outlook, from `/api/outlook/seasonal`.
  *
- * One fetch serves both consumers, as with the subseasonal outlook: the map
- * wants every region in every window, the town card wants one region in one
- * window, and both are slices of the same payload.
+ * One fetch serves both consumers: the map wants every region in the chosen
+ * season or window, the town card wants one region of it, and both are slices
+ * of the same payload.
  */
+
+type Blocks<K extends string> = Partial<Record<K, SeasonalBlock>>;
 
 type ApiPayload = {
   source?: 'seas5' | 'gmet';
@@ -29,8 +32,10 @@ type ApiPayload = {
   validFrom?: string | null;
   validTo?: string | null;
   pdfUrl?: string | null;
-  windows?: SeasonalWindow[];
-  modelWindows?: SeasonalWindow[];
+  seasons?: Blocks<SeasonKey> | unknown[];
+  windows?: Blocks<WindowKey> | unknown[];
+  modelSeasons?: Blocks<SeasonKey> | unknown[];
+  modelWindows?: Blocks<WindowKey> | unknown[];
   unavailable?: boolean;
   model?: string;
   baseline?: string | null;
@@ -42,8 +47,20 @@ type ApiPayload = {
   fetchFailed?: boolean;
 };
 
+/** A keyed object of blocks, or nothing. An older server sent a list here, which
+ * this version cannot read, so it is treated as no outlook rather than a crash. */
+function blocks<K extends string>(value: Blocks<K> | unknown[] | undefined): Blocks<K> {
+  return value && !Array.isArray(value) && typeof value === 'object' ? value : {};
+}
+
+function hasCells(entries: Blocks<string>): boolean {
+  return Object.values(entries).some((block) => (block?.cells?.length ?? 0) > 0);
+}
+
 export async function getSeasonalOutlookSet(): Promise<SeasonalOutlookSet> {
   const payload = await getJson<ApiPayload>('/api/outlook/seasonal');
+  const seasons = blocks<SeasonKey>(payload.seasons);
+  const windows = blocks<WindowKey>(payload.windows);
 
   return {
     source: payload.source === 'gmet' ? 'gmet' : 'seas5',
@@ -53,9 +70,11 @@ export async function getSeasonalOutlookSet(): Promise<SeasonalOutlookSet> {
     validFrom: payload.validFrom ?? null,
     validTo: payload.validTo ?? null,
     pdfUrl: payload.pdfUrl ?? null,
-    windows: payload.windows ?? [],
-    modelWindows: payload.modelWindows ?? [],
-    unavailable: Boolean(payload.unavailable),
+    seasons,
+    windows,
+    modelSeasons: blocks<SeasonKey>(payload.modelSeasons),
+    modelWindows: blocks<WindowKey>(payload.modelWindows),
+    unavailable: Boolean(payload.unavailable) || (!hasCells(seasons) && !hasCells(windows)),
     model: payload.model ?? 'ECMWF SEAS5',
     baseline: payload.baseline ?? null,
     stale: Boolean(payload.stale),
@@ -67,31 +86,118 @@ export async function getSeasonalOutlookSet(): Promise<SeasonalOutlookSet> {
   };
 }
 
-/** A region's cell in a window, matched on the normalised name. */
-export function regionCell(window: SeasonalWindow | undefined, region: string | null | undefined): SeasonalCell | undefined {
-  if (!window || !region) return undefined;
-  const wanted = normaliseRegion(region);
-  return window.cells.find((cell) => normaliseRegion(cell.region) === wanted);
+/** The season or window a variable is read over. */
+export function pickBlock(
+  set: Pick<SeasonalOutlookSet, 'seasons' | 'windows'>,
+  variable: SeasonalVariableId,
+  seasonKey: SeasonKey,
+  windowKey: WindowKey,
+): SeasonalBlock | undefined {
+  return isSeasonVariable(variable) ? set.seasons[seasonKey] : set.windows[windowKey];
 }
 
-/** The window the reader asked for, or the nearest one when they asked for none
- * or for one this run does not carry. */
-export function pickWindow(windows: SeasonalWindow[], windowKey?: string): SeasonalWindow | undefined {
-  return windows.find((window) => window.key === windowKey) ?? windows[0];
+/** A region's cell in a block, matched on the normalised name. */
+export function regionCell(block: SeasonalBlock | undefined, region: string | null | undefined): SeasonalCell | undefined {
+  if (!block || !region) return undefined;
+  const wanted = normaliseRegion(region);
+  return block.cells.find((cell) => normaliseRegion(cell.region) === wanted);
+}
+
+/** When every region's reading is only a normal, the month the forecast will be
+ * ready ("February 2027"); null when the block holds a forecast. */
+export function readyFrom(block: SeasonalBlock | undefined, variable: SeasonalVariableId): string | null {
+  const readings = (block?.cells ?? []).map((cell) => cell[variable]).filter((reading): reading is SeasonalReading => Boolean(reading));
+  if (readings.length === 0 || readings.some((reading) => reading.available)) return null;
+  return formatYearMonth(readings[0].availableFrom) ?? 'a later month';
+}
+
+/** The share of the winning third, as a whole percent. */
+export function leadingPct(reading: SeasonalReading): number {
+  if (!reading.probabilities || !reading.category) return 0;
+  return Math.round(reading.probabilities[reading.category] * 100);
+}
+
+function noClearSignal(reading: SeasonalReading): boolean {
+  return Boolean(reading.noSignal) || reading.confidence === 'low';
+}
+
+/** "Week 3 of March" for dates, "12 days" or "340 mm" otherwise. */
+export function readingText(reading: SeasonalReading, which: 'value' | 'normal'): string | null {
+  return which === 'value' ? (reading.display ?? null) : (reading.normalDisplay ?? null);
+}
+
+/**
+ * The sentence for one region's reading, written from the actual split.
+ *
+ * Plain words for a farmer reading in a second language: a chance, a
+ * direction, when or how much, and the reminder that it is a chance.
+ */
+export function summariseReading(
+  reading: SeasonalReading | undefined,
+  variable: SeasonalVariableId,
+  region: string,
+  label: string,
+): string {
+  const info = VARIABLE_INFO[variable];
+  // "the Southern Major Season", but plain "March to May".
+  const span = info.kind === 'season' ? `the ${label}` : label;
+  if (!reading) return `There is no outlook for the ${info.noun} in ${region} for ${span}.`;
+
+  const normal = readingText(reading, 'normal');
+  if (!reading.available) {
+    const ready = formatYearMonth(reading.availableFrom) ?? 'a later month';
+    const usual = normal ? ` Normally the ${info.noun} in ${region} is ${usualPhrase(variable, normal)}.` : '';
+    return `The forecast for ${span} will be ready from ${ready}.${usual}`;
+  }
+
+  if (variable === 'rainfallTotal' && reading.dryWindow) {
+    return `This is the dry season in ${region}. Little rain falls in ${label}, so there is no rainfall outlook for these months.`;
+  }
+
+  const value = readingText(reading, 'value');
+  if (!reading.probabilities || !reading.category) {
+    return value ? `The ${info.noun} in ${region} should be ${usualPhrase(variable, value)}.` : `There is no outlook for ${region} yet.`;
+  }
+
+  if (noClearSignal(reading)) {
+    return `The forecasts for ${region} do not agree, so plan for a normal ${info.noun}${normal ? `, ${usualPhrase(variable, normal)}` : ''}.`;
+  }
+
+  const around = value ? `, ${usualPhrase(variable, value)}` : '';
+  return `${leadingPct(reading)}% chance the ${info.noun} in ${region} is ${info.words[reading.category]}${around}. This is a probability, not a certainty.`;
+}
+
+/** "around Week 3 of March" for dates, "about 12 days" otherwise. */
+function usualPhrase(variable: SeasonalVariableId, text: string): string {
+  if (variable === 'onset' || variable === 'cessation') {
+    return text.startsWith('Week') ? `around ${text}` : text.charAt(0).toLowerCase() + text.slice(1);
+  }
+  return `about ${text}`;
+}
+
+/** A short phrase for the "the model alone reads" line. */
+export function leanPhrase(reading: SeasonalReading | undefined, variable: SeasonalVariableId): string | null {
+  if (!reading || !reading.available) return null;
+  if (reading.dryWindow) return 'dry season';
+  if (!reading.probabilities || !reading.category) return null;
+  if (noClearSignal(reading)) return 'no clear signal';
+  return `${VARIABLE_INFO[variable].words[reading.category]} (${leadingPct(reading)}%)`;
 }
 
 /**
  * The reader's own town card, from a set already in hand.
  *
- * Split from the fetch so the screen can recompute it when the reader changes
- * season, without a second request for a payload it already holds.
- *
- * Throws rather than falling back to a national figure, for the same reason the
- * subseasonal card does: an average over a country that is dry in the south and
- * wet in the north would tell everybody "normal".
+ * Throws rather than falling back to a national figure: an average over a
+ * country with two rainfall regimes would tell everybody "normal".
  */
-export function buildSeasonalOutlook(set: SeasonalOutlookSet, locationId: string, windowKey?: string): SeasonalOutlook {
-  if (set.unavailable || set.windows.length === 0) {
+export function buildSeasonalOutlook(
+  set: SeasonalOutlookSet,
+  locationId: string,
+  variable: SeasonalVariableId,
+  seasonKey: SeasonKey,
+  windowKey: WindowKey,
+): SeasonalOutlook {
+  if (set.unavailable) {
     // `computing` first: a refresh already running is the one case where the
     // reader has nothing to do, so it must not read as a failure even when the
     // attempt before it failed. "being prepared" is also what the poll keys on.
@@ -105,127 +211,42 @@ export function buildSeasonalOutlook(set: SeasonalOutlookSet, locationId: string
   }
 
   const place = HOME_LOCATIONS.find((entry) => entry.id === locationId);
-  if (!place) {
-    throw new ServiceError(`No seasonal outlook available for "${locationId}".`);
+  if (!place) throw new ServiceError(`No seasonal outlook available for "${locationId}".`);
+
+  const block = pickBlock(set, variable, seasonKey, windowKey);
+  const label = block?.label ?? (isSeasonVariable(variable) ? SEASON_LABELS[seasonKey] : windowKey);
+
+  if (isSeasonVariable(variable) && (seasonKey === 'northern') !== (sectorOf(place.region) === 'north')) {
+    const other = sectorOf(place.region) === 'north' ? 'the Northern Single Season' : 'a southern season';
+    return {
+      locationId,
+      townName: place.name,
+      region: place.region,
+      confidenceLevel: null,
+      plainLanguageSummary: `${place.region} does not have the ${label}. Choose ${other} to see ${place.name}.`,
+      modelSummary: null,
+      source: set.source,
+      issuedBy: set.issuedBy,
+    };
   }
 
-  const window = pickWindow(set.windows, windowKey)!;
-  const cell = regionCell(window, place.region);
-  if (!cell || (!cell.rainfall && !cell.temperature)) {
-    throw new ServiceError(`No seasonal outlook available for ${place.region}.`);
-  }
+  const cell = regionCell(block, place.region);
+  const reading = cell?.[variable];
+  if (!cell || !reading) throw new ServiceError(`No seasonal outlook available for ${place.region}.`);
 
-  // Only a reading for the same window counts: the model's Dec to Feb is no
-  // comment on a published Nov to Jan, so no fallback to the nearest window.
-  const modelCell =
-    set.source === 'gmet'
-      ? regionCell(
-          set.modelWindows.find((entry) => entry.key === window.key),
-          place.region,
-        )
-      : undefined;
+  // Only the same season or window counts: no fallback to the nearest one.
+  const modelBlock =
+    set.source === 'gmet' ? pickBlock({ seasons: set.modelSeasons, windows: set.modelWindows }, variable, seasonKey, windowKey) : undefined;
+  const modelLean = leanPhrase(regionCell(modelBlock, place.region)?.[variable], variable);
 
   return {
     locationId,
     townName: place.name,
     region: cell.region,
-    windowKey: window.key,
-    windowLabel: window.label,
-    confidenceLevel: confidenceFor(cell),
-    plainLanguageSummary: summariseRainfall(cell.rainfall, cell.region, window.label),
-    temperatureSummary: cell.temperature ? summariseTemperature(cell.temperature, cell.region, window.label) : null,
-    modelSummary: modelCell ? modelReads(modelCell) : null,
+    confidenceLevel: reading.available && reading.probabilities && !reading.dryWindow ? (reading.confidence ?? 'low') : null,
+    plainLanguageSummary: summariseReading(reading, variable, cell.region, label),
+    modelSummary: modelLean ? `The model alone reads: ${modelLean}.` : null,
     source: set.source,
     issuedBy: set.issuedBy,
   };
-}
-
-/** The town card, fetched. `windowKey` defaults to the nearest window. */
-export async function getSeasonalOutlook(locationId: string, windowKey?: string): Promise<SeasonalOutlook> {
-  const set = await getSeasonalOutlookSet();
-  return buildSeasonalOutlook(set, locationId, windowKey);
-}
-
-/** Rainfall decides the badge, unless rainfall has nothing to say this window. */
-function confidenceFor(cell: SeasonalCell) {
-  const rain = cell.rainfall;
-  if (rain && !rain.dryWindow && rain.probabilities && rain.confidence) return rain.confidence;
-  return cell.temperature?.confidence ?? 'low';
-}
-
-/** True when the split is too even, or too uninformative, to call a direction. */
-function noClearSignal(reading: SeasonalVariable): boolean {
-  return Boolean(reading.noSignal) || reading.confidence === 'low';
-}
-
-/**
- * The sentence beside the badge, written from the actual split.
- *
- * Plain words for a farmer reading in a second language: a chance, a direction,
- * the months, and the reminder that it is a chance.
- */
-export function summariseRainfall(reading: SeasonalVariable | null, region: string, label: string): string {
-  if (!reading) return `There is no rainfall outlook for ${region} from ${label}.`;
-
-  if (reading.dryWindow) {
-    return `This is the dry season in ${region}. Little rain falls from ${label}, so there is no rainfall outlook for these months.`;
-  }
-
-  if (!reading.probabilities || !reading.category) {
-    return `${region} should get about ${Math.round(reading.value)} mm of rain from ${label}. There is no long-term record here yet to compare it with.`;
-  }
-
-  if (noClearSignal(reading)) {
-    return `The forecasts for ${region} do not agree, so treat this season as normal.`;
-  }
-
-  const direction =
-    reading.category === 'below'
-      ? 'a drier than normal season'
-      : reading.category === 'above'
-        ? 'a wetter than normal season'
-        : 'near normal rain';
-
-  return `${region}: ${leadingProbabilityPct(reading)}% chance of ${direction} from ${label}. This is a probability, not a certainty.`;
-}
-
-export function summariseTemperature(reading: SeasonalVariable, region: string, label: string): string {
-  if (!reading.probabilities || !reading.category) {
-    return `Days in ${region} should reach about ${Math.round(reading.value)}°C from ${label}.`;
-  }
-
-  if (noClearSignal(reading)) {
-    return `The temperature forecasts for ${region} do not agree, so expect normal temperatures.`;
-  }
-
-  const direction =
-    reading.category === 'below'
-      ? 'a cooler than normal season'
-      : reading.category === 'above'
-        ? 'a warmer than normal season'
-        : 'near normal temperatures';
-
-  return `${leadingProbabilityPct(reading)}% chance of ${direction} from ${label}.`;
-}
-
-/** A short phrase for one reading, for the "the model alone reads" line. */
-export function leanPhrase(reading: SeasonalVariable | null, variable: SeasonalVariableId): string | null {
-  if (!reading) return null;
-  if (reading.dryWindow) return 'dry season';
-  if (!reading.probabilities || !reading.category) return null;
-  if (noClearSignal(reading)) return 'no clear signal';
-
-  const words =
-    variable === 'rainfall'
-      ? { below: 'drier than normal', normal: 'near normal', above: 'wetter than normal' }
-      : { below: 'cooler than normal', normal: 'near normal', above: 'warmer than normal' };
-
-  return `${words[reading.category]} (${leadingProbabilityPct(reading)}%)`;
-}
-
-function modelReads(cell: SeasonalCell): string | null {
-  const rain = leanPhrase(cell.rainfall, 'rainfall');
-  const heat = leanPhrase(cell.temperature, 'temperature');
-  const parts = [rain ? `rainfall ${rain}` : null, heat ? `temperature ${heat}` : null].filter(Boolean);
-  return parts.length > 0 ? `The model alone reads: ${parts.join(', ')}.` : null;
 }

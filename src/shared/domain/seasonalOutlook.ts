@@ -1,40 +1,56 @@
-import type { ConfidenceLevel, SubseasonalVariable, SubseasonalVariableId } from './subseasonalOutlook';
+import type { ConfidenceLevel, TercileCategory, TercileProbabilities } from './subseasonalOutlook';
 
 /**
- * The seasonal outlook: three overlapping three-month windows, by region.
+ * The seasonal outlook: agro-climatic indices by region.
  *
- * `/api/outlook/seasonal` serves ECMWF SEAS5 (51 members) reduced to one reading
- * per region per window, adjusted to local climate against an ERA5 1995-2024
- * baseline. Region is the honest resolution: a seasonal model run at roughly a
- * degree has nothing to say about one district that it does not say about the
- * next, so the payload carries no district geography at all.
+ * `/api/outlook/seasonal` works these out from each ECMWF SEAS5 member's daily
+ * rain, after scaling it to the local record, and compares them with the same
+ * indices over ERA5 1995-2024:
+ *
+ * - **Seasons** (onset, cessation, early and late dry spells): Ghana's three
+ *   rainy seasons. The northern season covers the five northern regions only,
+ *   the two southern seasons the other eleven, so each season's map paints only
+ *   its own half of the country.
+ * - **Windows** (rainfall total, rainy days, temperature): the fixed three-month
+ *   blocks MAM, MJJ and JAS, for every region.
+ *
+ * SEAS5 reaches about seven months ahead. A season that ends beyond that has
+ * `available: false`: the reading carries the normal and the month the forecast
+ * will be ready, and the screen says "Normal, not a forecast".
  *
  * When a published seasonal forecast is in force (`source === 'gmet'`), its
- * readings fill `windows` and the model's own reading travels beside it in
- * `modelWindows`, so the app can say what the model alone reads without ever
- * passing the published figures off as its own.
- *
- * Same rule as the subseasonal card: the town outlook below carries a
- * non-optional `plainLanguageSummary`, because a probabilistic outlook must
- * never be rendered without the sentence that says it is one.
+ * readings fill `seasons` and `windows` and the model's own travel beside them
+ * in `modelSeasons` and `modelWindows`.
  */
 export type SeasonalSource = 'seas5' | 'gmet';
-export type SeasonalVariableId = SubseasonalVariableId;
-export type SeasonalView = 'probability' | 'average';
+export type SeasonalView = 'probability' | 'deterministic';
 
-/**
- * One region's reading for one variable over one window.
- *
- * The subseasonal shape plus two flags, so `bandFor` and the palettes apply
- * unchanged. `value` is a window rainfall total in mm, or the mean daily maximum
- * in degrees.
- */
-export type SeasonalVariable = SubseasonalVariable & {
-  /** True when `value` has been adjusted against the local record. */
-  biasCorrected?: boolean;
-  /** Rainfall only: the window falls in this region's dry season, so a tercile
-   * split of near-zero totals would be noise. The map draws it as no signal and
-   * the card says it is the dry season, never that rain is forecast. */
+export type SeasonKey = 'northern' | 'southern-major' | 'southern-minor';
+export type WindowKey = 'MAM' | 'MJJ' | 'JAS';
+
+export type SeasonVariableId = 'onset' | 'cessation' | 'earlyDrySpell' | 'lateDrySpell';
+export type WindowVariableId = 'rainfallTotal' | 'rainyDays' | 'temperature';
+export type SeasonalVariableId = SeasonVariableId | WindowVariableId;
+
+/** One region's reading for one variable. */
+export type SeasonalReading = {
+  /** False when the season ends beyond the model's reach: only the normal is known. */
+  available: boolean;
+  /** "2027-02": the first monthly run that will cover it. Only when not available. */
+  availableFrom?: string;
+  /** The ensemble median: day of year for dates, days, mm or degrees otherwise. */
+  value?: number;
+  /** How the server writes `value`, e.g. "Week 3 of March" or "12 days". */
+  display?: string | null;
+  members?: number;
+  /** The 1995-2024 median, in the same unit as `value`. */
+  normal: number | null;
+  normalDisplay: string | null;
+  probabilities?: TercileProbabilities;
+  category?: TercileCategory;
+  confidence?: ConfidenceLevel;
+  noSignal?: boolean;
+  /** Rainfall total only: these months are the dry season here. */
   dryWindow?: boolean;
 };
 
@@ -43,17 +59,12 @@ export type SeasonalCell = {
   region: string;
   lat: number;
   lng: number;
-  rainfall: SeasonalVariable | null;
-  temperature: SeasonalVariable | null;
-};
+} & Partial<Record<SeasonalVariableId, SeasonalReading>>;
 
-/** One three-month window, e.g. "Nov to Jan". */
-export type SeasonalWindow = {
+export type SeasonalBlock = {
   key: string;
-  startMonth: number;
   label: string;
-  start: string;
-  end: string;
+  year: number;
   cells: SeasonalCell[];
 };
 
@@ -73,9 +84,11 @@ export type SeasonalOutlookSet = {
   validFrom: string | null;
   validTo: string | null;
   pdfUrl: string | null;
-  windows: SeasonalWindow[];
+  seasons: Partial<Record<SeasonKey, SeasonalBlock>>;
+  windows: Partial<Record<WindowKey, SeasonalBlock>>;
   /** The model's own reading, alongside a published forecast. Empty otherwise. */
-  modelWindows: SeasonalWindow[];
+  modelSeasons: Partial<Record<SeasonKey, SeasonalBlock>>;
+  modelWindows: Partial<Record<WindowKey, SeasonalBlock>>;
   unavailable: boolean;
   model: string;
   baseline: string | null;
@@ -94,17 +107,132 @@ export type SeasonalOutlook = {
   locationId: string;
   townName: string;
   region: string;
-  windowKey: string;
-  windowLabel: string;
-  confidenceLevel: ConfidenceLevel;
-  /** The rainfall sentence. Never optional, see the note at the top. */
+  /** Null when the reading is only a normal: there is no forecast to rate. */
+  confidenceLevel: ConfidenceLevel | null;
+  /** Never optional: a probabilistic outlook is never shown without its sentence. */
   plainLanguageSummary: string;
-  temperatureSummary: string | null;
   /** What the model alone reads, when a published forecast is in force. */
   modelSummary: string | null;
   source: SeasonalSource;
   issuedBy: string | null;
 };
+
+export const SEASON_KEYS: SeasonKey[] = ['southern-major', 'southern-minor', 'northern'];
+export const WINDOW_KEYS: WindowKey[] = ['MAM', 'MJJ', 'JAS'];
+
+export const SEASON_LABELS: Record<SeasonKey, string> = {
+  northern: 'Northern Single Season',
+  'southern-major': 'Southern Major Season',
+  'southern-minor': 'Southern Minor Season',
+};
+
+export const NORTHERN_REGIONS = ['Northern', 'Savannah', 'North East', 'Upper East', 'Upper West'];
+
+type VariableInfo = {
+  /** Exactly as the drawer lists it. */
+  label: string;
+  /** Lower case, for sentences: "the onset date". */
+  noun: string;
+  kind: 'season' | 'window';
+  unit: string;
+  /** What below / normal / above mean for this variable, in sentence words. */
+  words: Record<TercileCategory, string>;
+};
+
+/** The seven variables, in the order the drawer lists them. */
+export const SEASONAL_VARIABLES: SeasonalVariableId[] = [
+  'onset',
+  'earlyDrySpell',
+  'lateDrySpell',
+  'cessation',
+  'rainfallTotal',
+  'rainyDays',
+  'temperature',
+];
+
+export const VARIABLE_INFO: Record<SeasonalVariableId, VariableInfo> = {
+  onset: {
+    label: 'Onset Date',
+    noun: 'start of the rains',
+    kind: 'season',
+    unit: '',
+    words: { below: 'earlier than usual', normal: 'around the usual time', above: 'later than usual' },
+  },
+  earlyDrySpell: {
+    label: 'Early-Season Dry Spell',
+    noun: 'longest dry spell early in the season',
+    kind: 'season',
+    unit: 'days',
+    words: { below: 'shorter than usual', normal: 'about as long as usual', above: 'longer than usual' },
+  },
+  lateDrySpell: {
+    label: 'Late-Season Dry Spell',
+    noun: 'longest dry spell late in the season',
+    kind: 'season',
+    unit: 'days',
+    words: { below: 'shorter than usual', normal: 'about as long as usual', above: 'longer than usual' },
+  },
+  cessation: {
+    label: 'Cessation Date',
+    noun: 'end of the rains',
+    kind: 'season',
+    unit: '',
+    words: { below: 'earlier than usual', normal: 'around the usual time', above: 'later than usual' },
+  },
+  rainfallTotal: {
+    label: 'Rainfall Total (mm)',
+    noun: 'rainfall',
+    kind: 'window',
+    unit: 'mm',
+    words: { below: 'less than usual', normal: 'about the usual amount', above: 'more than usual' },
+  },
+  rainyDays: {
+    label: 'Number of Rainy Days (days)',
+    noun: 'number of rainy days',
+    kind: 'window',
+    unit: 'days',
+    words: { below: 'fewer than usual', normal: 'about the usual number', above: 'more than usual' },
+  },
+  temperature: {
+    label: 'Temperature (°C)',
+    noun: 'daytime temperature',
+    kind: 'window',
+    unit: '°C',
+    words: { below: 'cooler than usual', normal: 'about usual', above: 'warmer than usual' },
+  },
+};
+
+export function isSeasonVariable(variable: SeasonalVariableId): variable is SeasonVariableId {
+  return VARIABLE_INFO[variable].kind === 'season';
+}
+
+export function sectorOf(region: string): 'north' | 'south' {
+  const wanted = normaliseRegion(region);
+  return NORTHERN_REGIONS.some((name) => normaliseRegion(name) === wanted) ? 'north' : 'south';
+}
+
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+/** "2027-02" -> "February 2027". */
+export function formatYearMonth(value: string | undefined | null): string | null {
+  const match = /^(\d{4})-(\d{2})/.exec(value ?? '');
+  if (!match) return null;
+  const month = MONTH_NAMES[Number(match[2]) - 1];
+  return month ? `${month} ${match[1]}` : null;
+}
 
 /**
  * One spelling for a region name, whatever wrote it.

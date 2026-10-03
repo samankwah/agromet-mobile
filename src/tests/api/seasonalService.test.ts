@@ -1,13 +1,13 @@
 import {
   buildSeasonalOutlook,
-  getSeasonalOutlook,
   getSeasonalOutlookSet,
+  pickBlock,
+  readyFrom,
   regionCell,
-  summariseRainfall,
-  summariseTemperature,
+  summariseReading,
 } from '../../shared/api/seasonalService';
-import { normaliseRegion } from '../../shared/domain/seasonalOutlook';
-import { seasonalCell, seasonalPayload, seasonalReading, seasonalWindow } from '../fixtures/seasonal';
+import { VARIABLE_INFO, formatYearMonth, normaliseRegion, sectorOf } from '../../shared/domain/seasonalOutlook';
+import { normalOnly, seasonalPayload, seasonalReading } from '../fixtures/seasonal';
 
 function stub(data: unknown) {
   const mock = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ success: true, data }) });
@@ -19,166 +19,147 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+async function loadSet(overrides: Record<string, unknown> = {}) {
+  stub(seasonalPayload(overrides));
+  return getSeasonalOutlookSet();
+}
+
 describe('getSeasonalOutlookSet', () => {
-  it('carries every window and its provenance', async () => {
-    stub(seasonalPayload());
-    const set = await getSeasonalOutlookSet();
+  it('carries the three seasons, the three windows and their provenance', async () => {
+    const set = await loadSet();
 
     expect(set.source).toBe('seas5');
-    expect(set.windows.map((window) => window.label)).toEqual(['Nov to Jan', 'Dec to Feb', 'Jan to Mar']);
+    expect(Object.keys(set.seasons).sort()).toEqual(['northern', 'southern-major', 'southern-minor']);
+    expect(Object.keys(set.windows)).toEqual(['MAM', 'MJJ', 'JAS']);
     expect(set.model).toContain('SEAS5');
     expect(set.baseline).toBe('ERA5 1995-2024');
     expect(set.runDate).toBe('2026-10-01');
-    expect(set.modelWindows).toEqual([]);
+    expect(set.modelSeasons).toEqual({});
+    expect(set.pdfUrl).toBeNull();
   });
 
-  it('fills the optional published-forecast fields with null, not undefined', async () => {
-    stub(seasonalPayload());
-    const set = await getSeasonalOutlookSet();
+  it('treats a payload from an older server, with windows as a list, as no outlook rather than crashing', async () => {
+    const set = await loadSet({ seasons: undefined, windows: [{ key: '2026-11', cells: [] }] });
 
-    expect(set.pdfUrl).toBeNull();
-    expect(set.validFrom).toBeNull();
+    expect(set.unavailable).toBe(true);
+    expect(set.windows).toEqual({});
   });
 });
 
-/* The property worth guarding is that the reader gets their own region. The south
-   and the far north often lean opposite ways, so a mismatch would not look like an
-   error, it would look like a forecast for somewhere else. */
-describe('getSeasonalOutlook', () => {
-  it("takes the reading for the town's own region", async () => {
-    stub(seasonalPayload());
-    const outlook = await getSeasonalOutlook('accra');
+describe('picking a season or a window', () => {
+  it('reads season variables from the season and the rest from the window', async () => {
+    const set = await loadSet();
 
-    expect(outlook.region).toBe('Greater Accra');
-    expect(outlook.windowLabel).toBe('Nov to Jan');
-    expect(outlook.confidenceLevel).toBe('high');
-    expect(outlook.plainLanguageSummary).toBe(
-      'Greater Accra: 72% chance of a drier than normal season from Nov to Jan. This is a probability, not a certainty.',
-    );
-    expect(outlook.temperatureSummary).toBe('70% chance of a warmer than normal season from Nov to Jan.');
-  });
-
-  it('follows the season the reader picked', async () => {
-    stub(seasonalPayload());
-    const outlook = await getSeasonalOutlook('accra', '2026-12');
-
-    expect(outlook.windowLabel).toBe('Dec to Feb');
-    expect(outlook.plainLanguageSummary).toBe('The forecasts for Greater Accra do not agree, so treat this season as normal.');
-  });
-
-  it('says it is the dry season rather than forecasting rain in a dry window', async () => {
-    stub(seasonalPayload());
-    const outlook = await getSeasonalOutlook('tamale');
-
-    expect(outlook.plainLanguageSummary).toBe(
-      'This is the dry season in Northern. Little rain falls from Nov to Jan, so there is no rainfall outlook for these months.',
-    );
-    // The badge follows temperature when rainfall has nothing to say.
-    expect(outlook.confidenceLevel).toBe('high');
+    expect(pickBlock(set, 'onset', 'northern', 'MAM')?.label).toBe('Northern Single Season');
+    expect(pickBlock(set, 'rainyDays', 'northern', 'MJJ')?.label).toBe('May to July');
   });
 
   it('matches region names whatever their spelling', async () => {
-    stub(
-      seasonalPayload({
-        windows: [seasonalWindow('2026-11', 'Nov to Jan', [seasonalCell('greater accra region')])],
-      }),
-    );
+    const set = await loadSet();
 
-    expect((await getSeasonalOutlook('accra')).region).toBe('greater accra region');
+    expect(regionCell(set.seasons['southern-major'], 'GREATER ACCRA Region')?.region).toBe('Greater Accra');
+    expect(normaliseRegion(' Bono  East Region ')).toBe('bono east');
   });
 
-  it('throws rather than borrowing another region when the town has none', async () => {
-    stub(seasonalPayload());
+  it('says when the forecast will be ready only when every region is a normal', async () => {
+    const set = await loadSet();
 
-    await expect(getSeasonalOutlook('wa')).rejects.toThrow('No seasonal outlook available for Upper West.');
+    expect(readyFrom(set.seasons['southern-minor'], 'onset')).toBe('May 2027');
+    expect(readyFrom(set.seasons['southern-major'], 'onset')).toBeNull();
+    expect(formatYearMonth('2027-02')).toBe('February 2027');
   });
 
-  describe('error priority', () => {
-    it('says it is being prepared while computing, even after a failed fetch', async () => {
-      stub(seasonalPayload({ windows: [], unavailable: true, computing: true, fetchFailed: true }));
-
-      await expect(getSeasonalOutlook('accra')).rejects.toThrow('being prepared');
-    });
-
-    it('says the service did not answer when the fetch failed', async () => {
-      stub(seasonalPayload({ windows: [], unavailable: true, fetchFailed: true }));
-
-      await expect(getSeasonalOutlook('accra')).rejects.toThrow('The weather service did not answer. Try again in a moment.');
-    });
-
-    it('says nothing has been computed when the store is simply empty', async () => {
-      stub(seasonalPayload({ windows: [], unavailable: true }));
-
-      await expect(getSeasonalOutlook('accra')).rejects.toThrow('No seasonal outlook has been computed yet.');
-    });
+  it('knows which half of the country each region farms in', () => {
+    expect(sectorOf('Upper East')).toBe('north');
+    expect(sectorOf('Ashanti')).toBe('south');
   });
 });
 
-describe('a published forecast', () => {
-  it('adds what the model alone reads for the same window', async () => {
-    stub(
-      seasonalPayload({
-        source: 'gmet',
-        issuedBy: 'Ghana Meteorological Agency',
-        modelWindows: [
-          seasonalWindow('2026-11', 'Nov to Jan', [
-            seasonalCell('Greater Accra', {
-              rainfall: seasonalReading({ category: 'above', probabilities: { below: 0.1, normal: 0.3, above: 0.6 } }),
-              temperature: null,
-            }),
-          ]),
-        ],
-      }),
+describe('the plain sentences', () => {
+  it('names the chance, the direction and the week for an onset', () => {
+    expect(summariseReading(seasonalReading(), 'onset', 'Ashanti', 'Southern Major Season')).toBe(
+      '72% chance the start of the rains in Ashanti is earlier than usual, around Week 2 of March. This is a probability, not a certainty.',
     );
-    const outlook = await getSeasonalOutlook('accra');
-
-    expect(outlook.source).toBe('gmet');
-    expect(outlook.modelSummary).toBe('The model alone reads: rainfall wetter than normal (60%).');
   });
 
-  it('says nothing about the model for a window it did not cover', () => {
-    const set = {
-      ...seasonalPayload({ source: 'gmet', modelWindows: [seasonalWindow('2026-12', 'Dec to Feb', [seasonalCell('Greater Accra')])] }),
-    } as unknown as Parameters<typeof buildSeasonalOutlook>[0];
+  it('says a season out of reach is the normal and when the forecast comes', () => {
+    expect(summariseReading(normalOnly(), 'cessation', 'Volta', 'Southern Minor Season')).toBe(
+      'The forecast for the Southern Minor Season will be ready from May 2027. Normally the end of the rains in Volta is around Week 1 of October.',
+    );
+  });
 
-    expect(buildSeasonalOutlook(set, 'accra', '2026-11').modelSummary).toBeNull();
+  it('says plainly when most years have no clear start', () => {
+    const reading = normalOnly({ normalDisplay: 'No clear start in most years' });
+
+    expect(summariseReading(reading, 'onset', 'Greater Accra', 'Southern Minor Season')).toMatch(/is no clear start in most years\.$/);
+  });
+
+  it('does not call a direction when the runs disagree', () => {
+    const reading = seasonalReading({
+      category: 'normal',
+      probabilities: { below: 0.3, normal: 0.4, above: 0.3 },
+      confidence: 'low',
+      display: '9 days',
+      normalDisplay: '8 days',
+    });
+
+    expect(summariseReading(reading, 'lateDrySpell', 'Bono', 'Southern Major Season')).toBe(
+      'The forecasts for Bono do not agree, so plan for a normal longest dry spell late in the season, about 8 days.',
+    );
+  });
+
+  it('says the dry season is the dry season, never that rain is forecast', () => {
+    const reading = seasonalReading({ dryWindow: true });
+
+    expect(summariseReading(reading, 'rainfallTotal', 'Northern', 'March to May')).toMatch(/^This is the dry season in Northern/);
+  });
+
+  it('uses no dashes in any variable label', () => {
+    for (const info of Object.values(VARIABLE_INFO)) {
+      expect(info.label).not.toMatch(/[–—]/);
+    }
   });
 });
 
-describe('the summaries', () => {
-  it('give the average when there is no long-term record to compare with', () => {
-    const reading = seasonalReading({ probabilities: undefined, category: undefined, value: 212.4 });
+describe("the reader's own town card", () => {
+  it('reads the chosen variable in the chosen season for the town', async () => {
+    const set = await loadSet();
+    const outlook = buildSeasonalOutlook(set, 'accra', 'onset', 'southern-major', 'MAM');
 
-    expect(summariseRainfall(reading, 'Volta', 'Nov to Jan')).toBe(
-      'Volta should get about 212 mm of rain from Nov to Jan. There is no long-term record here yet to compare it with.',
+    expect(outlook.region).toBe('Greater Accra');
+    expect(outlook.confidenceLevel).toBe('high');
+    expect(outlook.plainLanguageSummary).toMatch(/^72% chance the start of the rains in Greater Accra is earlier than usual/);
+  });
+
+  it('points a southern town away from the northern season', async () => {
+    const set = await loadSet();
+    const outlook = buildSeasonalOutlook(set, 'accra', 'onset', 'northern', 'MAM');
+
+    expect(outlook.plainLanguageSummary).toBe(
+      'Greater Accra does not have the Northern Single Season. Choose a southern season to see Accra.',
     );
+    expect(outlook.confidenceLevel).toBeNull();
   });
 
-  it('treat a no-signal split as normal', () => {
-    expect(summariseTemperature(seasonalReading({ noSignal: true }), 'Oti', 'Nov to Jan')).toBe(
-      'The temperature forecasts for Oti do not agree, so expect normal temperatures.',
-    );
+  it('gives no badge to a normal', async () => {
+    const set = await loadSet();
+    const outlook = buildSeasonalOutlook(set, 'accra', 'temperature', 'southern-major', 'JAS');
+
+    expect(outlook.confidenceLevel).toBeNull();
+    expect(outlook.plainLanguageSummary).toMatch(/^The forecast for July to September will be ready from May 2027/);
   });
 
-  it('never use a dash in what the farmer reads', () => {
-    const sentences = [
-      summariseRainfall(seasonalReading(), 'Ashanti', 'Nov to Jan'),
-      summariseRainfall(seasonalReading({ dryWindow: true }), 'Ashanti', 'Nov to Jan'),
-      summariseRainfall(seasonalReading({ confidence: 'low' }), 'Ashanti', 'Nov to Jan'),
-      summariseRainfall(null, 'Ashanti', 'Nov to Jan'),
-      summariseTemperature(seasonalReading({ category: 'below' }), 'Ashanti', 'Nov to Jan'),
-    ];
+  it('adds what the model alone reads beside a published forecast', async () => {
+    const payload = seasonalPayload();
+    const set = await loadSet({ source: 'gmet', issuedBy: 'Ghana Meteorological Agency', modelSeasons: payload.seasons });
+    const outlook = buildSeasonalOutlook(set, 'accra', 'onset', 'southern-major', 'MAM');
 
-    for (const sentence of sentences) expect(sentence).not.toMatch(/[–—]/);
+    expect(outlook.modelSummary).toBe('The model alone reads: earlier than usual (72%).');
   });
-});
 
-describe('regionCell and normaliseRegion', () => {
-  it('strip a trailing "Region" and ignore case', () => {
-    expect(normaliseRegion('  Bono East Region ')).toBe('bono east');
-    const window = seasonalWindow('2026-11', 'Nov to Jan', [seasonalCell('North East')]);
+  it('says the outlook is being prepared while the server builds it', async () => {
+    const set = await loadSet({ seasons: {}, windows: {}, unavailable: true, computing: true });
 
-    expect(regionCell(window, 'north east region')?.region).toBe('North East');
-    expect(regionCell(window, 'Northern')).toBeUndefined();
+    expect(() => buildSeasonalOutlook(set, 'accra', 'onset', 'southern-major', 'MAM')).toThrow(/being prepared/);
   });
 });
