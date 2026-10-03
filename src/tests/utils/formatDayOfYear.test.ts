@@ -7,7 +7,8 @@ describe('weekOfMonth', () => {
     expect(weekOfMonth(7)).toBe(1);
     expect(weekOfMonth(8)).toBe(2);
     expect(weekOfMonth(15)).toBe(3);
-    expect(weekOfMonth(29)).toBe(5);
+    expect(weekOfMonth(29)).toBe(4);
+    expect(weekOfMonth(31)).toBe(4);
   });
 });
 
@@ -18,7 +19,7 @@ describe('formatDayOfYearAsWeekOfMonth', () => {
     // Day 74 = Mar 15 (31 Jan + 28 Feb = 59, +15)
     expect(formatDayOfYearAsWeekOfMonth(74)).toBe('Mar W3');
     // Day 365 = Dec 31
-    expect(formatDayOfYearAsWeekOfMonth(365)).toBe('Dec W5');
+    expect(formatDayOfYearAsWeekOfMonth(365)).toBe('Dec W4');
   });
 
   it('covers the onset range used by the seasonal outlook', () => {

@@ -116,6 +116,7 @@ export function seasonalPayload(overrides: Record<string, unknown> = {}) {
       ]),
       MJJ: block('MJJ', 'May to July', [windowCell('Greater Accra')]),
       JAS: block('JAS', 'July to September', [allNormal('Greater Accra', ['rainfallTotal', 'rainyDays', 'temperature'])]),
+      SON: block('SON', 'September to November', [allNormal('Greater Accra', ['rainfallTotal', 'rainyDays', 'temperature'])]),
     },
     modelSeasons: {},
     modelWindows: {},

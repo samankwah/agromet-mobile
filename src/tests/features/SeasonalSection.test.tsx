@@ -62,14 +62,16 @@ function renderWithControls(overrides: Overrides = {}) {
   return view;
 }
 
+/* Picked by the sheet's menu item, not by text: the All Variables table carries
+   the same labels. */
 function chooseVariable(view: ReturnType<typeof render>, label: string) {
   fireEvent.press(view.getByLabelText(/^VARIABLE: /));
-  fireEvent.press(view.getByText(label));
+  fireEvent.press(view.getByRole('menuitem', { name: label }));
 }
 
 function chooseSeason(view: ReturnType<typeof render>, label: string) {
   fireEvent.press(view.getByLabelText(/^SEASON: /));
-  fireEvent.press(view.getByText(label));
+  fireEvent.press(view.getByRole('menuitem', { name: label }));
 }
 
 describe('SeasonalSection controls', () => {
@@ -82,11 +84,20 @@ describe('SeasonalSection controls', () => {
     expect(queryByText('Average')).toBeNull();
   });
 
+  it('opens on All Variables and All Seasons', () => {
+    const view = renderWithControls();
+
+    expect(view.getByLabelText('VARIABLE: All Variables')).toBeTruthy();
+    expect(view.getByLabelText('SEASON: All Seasons')).toBeTruthy();
+    expect(view.getByText(/The map shows Rainfall Total \(mm\)/)).toBeTruthy();
+  });
+
   it('lists the seven variables exactly as named', () => {
     const view = renderWithControls();
-    fireEvent.press(view.getByLabelText('VARIABLE: Onset Date'));
+    fireEvent.press(view.getByLabelText('VARIABLE: All Variables'));
 
     for (const label of [
+      'Onset Date',
       'Early-Season Dry Spell',
       'Late-Season Dry Spell',
       'Cessation Date',
@@ -94,27 +105,25 @@ describe('SeasonalSection controls', () => {
       'Number of Rainy Days (days)',
       'Temperature (°C)',
     ]) {
-      expect(view.getByText(label)).toBeTruthy();
+      expect(view.getByRole('menuitem', { name: label })).toBeTruthy();
     }
   });
 
-  it('offers the three rainy seasons for onset, and opens on the reader’s own half of the country', () => {
-    const south = renderWithControls();
-    expect(south.getByLabelText('SEASON: Southern Major Season')).toBeTruthy();
-    south.unmount();
+  it('offers All Seasons and the three rainy seasons', () => {
+    const view = renderWithControls();
+    fireEvent.press(view.getByLabelText('SEASON: All Seasons'));
 
-    const north = renderWithControls({ locationId: 'tamale' });
-    expect(north.getByLabelText('SEASON: Northern Single Season')).toBeTruthy();
-    fireEvent.press(north.getByLabelText('SEASON: Northern Single Season'));
-    expect(north.getByText('Southern Minor Season')).toBeTruthy();
+    for (const label of ['Southern Major Season', 'Southern Minor Season', 'Northern Single Season']) {
+      expect(view.getByRole('menuitem', { name: label })).toBeTruthy();
+    }
   });
 
-  it('swaps the season list for MAM, MJJ and JAS on rainfall totals', () => {
+  it('swaps the season list for MAM, MJJ, JAS and SON on rainfall totals', () => {
     const view = renderWithControls();
     chooseVariable(view, 'Rainfall Total (mm)');
 
     const windows = view.getByLabelText('Three-month window');
-    for (const label of ['MAM', 'MJJ', 'JAS']) {
+    for (const label of ['MAM', 'MJJ', 'JAS', 'SON']) {
       expect(windows.findByProps({ accessibilityLabel: label })).toBeTruthy();
     }
     expect(view.queryByLabelText(/^SEASON: /)).toBeNull();
@@ -145,18 +154,42 @@ describe('SeasonalSection controls', () => {
 describe('a season beyond the model reach', () => {
   it('says the map is the normal and when the forecast will be ready', () => {
     const view = renderWithControls();
-    expect(view.queryByText(/Normal, not a forecast/)).toBeNull();
+    chooseVariable(view, 'Onset Date');
+    expect(view.queryByText(/Normal, not a forecast\./)).toBeNull();
 
     chooseSeason(view, 'Southern Minor Season');
 
     expect(view.getByText(/The forecast for this season will be ready from May 2027\./)).toBeTruthy();
     expect(view.getByText(/The forecast for the Southern Minor Season will be ready from May 2027/)).toBeTruthy();
   });
+
+  it('says why Probability shows the normal instead of chances', () => {
+    const view = renderWithControls();
+    chooseVariable(view, 'Onset Date');
+    chooseSeason(view, 'Southern Minor Season');
+    fireEvent.press(view.getByLabelText('Forecast view').findByProps({ accessibilityLabel: 'Probability' }));
+
+    expect(view.getByText(/Chances are worked out once the season is in the forecast, from May 2027/)).toBeTruthy();
+  });
+});
+
+describe('All Variables', () => {
+  it("lists every variable for the reader's town, with the windows as columns", () => {
+    const view = renderWithControls();
+
+    expect(view.getAllByText('Early-Season Dry Spell').length).toBeGreaterThan(0);
+    expect(view.getAllByText('SON').length).toBeGreaterThan(1);
+    expect(view.getAllByText('420 mm').length).toBeGreaterThan(0);
+    // JAS and SON are only normals in the fixture: starred, with the key.
+    expect(view.getByText(/Normal \(1995 to 2024\), not a forecast/)).toBeTruthy();
+  });
 });
 
 describe("the reader's own town card", () => {
   it('shows the town, the badge and the plain sentence', () => {
-    const { getByText } = renderWithControls();
+    const view = renderWithControls();
+    chooseVariable(view, 'Onset Date');
+    const { getByText } = view;
 
     expect(getByText('Accra, Greater Accra')).toBeTruthy();
     expect(getByText('High confidence')).toBeTruthy();

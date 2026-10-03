@@ -2,11 +2,14 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { buildSeasonalOutlook, pickBlock, readingText, readyFrom, regionCell } from '../../../shared/api/seasonalService';
-import { HOME_LOCATIONS } from '../../../shared/data/mockWeather';
+import { buildSeasonalOutlook, buildSummary, pickBlock, readingText, readyFrom, regionCell } from '../../../shared/api/seasonalService';
 import type {
+  SeasonChoice,
   SeasonKey,
   SeasonalOutlook,
+  SeasonalSummary,
+  SummaryValue,
+  VariableChoice,
   SeasonalOutlookSet,
   SeasonalReading,
   SeasonalVariableId,
@@ -14,12 +17,15 @@ import type {
   WindowKey,
 } from '../../../shared/domain/seasonalOutlook';
 import {
+  ALL_SEASONS_LABEL,
+  ALL_VARIABLES_LABEL,
   SEASONAL_VARIABLES,
   SEASON_KEYS,
   SEASON_LABELS,
   VARIABLE_INFO,
   WINDOW_KEYS,
   isSeasonVariable,
+  mainSeasonOf,
   sectorOf,
 } from '../../../shared/domain/seasonalOutlook';
 import { useNetworkStatus } from '../../../shared/net/useNetworkStatus';
@@ -70,8 +76,13 @@ const MAP_HEIGHT = 520;
 const VIEW_SEGMENTS = ['Probability', 'Deterministic'];
 const VIEWS: SeasonalView[] = ['probability', 'deterministic'];
 
-const VARIABLE_OPTIONS = SEASONAL_VARIABLES.map((id) => ({ id, label: VARIABLE_INFO[id].label }));
-const SEASON_OPTIONS = SEASON_KEYS.map((id) => ({ id, label: SEASON_LABELS[id] }));
+// "All" first in both lists: it is the default, and the first thing a reader
+// sees should be the whole picture.
+const VARIABLE_OPTIONS = [
+  { id: 'all', label: ALL_VARIABLES_LABEL },
+  ...SEASONAL_VARIABLES.map((id) => ({ id, label: VARIABLE_INFO[id].label })),
+];
+const SEASON_OPTIONS = [{ id: 'all', label: ALL_SEASONS_LABEL }, ...SEASON_KEYS.map((id) => ({ id, label: SEASON_LABELS[id] }))];
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -84,12 +95,6 @@ function formatRunDate(date: string): string | null {
   return month ? `${Number(match[3])} ${month} ${match[1]}` : null;
 }
 
-/** The season the reader most likely farms: their own half of the country. */
-function homeSeason(locationId: string): SeasonKey {
-  const place = HOME_LOCATIONS.find((entry) => entry.id === locationId);
-  return place && sectorOf(place.region) === 'north' ? 'northern' : 'southern-major';
-}
-
 /**
  * The seasonal outlook, as a map of Ghana.
  *
@@ -98,9 +103,13 @@ function homeSeason(locationId: string): SeasonKey {
  *
  * - **Seven variables, worked out from daily rain.** Onset, cessation and the
  *   two dry spells belong to a rainy season, so they come with a SEASON choice
- *   (Northern Single, Southern Major, Southern Minor), and each season paints
- *   only its own half of the country. Rainfall total, rainy days and temperature
- *   come with the fixed MAM, MJJ and JAS windows instead.
+ *   (All Seasons, Southern Major, Southern Minor, Northern Single). A named
+ *   season paints only its own half of the country; All Seasons paints each
+ *   zone's main season. Rainfall total, rainy days and temperature come with the
+ *   fixed MAM, MJJ, JAS and SON windows instead.
+ * - **All Variables and All Seasons by default.** The map then shows the
+ *   rainfall total for the chosen three months, and the region and town cards
+ *   list every variable.
  * - **Beyond the model's reach.** SEAS5 sees about seven months ahead. For a
  *   season further off the map paints the 30-year normal, and a banner that
  *   cannot be scrolled away says it is the normal, not a forecast, and when the
@@ -114,22 +123,34 @@ export function SeasonalSection({ set, status, error, onRetry, locationId }: Pro
   const { isOnline } = useNetworkStatus();
   const [drawerExpanded, setDrawerExpanded] = useState(false);
   const [viewIndex, setViewIndex] = useState<number | null>(null);
-  const [variable, setVariable] = useState<SeasonalVariableId>('onset');
-  const [seasonKey, setSeasonKey] = useState<SeasonKey>(() => homeSeason(locationId));
+  const [variableChoice, setVariableChoice] = useState<VariableChoice>('all');
+  const [seasonKey, setSeasonKey] = useState<SeasonChoice>('all');
   const [windowKey, setWindowKey] = useState<WindowKey>('MAM');
   const [selection, setSelection] = useState<MapSelection | null>(null);
 
+  // A map colours one thing, so All Variables maps the rainfall total.
+  const variable: SeasonalVariableId = variableChoice === 'all' ? 'rainfallTotal' : variableChoice;
+  const isAll = variableChoice === 'all';
   const isSeason = isSeasonVariable(variable);
   const block = useMemo(() => (set ? pickBlock(set, variable, seasonKey, windowKey) : undefined), [set, variable, seasonKey, windowKey]);
   const blockCells = useMemo(() => block?.cells ?? [], [block]);
-  const blockLabel = block ? `${block.label} ${block.year}` : isSeason ? SEASON_LABELS[seasonKey] : windowKey;
+  const blockLabel = block
+    ? `${block.label} ${block.year}`
+    : isSeason
+      ? seasonKey === 'all'
+        ? ALL_SEASONS_LABEL
+        : SEASON_LABELS[seasonKey]
+      : windowKey;
   const ready = useMemo(() => readyFrom(block, variable), [block, variable]);
   const normalOnly = ready !== null;
 
   const anyProbabilities = useMemo(() => hasProbabilities(blockCells, variable), [blockCells, variable]);
   // Null until the reader chooses, so the default follows the data.
   const view = VIEWS[viewIndex ?? (anyProbabilities ? 0 : 1)];
+  // Chances need a forecast. Beyond the model's reach there is only the normal,
+  // so the map keeps showing it and the drawer says why (see probabilityNote).
   const isProbability = view === 'probability' && !normalOnly;
+  const probabilityNote = view === 'probability' && normalOnly;
   const valueFormat = valueFormatFor(variable);
   const stops = stopsFor(variable);
   const palette = paletteForVariable(variable);
@@ -157,11 +178,11 @@ export function SeasonalSection({ set, status, error, onRetry, locationId }: Pro
   const town = useMemo((): { outlook?: SeasonalOutlook; error?: unknown } => {
     if (!set) return {};
     try {
-      return { outlook: buildSeasonalOutlook(set, locationId, variable, seasonKey, windowKey) };
+      return { outlook: buildSeasonalOutlook(set, locationId, variableChoice, seasonKey, windowKey) };
     } catch (caught) {
       return { error: caught };
     }
-  }, [set, locationId, variable, seasonKey, windowKey]);
+  }, [set, locationId, variableChoice, seasonKey, windowKey]);
 
   const handleSelect = useCallback((next: MapSelection) => {
     setSelection(next);
@@ -188,6 +209,14 @@ export function SeasonalSection({ set, status, error, onRetry, locationId }: Pro
 
   const runDate = set?.runDate ? formatRunDate(set.runDate) : null;
   const selectedReading = selection?.region ? regionCell(block, selection.region)?.[variable] : undefined;
+  // All Variables: the tapped region's full table, for its own main season under
+  // All Seasons, or for the chosen season when the region has it.
+  const selectedSummary = useMemo((): SeasonalSummary | null => {
+    if (variableChoice !== 'all' || !set || !selection?.region) return null;
+    const region = selection.region;
+    const season: SeasonKey = seasonKey === 'all' ? mainSeasonOf(region) : seasonKey;
+    return buildSummary(set, region, season);
+  }, [variableChoice, set, selection, seasonKey]);
 
   return (
     <AsyncStateView status={status} error={error} onRetry={onRetry} skeleton={<SpatialOutlookSkeleton />}>
@@ -263,7 +292,12 @@ export function SeasonalSection({ set, status, error, onRetry, locationId }: Pro
           <View style={{ gap: theme.spacing.lg }}>
             {set?.source === 'gmet' && !unavailable ? <PublishedNotice issuedBy={set.issuedBy} /> : null}
 
-            {isEmpty || !selection?.region ? null : (
+            {isEmpty || !selection?.region ? null : selectedSummary ? (
+              <View style={{ gap: theme.spacing.sm }}>
+                <RegionHeader region={selection.region} onClear={() => setSelection(null)} />
+                <SummaryTable summary={selectedSummary} />
+              </View>
+            ) : (
               <RegionDetail
                 region={selection.region}
                 reading={selectedReading}
@@ -284,21 +318,34 @@ export function SeasonalSection({ set, status, error, onRetry, locationId }: Pro
                 accessibilityLabel="Forecast view"
                 equalWidth
               />
+              {probabilityNote ? (
+                <Text variant="caption" muted style={{ marginTop: theme.spacing.xs }}>
+                  Chances are worked out once the season is in the forecast, from {ready}. Until then the map shows the normal.
+                </Text>
+              ) : null}
             </View>
 
-            {/* Seven variables are too many for a pill row, so a dropdown. */}
+            {/* Eight choices are too many for a pill row, so a dropdown. */}
             <Dropdown
               label="VARIABLE"
               options={VARIABLE_OPTIONS}
-              selectedId={variable}
-              onSelect={(id) => setVariable(id as SeasonalVariableId)}
+              selectedId={variableChoice}
+              onSelect={(id) => setVariableChoice(id as VariableChoice)}
             />
 
-            {isSeason ? (
-              <Dropdown label="SEASON" options={SEASON_OPTIONS} selectedId={seasonKey} onSelect={(id) => setSeasonKey(id as SeasonKey)} />
-            ) : (
+            {/* All Variables needs both: the season for the onset, dry spell and
+                cessation rows, and the three months the map's rainfall covers. */}
+            {isSeason || isAll ? (
+              <Dropdown
+                label="SEASON"
+                options={SEASON_OPTIONS}
+                selectedId={seasonKey}
+                onSelect={(id) => setSeasonKey(id as SeasonChoice)}
+              />
+            ) : null}
+            {isSeason ? null : (
               <View>
-                <FieldLabel>SEASON</FieldLabel>
+                <FieldLabel>{isAll ? 'MONTHS' : 'SEASON'}</FieldLabel>
                 <SegmentedControl
                   segments={WINDOW_KEYS}
                   selectedIndex={WINDOW_KEYS.indexOf(windowKey)}
@@ -311,9 +358,12 @@ export function SeasonalSection({ set, status, error, onRetry, locationId }: Pro
 
             {block ? (
               <Text variant="caption" muted>
-                {isSeason
-                  ? `${blockLabel}. ${seasonKey === 'northern' ? 'Covers the five northern regions.' : 'Covers the eleven southern regions.'}`
-                  : `${blockLabel}, all regions.`}
+                {!isSeason
+                  ? `${blockLabel}, all regions.`
+                  : seasonKey === 'all'
+                    ? `${blockLabel}. The Northern Single Season in the five northern regions, and the Southern Major Season in the other eleven.`
+                    : `${blockLabel}. ${seasonKey === 'northern' ? 'Covers the five northern regions.' : 'Covers the eleven southern regions.'}`}
+                {isAll ? ' The map shows Rainfall Total (mm). Pick one variable to map it.' : ''}
               </Text>
             ) : null}
 
@@ -327,6 +377,7 @@ export function SeasonalSection({ set, status, error, onRetry, locationId }: Pro
                 skeleton={<SubseasonalOutlookSkeleton />}
               >
                 {town.outlook ? <TownGuidance outlook={town.outlook} /> : null}
+                {town.outlook?.summary ? <SummaryTable summary={town.outlook.summary} /> : null}
               </AsyncStateView>
             )}
 
@@ -428,6 +479,104 @@ function PublishedNotice({ issuedBy }: { issuedBy: string | null }) {
       <Text variant="caption" muted>
         {issuedBy ? `Issued by ${issuedBy}` : 'A published forecast is shown in place of the model.'}
       </Text>
+    </Card>
+  );
+}
+
+/** The tapped region's name with a close button. */
+function RegionHeader({ region, onClear }: { region: string; onClear: () => void }) {
+  const theme = useTheme();
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+      <Ionicons name="location-outline" size={18} color={theme.colors.muted} />
+      <Text variant="h2" style={{ flex: 1 }} numberOfLines={2}>
+        {region}
+      </Text>
+      <Pressable onPress={onClear} accessibilityRole="button" accessibilityLabel={`Close ${region} details`} hitSlop={12}>
+        {/* Chrome on a nested View, never the Pressable: Android drops it. */}
+        <View style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="close" size={20} color={theme.colors.muted} />
+        </View>
+      </Pressable>
+    </View>
+  );
+}
+
+/** One figure: the forecast in full colour, a normal muted and marked. */
+function SummaryFigure({ value, align = 'left' }: { value: SummaryValue; align?: 'left' | 'right' }) {
+  return (
+    <Text variant="caption" muted={value.isNormal} style={{ textAlign: align, fontWeight: value.isNormal ? '400' : '600' }}>
+      {value.text ?? 'No data'}
+      {value.isNormal && value.text ? '*' : ''}
+    </Text>
+  );
+}
+
+/**
+ * Every variable for one region, for All Variables.
+ *
+ * The season's four indices as rows, then a small grid of the window figures
+ * with MAM, MJJ, JAS and SON as columns. A figure that is only the normal gets a
+ * star and the key below, so a normal is never read as a forecast.
+ */
+function SummaryTable({ summary }: { summary: SeasonalSummary }) {
+  const theme = useTheme();
+  const hasSeason = summary.seasonRows.some((row) => row.value.text);
+
+  return (
+    <Card style={{ gap: theme.spacing.sm }}>
+      <Text variant="bodyStrong">{summary.seasonLabel}</Text>
+      {hasSeason ? (
+        summary.seasonRows.map((row) => (
+          <View key={row.variable} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing.sm }}>
+            <Text variant="caption" style={{ flex: 1 }}>
+              {row.label}
+            </Text>
+            <View style={{ alignItems: 'flex-end', flexShrink: 1 }}>
+              <SummaryFigure value={row.value} align="right" />
+              {row.value.lean ? (
+                <Text variant="caption" muted style={{ textAlign: 'right' }}>
+                  {row.value.lean}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        ))
+      ) : (
+        <Text variant="caption" muted>
+          {summary.region} does not have this season.
+        </Text>
+      )}
+
+      <Divider />
+
+      <View style={{ flexDirection: 'row', gap: theme.spacing.xs }}>
+        <View style={{ flex: 1.4 }} />
+        {WINDOW_KEYS.map((key) => (
+          <Text key={key} variant="caption" style={{ flex: 1, textAlign: 'right', fontWeight: '700' }}>
+            {key}
+          </Text>
+        ))}
+      </View>
+      {summary.windowRows.map((row) => (
+        <View key={row.variable} style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+          <Text variant="caption" style={{ flex: 1.4 }} numberOfLines={2}>
+            {row.label}
+          </Text>
+          {WINDOW_KEYS.map((key) => (
+            <View key={key} style={{ flex: 1 }}>
+              <SummaryFigure value={row.values[key]} align="right" />
+            </View>
+          ))}
+        </View>
+      ))}
+
+      {summary.hasNormals ? (
+        <Text variant="caption" muted>
+          * Normal (1995 to 2024), not a forecast. These months are too far ahead for the model yet.
+        </Text>
+      ) : null}
     </Card>
   );
 }

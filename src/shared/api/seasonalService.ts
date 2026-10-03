@@ -1,7 +1,11 @@
 import { HOME_LOCATIONS } from '../data/mockWeather';
 import type {
+  SeasonChoice,
   SeasonKey,
   SeasonalBlock,
+  SeasonalSummary,
+  SummaryValue,
+  VariableChoice,
   SeasonalCell,
   SeasonalOutlook,
   SeasonalOutlookSet,
@@ -10,7 +14,19 @@ import type {
   SeasonalVariableId,
   WindowKey,
 } from '../domain/seasonalOutlook';
-import { SEASON_LABELS, VARIABLE_INFO, formatYearMonth, isSeasonVariable, normaliseRegion, sectorOf } from '../domain/seasonalOutlook';
+import {
+  ALL_SEASONS_LABEL,
+  SEASON_LABELS,
+  SEASON_VARIABLE_IDS,
+  VARIABLE_INFO,
+  WINDOW_KEYS,
+  WINDOW_VARIABLE_IDS,
+  formatYearMonth,
+  isSeasonVariable,
+  mainSeasonOf,
+  normaliseRegion,
+  sectorOf,
+} from '../domain/seasonalOutlook';
 import { getJson } from './http';
 import { ServiceError } from './mockDelay';
 
@@ -86,14 +102,30 @@ export async function getSeasonalOutlookSet(): Promise<SeasonalOutlookSet> {
   };
 }
 
-/** The season or window a variable is read over. */
+/**
+ * The season or window a variable is read over.
+ *
+ * All Seasons joins the two main seasons into one block: the northern season's
+ * five regions and the southern major season's eleven, so the map covers the
+ * whole country without any region appearing twice.
+ */
 export function pickBlock(
   set: Pick<SeasonalOutlookSet, 'seasons' | 'windows'>,
   variable: SeasonalVariableId,
-  seasonKey: SeasonKey,
+  season: SeasonChoice,
   windowKey: WindowKey,
 ): SeasonalBlock | undefined {
-  return isSeasonVariable(variable) ? set.seasons[seasonKey] : set.windows[windowKey];
+  if (!isSeasonVariable(variable)) return set.windows[windowKey];
+  if (season !== 'all') return set.seasons[season];
+  const north = set.seasons.northern;
+  const south = set.seasons['southern-major'];
+  if (!north && !south) return undefined;
+  return {
+    key: 'all',
+    label: ALL_SEASONS_LABEL,
+    year: Math.min(north?.year ?? Infinity, south?.year ?? Infinity),
+    cells: [...(north?.cells ?? []), ...(south?.cells ?? [])],
+  };
 }
 
 /** A region's cell in a block, matched on the normalised name. */
@@ -103,12 +135,25 @@ export function regionCell(block: SeasonalBlock | undefined, region: string | nu
   return block.cells.find((cell) => normaliseRegion(cell.region) === wanted);
 }
 
-/** When every region's reading is only a normal, the month the forecast will be
- * ready ("February 2027"); null when the block holds a forecast. */
+/**
+ * When every region's reading is only a normal, the month the forecast will be
+ * ready ("February 2027"); null when the block holds a forecast.
+ *
+ * All Seasons can mix two seasons that become ready in different months, so
+ * then each half of the country gets its own month.
+ */
 export function readyFrom(block: SeasonalBlock | undefined, variable: SeasonalVariableId): string | null {
-  const readings = (block?.cells ?? []).map((cell) => cell[variable]).filter((reading): reading is SeasonalReading => Boolean(reading));
-  if (readings.length === 0 || readings.some((reading) => reading.available)) return null;
-  return formatYearMonth(readings[0].availableFrom) ?? 'a later month';
+  const cells = (block?.cells ?? []).filter((cell) => Boolean(cell[variable]));
+  if (cells.length === 0 || cells.some((cell) => cell[variable]!.available)) return null;
+
+  const bySector = new Map<'north' | 'south', string>();
+  for (const cell of cells) {
+    const month = cell[variable]!.availableFrom;
+    if (month && !bySector.has(sectorOf(cell.region))) bySector.set(sectorOf(cell.region), month);
+  }
+  const months = [...new Set(bySector.values())];
+  if (months.length <= 1) return formatYearMonth(months[0]) ?? 'a later month';
+  return `${formatYearMonth(bySector.get('south'))} in the south and ${formatYearMonth(bySector.get('north'))} in the north`;
 }
 
 /** The share of the winning third, as a whole percent. */
@@ -193,8 +238,8 @@ export function leanPhrase(reading: SeasonalReading | undefined, variable: Seaso
 export function buildSeasonalOutlook(
   set: SeasonalOutlookSet,
   locationId: string,
-  variable: SeasonalVariableId,
-  seasonKey: SeasonKey,
+  variableChoice: VariableChoice,
+  seasonChoice: SeasonChoice,
   windowKey: WindowKey,
 ): SeasonalOutlook {
   if (set.unavailable) {
@@ -213,6 +258,12 @@ export function buildSeasonalOutlook(
   const place = HOME_LOCATIONS.find((entry) => entry.id === locationId);
   if (!place) throw new ServiceError(`No seasonal outlook available for "${locationId}".`);
 
+  // All Variables leads with the rainfall total. All Seasons means the town's own main
+  // season, so the sentence names a real season ("the Southern Major Season").
+  const variable: SeasonalVariableId = variableChoice === 'all' ? 'rainfallTotal' : variableChoice;
+  const seasonKey: SeasonKey = seasonChoice === 'all' ? mainSeasonOf(place.region) : seasonChoice;
+  const summary = variableChoice === 'all' ? buildSummary(set, place.region, seasonKey) : null;
+
   const block = pickBlock(set, variable, seasonKey, windowKey);
   const label = block?.label ?? (isSeasonVariable(variable) ? SEASON_LABELS[seasonKey] : windowKey);
 
@@ -227,6 +278,7 @@ export function buildSeasonalOutlook(
       modelSummary: null,
       source: set.source,
       issuedBy: set.issuedBy,
+      summary: null,
     };
   }
 
@@ -248,5 +300,36 @@ export function buildSeasonalOutlook(
     modelSummary: modelLean ? `The model alone reads: ${modelLean}.` : null,
     source: set.source,
     issuedBy: set.issuedBy,
+    summary,
   };
+}
+
+function summaryValue(reading: SeasonalReading | undefined, variable: SeasonalVariableId): SummaryValue {
+  if (!reading) return { text: null, isNormal: false, lean: null };
+  if (!reading.available) return { text: reading.normalDisplay ?? null, isNormal: true, lean: null };
+  return { text: reading.display ?? null, isNormal: false, lean: leanPhrase(reading, variable) };
+}
+
+/**
+ * Every variable for one region, for the All Variables view: the season's four
+ * indices for `seasonKey`, then rainfall total, rainy days and temperature for
+ * each of MAM, MJJ, JAS and SON.
+ */
+export function buildSummary(set: Pick<SeasonalOutlookSet, 'seasons' | 'windows'>, region: string, seasonKey: SeasonKey): SeasonalSummary {
+  const seasonCell = regionCell(set.seasons[seasonKey], region);
+  const seasonRows = SEASON_VARIABLE_IDS.map((variable) => ({
+    variable,
+    label: VARIABLE_INFO[variable].label,
+    value: summaryValue(seasonCell?.[variable], variable),
+  }));
+  const windowRows = WINDOW_VARIABLE_IDS.map((variable) => ({
+    variable,
+    label: VARIABLE_INFO[variable].label,
+    values: Object.fromEntries(
+      WINDOW_KEYS.map((key) => [key, summaryValue(regionCell(set.windows[key], region)?.[variable], variable)]),
+    ) as Record<WindowKey, SummaryValue>,
+  }));
+  const hasNormals =
+    seasonRows.some((row) => row.value.isNormal) || windowRows.some((row) => Object.values(row.values).some((value) => value.isNormal));
+  return { region, seasonLabel: SEASON_LABELS[seasonKey], seasonRows, windowRows, hasNormals };
 }

@@ -1,5 +1,6 @@
 import {
   buildSeasonalOutlook,
+  buildSummary,
   getSeasonalOutlookSet,
   pickBlock,
   readyFrom,
@@ -30,7 +31,7 @@ describe('getSeasonalOutlookSet', () => {
 
     expect(set.source).toBe('seas5');
     expect(Object.keys(set.seasons).sort()).toEqual(['northern', 'southern-major', 'southern-minor']);
-    expect(Object.keys(set.windows)).toEqual(['MAM', 'MJJ', 'JAS']);
+    expect(Object.keys(set.windows)).toEqual(['MAM', 'MJJ', 'JAS', 'SON']);
     expect(set.model).toContain('SEAS5');
     expect(set.baseline).toBe('ERA5 1995-2024');
     expect(set.runDate).toBe('2026-10-01');
@@ -67,6 +68,33 @@ describe('picking a season or a window', () => {
     expect(readyFrom(set.seasons['southern-minor'], 'onset')).toBe('May 2027');
     expect(readyFrom(set.seasons['southern-major'], 'onset')).toBeNull();
     expect(formatYearMonth('2027-02')).toBe('February 2027');
+  });
+
+  it('joins the two main seasons for All Seasons, each region once', async () => {
+    const set = await loadSet();
+    const all = pickBlock(set, 'onset', 'all', 'MAM');
+
+    expect(all?.label).toBe('All Seasons');
+    expect(all?.cells.map((cell) => cell.region).sort()).toEqual(['Ashanti', 'Greater Accra', 'Northern']);
+  });
+
+  it('gives each half of the country its own ready month when they differ', async () => {
+    const set = await loadSet();
+    const north = {
+      key: 'northern',
+      label: 'N',
+      year: 2027,
+      cells: [{ id: 'Northern', region: 'Northern', lat: 9, lng: -1, onset: normalOnly({ availableFrom: '2027-02' }) }],
+    };
+    const south = {
+      key: 'southern-major',
+      label: 'S',
+      year: 2027,
+      cells: [{ id: 'Ashanti', region: 'Ashanti', lat: 7, lng: -1, onset: normalOnly({ availableFrom: '2026-12' }) }],
+    };
+    const block = pickBlock({ ...set, seasons: { northern: north, 'southern-major': south } }, 'onset', 'all', 'MAM');
+
+    expect(readyFrom(block, 'onset')).toBe('December 2026 in the south and February 2027 in the north');
   });
 
   it('knows which half of the country each region farms in', () => {
@@ -129,6 +157,28 @@ describe("the reader's own town card", () => {
     expect(outlook.region).toBe('Greater Accra');
     expect(outlook.confidenceLevel).toBe('high');
     expect(outlook.plainLanguageSummary).toMatch(/^72% chance the start of the rains in Greater Accra is earlier than usual/);
+  });
+
+  it('under All Variables and All Seasons, reads the town in its own main season and lists everything', async () => {
+    const set = await loadSet();
+    const outlook = buildSeasonalOutlook(set, 'tamale', 'all', 'all', 'MAM');
+
+    expect(outlook.plainLanguageSummary).toMatch(/dry season in Northern/);
+    expect(outlook.summary?.seasonLabel).toBe('Northern Single Season');
+    expect(outlook.summary?.windowRows.map((row) => row.label)).toEqual([
+      'Rainfall Total (mm)',
+      'Number of Rainy Days (days)',
+      'Temperature (°C)',
+    ]);
+  });
+
+  it('marks normals in the summary so they are never read as forecasts', async () => {
+    const set = await loadSet();
+    const summary = buildSummary(set, 'Greater Accra', 'southern-major');
+
+    expect(summary.windowRows[0].values.MAM).toEqual({ text: '420 mm', isNormal: false, lean: 'more than usual (60%)' });
+    expect(summary.windowRows[0].values.JAS.isNormal).toBe(true);
+    expect(summary.hasNormals).toBe(true);
   });
 
   it('points a southern town away from the northern season', async () => {

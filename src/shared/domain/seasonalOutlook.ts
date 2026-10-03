@@ -12,7 +12,7 @@ import type { ConfidenceLevel, TercileCategory, TercileProbabilities } from './s
  *   the two southern seasons the other eleven, so each season's map paints only
  *   its own half of the country.
  * - **Windows** (rainfall total, rainy days, temperature): the fixed three-month
- *   blocks MAM, MJJ and JAS, for every region.
+ *   blocks MAM, MJJ, JAS and SON, for every region.
  *
  * SEAS5 reaches about seven months ahead. A season that ends beyond that has
  * `available: false`: the reading carries the normal and the month the forecast
@@ -26,7 +26,7 @@ export type SeasonalSource = 'seas5' | 'gmet';
 export type SeasonalView = 'probability' | 'deterministic';
 
 export type SeasonKey = 'northern' | 'southern-major' | 'southern-minor';
-export type WindowKey = 'MAM' | 'MJJ' | 'JAS';
+export type WindowKey = 'MAM' | 'MJJ' | 'JAS' | 'SON';
 
 export type SeasonVariableId = 'onset' | 'cessation' | 'earlyDrySpell' | 'lateDrySpell';
 export type WindowVariableId = 'rainfallTotal' | 'rainyDays' | 'temperature';
@@ -115,15 +115,65 @@ export type SeasonalOutlook = {
   modelSummary: string | null;
   source: SeasonalSource;
   issuedBy: string | null;
+  /** Every variable at once, when the reader chose All Variables. */
+  summary?: SeasonalSummary | null;
+};
+
+/** One figure in the all-variables table: a forecast, or only the normal. */
+export type SummaryValue = {
+  text: string | null;
+  /** True when the season is beyond the model's reach and this is the normal. */
+  isNormal: boolean;
+  /** "earlier than usual (60%)" for a forecast with a clear lean. */
+  lean: string | null;
+};
+
+/** Every variable for one region: the season's four, then the windows' three. */
+export type SeasonalSummary = {
+  region: string;
+  seasonLabel: string;
+  seasonRows: { variable: SeasonVariableId; label: string; value: SummaryValue }[];
+  windowRows: { variable: WindowVariableId; label: string; values: Record<WindowKey, SummaryValue> }[];
+  /** True when any figure in the table is a normal, so the screen adds the key. */
+  hasNormals: boolean;
 };
 
 export const SEASON_KEYS: SeasonKey[] = ['southern-major', 'southern-minor', 'northern'];
-export const WINDOW_KEYS: WindowKey[] = ['MAM', 'MJJ', 'JAS'];
+export const WINDOW_KEYS: WindowKey[] = ['MAM', 'MJJ', 'JAS', 'SON'];
+
+/**
+ * What the reader picks in the drawer. "All" is the default for both.
+ *
+ * All Seasons is each zone's main season on one map, the way national onset
+ * maps are drawn: the Northern Single Season in the five northern regions and
+ * the Southern Major Season in the other eleven. The minor season stays its own
+ * choice, because the north has no second season to pair it with.
+ *
+ * All Variables maps Rainfall Total (a map can colour only one thing) and lists
+ * every variable together in the region and town cards.
+ */
+export type SeasonChoice = 'all' | SeasonKey;
+export type VariableChoice = 'all' | SeasonalVariableId;
+
+export const ALL_SEASONS_LABEL = 'All Seasons';
+export const ALL_VARIABLES_LABEL = 'All Variables';
+
+/** The season a region's main rains fall in: what All Seasons shows there. */
+export function mainSeasonOf(region: string): SeasonKey {
+  return sectorOf(region) === 'north' ? 'northern' : 'southern-major';
+}
 
 export const SEASON_LABELS: Record<SeasonKey, string> = {
   northern: 'Northern Single Season',
   'southern-major': 'Southern Major Season',
   'southern-minor': 'Southern Minor Season',
+};
+
+export const WINDOW_LABELS: Record<WindowKey, string> = {
+  MAM: 'March to May',
+  MJJ: 'May to July',
+  JAS: 'July to September',
+  SON: 'September to November',
 };
 
 export const NORTHERN_REGIONS = ['Northern', 'Savannah', 'North East', 'Upper East', 'Upper West'];
@@ -201,6 +251,9 @@ export const VARIABLE_INFO: Record<SeasonalVariableId, VariableInfo> = {
     words: { below: 'cooler than usual', normal: 'about usual', above: 'warmer than usual' },
   },
 };
+
+export const SEASON_VARIABLE_IDS: SeasonVariableId[] = ['onset', 'earlyDrySpell', 'lateDrySpell', 'cessation'];
+export const WINDOW_VARIABLE_IDS: WindowVariableId[] = ['rainfallTotal', 'rainyDays', 'temperature'];
 
 export function isSeasonVariable(variable: SeasonalVariableId): variable is SeasonVariableId {
   return VARIABLE_INFO[variable].kind === 'season';
