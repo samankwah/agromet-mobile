@@ -165,11 +165,7 @@ describe("the reader's own town card", () => {
 
     expect(outlook.plainLanguageSummary).toMatch(/dry season in Northern/);
     expect(outlook.summary?.seasonLabel).toBe('Northern Single Season');
-    expect(outlook.summary?.windowRows.map((row) => row.label)).toEqual([
-      'Rainfall Total (mm)',
-      'Number of Rainy Days (days)',
-      'Temperature (°C)',
-    ]);
+    expect(outlook.summary?.windowRows.map((row) => row.label)).toEqual(['Rainfall (mm)', 'Rainy days', 'Temperature (°C)']);
   });
 
   it('marks normals in the summary so they are never read as forecasts', async () => {

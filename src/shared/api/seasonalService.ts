@@ -6,6 +6,7 @@ import type {
   SeasonalSummary,
   SummaryValue,
   VariableChoice,
+  WindowVariableId,
   SeasonalCell,
   SeasonalOutlook,
   SeasonalOutlookSet,
@@ -310,6 +311,13 @@ function summaryValue(reading: SeasonalReading | undefined, variable: SeasonalVa
   return { text: reading.display ?? null, isNormal: false, lean: leanPhrase(reading, variable) };
 }
 
+/** Shorter names for the table rows, which share the width with four columns. */
+const SHORT_WINDOW_LABELS: Record<WindowVariableId, string> = {
+  rainfallTotal: 'Rainfall (mm)',
+  rainyDays: 'Rainy days',
+  temperature: 'Temperature (°C)',
+};
+
 /**
  * Every variable for one region, for the All Variables view: the season's four
  * indices for `seasonKey`, then rainfall total, rainy days and temperature for
@@ -324,7 +332,7 @@ export function buildSummary(set: Pick<SeasonalOutlookSet, 'seasons' | 'windows'
   }));
   const windowRows = WINDOW_VARIABLE_IDS.map((variable) => ({
     variable,
-    label: VARIABLE_INFO[variable].label,
+    label: SHORT_WINDOW_LABELS[variable],
     values: Object.fromEntries(
       WINDOW_KEYS.map((key) => [key, summaryValue(regionCell(set.windows[key], region)?.[variable], variable)]),
     ) as Record<WindowKey, SummaryValue>,
