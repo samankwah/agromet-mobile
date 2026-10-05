@@ -244,6 +244,8 @@ function RootNavigator() {
               is no stack to go back through. */}
           <Stack.Screen name="rain-map" options={{ headerShown: false }} />
           <Stack.Screen name="hazard/[region]" options={{ title: 'Region reading' }} />
+          <Stack.Screen name="seasonal/[region]/index" options={{ title: 'Seasonal advisory' }} />
+          <Stack.Screen name="seasonal/[region]/[variable]" options={{ title: 'Seasonal advice' }} />
           <Stack.Screen name="settings" options={{ title: 'Settings' }} />
           <Stack.Screen name="about" options={{ title: 'About AgroMet' }} />
           <Stack.Screen name="contact" options={{ title: 'Contact us' }} />

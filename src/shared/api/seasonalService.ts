@@ -214,7 +214,7 @@ export function summariseReading(
 }
 
 /** "around Week 3 of March" for dates, "about 12 days" otherwise. */
-function usualPhrase(variable: SeasonalVariableId, text: string): string {
+export function usualPhrase(variable: SeasonalVariableId, text: string): string {
   if (variable === 'onset' || variable === 'cessation') {
     return text.startsWith('Week') ? `around ${text}` : text.charAt(0).toLowerCase() + text.slice(1);
   }
