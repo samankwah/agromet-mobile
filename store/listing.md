@@ -8,27 +8,25 @@ more than the app does.
 House rules for this copy: plain short words for farmers, no em dashes, and
 never present the app as official. It is an independent app.
 
-Fill this before pasting: `SITE_URL`.
-
 ---
 
 ## Shared facts
 
-| Field                    | Value                                   |
-| ------------------------ | --------------------------------------- |
-| App name                 | AgroMet Ghana                           |
-| Package / bundle ID      | `com.agromet.ghana`                     |
-| Category                 | Weather (Apple primary), Weather (Play) |
-| Apple secondary category | Education                               |
-| Price                    | Free. No ads. No in-app purchases.      |
-| Privacy policy URL       | `SITE_URL/privacy`                      |
-| Terms URL                | `SITE_URL/terms`                        |
-| Support URL              | `SITE_URL/contact`                      |
-| Marketing URL            | `SITE_URL/app`                          |
-| Contact email            | `0243999631a@gmail.com`                 |
-| Contact phone            | +233 24 399 9631                        |
-| Countries                | Ghana first. Adding others is fine.     |
-| Languages                | English                                 |
+| Field                    | Value                                      |
+| ------------------------ | ------------------------------------------ |
+| App name                 | AgroMet Ghana                              |
+| Package / bundle ID      | `com.agromet.ghana`                        |
+| Category                 | Weather (Apple primary), Weather (Play)    |
+| Apple secondary category | Education                                  |
+| Price                    | Free. No ads. No in-app purchases.         |
+| Privacy policy URL       | `https://agromet-ghana.vercel.app/privacy` |
+| Terms URL                | `https://agromet-ghana.vercel.app/terms`   |
+| Support URL              | `https://agromet-ghana.vercel.app/contact` |
+| Marketing URL            | `https://agromet-ghana.vercel.app/app`     |
+| Contact email            | `0243999631a@gmail.com`                    |
+| Contact phone            | +233 24 399 9631                           |
+| Countries                | Ghana first. Adding others is fine.        |
+| Languages                | English                                    |
 
 ---
 
@@ -128,7 +126,7 @@ Contact: 0243999631a@gmail.com, +233 24 399 9631
 
 | Section               | Answer                                                                                                                                                                                                                 |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Privacy policy        | `SITE_URL/privacy`                                                                                                                                                                                                     |
+| Privacy policy        | `https://agromet-ghana.vercel.app/privacy`                                                                                                                                                                             |
 | App access            | All functionality is available without special access.                                                                                                                                                                 |
 | Ads                   | No, the app does not contain ads.                                                                                                                                                                                      |
 | Content rating (IARC) | Category: Reference, News or Educational. No violence, sex, drugs, gambling or bad language. Users cannot talk to each other. The app does not share the user's location with other users. Expect "Everyone" / PEGI 3. |

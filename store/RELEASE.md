@@ -20,9 +20,11 @@ without them.
    https://developer.apple.com/programs/enroll/
    - Turn on two-factor sign-in for the Apple ID first. The seller name on the
      App Store will be your legal name.
-3. **[you] Decide and tell Claude:** the website address (`SITE_URL`) and the
-   contact email (`CONTACT_EMAIL`). They go into `eas.json`, the backend
-   (`CONTACT_EMAIL` env var on Vercel), the download page and the listings.
+3. **Done (2026-10-05):** the website is https://agromet-ghana.vercel.app
+   (Vercel project `agromet-ghana`, deployed with `npx vercel --prod` from
+   `frontend/`) and the contact email is `0243999631a@gmail.com`. Both are in
+   `eas.json`, the backend env (`CONTACT_EMAIL`, `FRONTEND_ORIGINS`), the
+   download page and the listings.
 
 ## Timeline to expect
 
@@ -213,7 +215,7 @@ day or two, then 100%.
 
 - Make the QR code for the download page once the website address is final:
   ```
-  npx --yes qrcode -t svg -o ../frontend/public/app-qr.svg "SITE_URL/app"
+  npx --yes qrcode -t svg -o ../frontend/public/app-qr.svg "https://agromet-ghana.vercel.app/app"
   ```
   and set `shortUrl` in `frontend/src/config/mobileApp.js`. Print that QR on
   posters and flyers. It points at the page, not at a store, so it never
@@ -265,4 +267,4 @@ updates stop reaching new users.
 - [ ] Forecasts > Seasonal shows the SEAS5 outlook (onset, cessation, dry
       spells, season totals) and names ECMWF as the source.
 - [ ] About says the app is independent and not an official government app.
-- [ ] Share the app from the menu: the message links to `SITE_URL/app`.
+- [ ] Share the app from the menu: the message links to `https://agromet-ghana.vercel.app/app`.
