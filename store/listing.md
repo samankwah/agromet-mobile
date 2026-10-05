@@ -8,7 +8,7 @@ more than the app does.
 House rules for this copy: plain short words for farmers, no em dashes, and
 never present the app as official. It is an independent app.
 
-Fill these before pasting: `SITE_URL`, `CONTACT_EMAIL`.
+Fill this before pasting: `SITE_URL`.
 
 ---
 
@@ -25,7 +25,7 @@ Fill these before pasting: `SITE_URL`, `CONTACT_EMAIL`.
 | Terms URL                | `SITE_URL/terms`                        |
 | Support URL              | `SITE_URL/contact`                      |
 | Marketing URL            | `SITE_URL/app`                          |
-| Contact email            | `CONTACT_EMAIL`                         |
+| Contact email            | `0243999631a@gmail.com`                 |
 | Contact phone            | +233 24 399 9631                        |
 | Countries                | Ghana first. Adding others is fine.     |
 | Languages                | English                                 |
@@ -48,8 +48,9 @@ What you can do:
 • See today's weather and the next 7 days for your town.
 • Get warnings when heavy rain, strong wind or great heat is coming.
 • See the rain outlook for the coming weeks.
+• See the season ahead: when the rains may start and stop, dry spells, and how much rain the season may bring.
 • Check flood and dry spell risk for your area.
-• Read weekly farm advice for your district when it is published.
+• Read weekly farm advice for your district. Until advice is published for your area, the app shows an example, marked as an example.
 • Use crop and poultry calendars to know when to plant, weed, harvest and care for birds.
 • Set reminders for farm jobs.
 • Take a photo of a sick leaf to find out what may be wrong and what to do.
@@ -60,7 +61,7 @@ Made for low data and simple phones. The app keeps your last forecast so you can
 
 A word of care: forecasts are a best guess, not a promise, and AI answers can be wrong. For big decisions, also ask your local extension officer.
 
-AgroMet Ghana is an independent app. It is not an official government app. Weather data comes from public weather services such as Open-Meteo and NOAA.
+AgroMet Ghana is an independent app. It is not an official government app. Weather data comes from public weather services such as Open-Meteo, NOAA and ECMWF (seasonal outlook).
 ```
 
 **Release notes (1.0.0):** `First release.`
@@ -112,11 +113,13 @@ To try crop diagnosis: Farm Tools > Diagnose a crop > take or choose a photo of 
 
 To try AgroMet AI: open the Consult tab and ask "When should I plant maize in Ashanti?". Hold any answer to see Share, Read aloud and Report this answer.
 
-Market prices are shown as examples and labelled that way in the app.
+Market prices are shown as examples and labelled that way in the app. Until a weekly advisory is published for an area, the Advisories screen shows an example advisory, also labelled as an example.
 
-AgroMet Ghana is an independent app and does not claim to be a government service. Weather data comes from Open-Meteo and NOAA.
+The seasonal outlook (Forecasts > Seasonal) is worked out from ECMWF SEAS5 forecasts, through Open-Meteo. It is not an official Ghana Meteorological Agency outlook.
 
-Contact: CONTACT_EMAIL, +233 24 399 9631
+AgroMet Ghana is an independent app and does not claim to be a government service. Weather data comes from Open-Meteo, NOAA and ECMWF.
+
+Contact: 0243999631a@gmail.com, +233 24 399 9631
 ```
 
 ---
@@ -139,7 +142,7 @@ Contact: CONTACT_EMAIL, +233 24 399 9631
 ### Data safety
 
 Data is encrypted in transit: **Yes**. Users can ask for their data to be
-deleted: **Yes**, by email to `CONTACT_EMAIL`. No data is sold, and none is
+deleted: **Yes**, by email to `0243999631a@gmail.com`. No data is sold, and none is
 used for ads or shared with third parties for their own use (service providers
 that process data for us do not count as sharing).
 

@@ -259,8 +259,10 @@ updates stop reaching new users.
 - [ ] Maps load on a slow connection (flood and drought, rain map).
 - [ ] Menu: Terms, Privacy and Contact all open; Contact shows the right
       email or phone.
-- [ ] No invented content anywhere: no news card, no sample advisories, the
-      Seasonal tab says the outlook is coming, and market prices say they are
-      examples.
+- [ ] No invented content shown as real: no news card; where no advisory is
+      published, the example advisory says it is an example; market prices say
+      they are examples.
+- [ ] Forecasts > Seasonal shows the SEAS5 outlook (onset, cessation, dry
+      spells, season totals) and names ECMWF as the source.
 - [ ] About says the app is independent and not an official government app.
 - [ ] Share the app from the menu: the message links to `SITE_URL/app`.

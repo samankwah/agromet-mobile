@@ -28,6 +28,7 @@
         "EXPO_PUBLIC_API_URL": "https://agromet-backend.vercel.app",
         "EXPO_PUBLIC_MARKET_WHATSAPP": "233243999631",
         "EXPO_PUBLIC_CONTACT_PHONE": "+233243999631",
+        "EXPO_PUBLIC_CONTACT_EMAIL": "0243999631a@gmail.com",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true",
         "AGROMET_ARM_ONLY": "1"
       }
@@ -42,6 +43,7 @@
         "EXPO_PUBLIC_API_URL": "https://agromet-backend.vercel.app",
         "EXPO_PUBLIC_MARKET_WHATSAPP": "233243999631",
         "EXPO_PUBLIC_CONTACT_PHONE": "+233243999631",
+        "EXPO_PUBLIC_CONTACT_EMAIL": "0243999631a@gmail.com",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     }
