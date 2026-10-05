@@ -5,6 +5,7 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { GHANA_BOUNDARIES } from '../data/ghanaBoundaries';
 import type { SpatialGeography, SpatialGridCell, SpatialValueFormat } from '../domain/spatialOutlook';
 import { useTheme } from '../theme/ThemeProvider';
+import { buildBoundaryGeoJson, CARTO_STYLES, mapLibreHeadTags } from './maplibre/mapDocument';
 import { buildColorClasses, TERCILE_CATEGORIES, type ColorStops } from '../utils/colorScale';
 import { formatSpatialValue } from '../utils/formatSpatialValue';
 
@@ -26,7 +27,7 @@ type Props = {
    * the offline SVG one. See `utils/tercilePalette.ts`. */
   palette?: { label: string; color: string; sublabel?: string }[];
   /** Called with the tapped cell's place and coordinate. Omit it and the map
-   * keeps its read-only popup, which is what the Seasonal view still wants. */
+   * keeps its read-only popup. */
   onSelect?: (selection: MapSelection) => void;
   /** The continuous ramp for the fill. Must be the same one handed to the
    * legend: a map keyed by a scale it does not use is the failure mode this
@@ -53,12 +54,12 @@ type Props = {
  * later if/when the project moves to dev/EAS builds — only this file
  * changes, since the props are already map-library-agnostic.
  *
- * CARTO's `positron-gl-style` needs no API key (verified), and the
- * basemap gives the place labels, roads and boundaries that make a
- * forecast overlay legible as *Ghana* rather than an abstract shape.
+ * CARTO's basemaps need no API key (verified), and the basemap gives the
+ * place names, roads and boundaries that make a forecast overlay legible as
+ * *Ghana* rather than an abstract shape. Which of the two is drawn follows the
+ * app's colour scheme: a white map under a dark app is the one thing on the
+ * screen still lit up, and it drags the reader's eye away from the forecast.
  */
-const MAPLIBRE_VERSION = '5.24.0';
-const CARTO_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 
 /** What a tap on the map resolves to. */
 export type MapSelection = {
@@ -106,13 +107,6 @@ function buildGeoJson(
       ],
     },
   }));
-  return JSON.stringify({ type: 'FeatureCollection', features });
-}
-
-/** Boundary outlines for the selected geography level, so region/district
- * lines sit above the forecast fill the way they do in the reference. */
-function buildBoundaryGeoJson(geography: SpatialGeography): string {
-  const features = geography === 'region' ? GHANA_BOUNDARIES.regions : GHANA_BOUNDARIES.districts;
   return JSON.stringify({ type: 'FeatureCollection', features });
 }
 
@@ -167,23 +161,24 @@ function buildDataScript(
 }
 
 /** The map itself: basemap, boundaries and behaviour. Depends on the geography
- * alone, so it is built once per boundary level rather than per data change. */
-function buildHtml(geography: SpatialGeography): string {
+ * and the colour scheme alone, so it is built once per boundary level rather
+ * than per data change. */
+function buildHtml(geography: SpatialGeography, scheme: 'light' | 'dark'): string {
   const { minLng, minLat, maxLng, maxLat } = GHANA_BOUNDARIES.bounds;
+  const dark = scheme === 'dark';
 
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<link href="https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.css" rel="stylesheet" />
-<script src="https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.js"></script>
+${mapLibreHeadTags()}
 <style>
   html, body, #map { margin:0; padding:0; height:100%; width:100%; background:transparent; }
   .maplibregl-ctrl-attrib { font-size: 9px; }
   #offline {
     position:absolute; inset:0; display:none; align-items:center; justify-content:center;
-    font-family: system-ui, sans-serif; font-size:14px; color:#586b78; text-align:center; padding:24px;
+    font-family: system-ui, sans-serif; font-size:14px; color:${dark ? '#8fa0ad' : '#586b78'}; text-align:center; padding:24px;
   }
 </style>
 </head>
@@ -204,7 +199,7 @@ function buildHtml(geography: SpatialGeography): string {
     try {
       var map = new maplibregl.Map({
         container: 'map',
-        style: '${CARTO_STYLE}',
+        style: '${dark ? CARTO_STYLES.dark : CARTO_STYLES.light}',
         bounds: [[${minLng}, ${minLat}], [${maxLng}, ${maxLat}]],
         fitBoundsOptions: { padding: 16 },
         attributionControl: { compact: true }
@@ -236,7 +231,7 @@ function buildHtml(geography: SpatialGeography): string {
           id: 'boundary-line',
           type: 'line',
           source: 'boundaries',
-          paint: { 'line-color': '#37474f', 'line-width': 0.8, 'line-opacity': 0.55 }
+          paint: { 'line-color': '${dark ? '#8fa0ad' : '#37474f'}', 'line-width': 0.8, 'line-opacity': 0.55 }
         });
 
         // Tap a cell to read its exact value — the legend gives the range,
@@ -249,7 +244,7 @@ function buildHtml(geography: SpatialGeography): string {
           type: 'line',
           source: 'boundaries',
           filter: ['==', ['get', 'name'], '__none__'],
-          paint: { 'line-color': '#111827', 'line-width': 2.4, 'line-opacity': 0.95 }
+          paint: { 'line-color': '${dark ? '#f8fafc' : '#111827'}', 'line-width': 2.4, 'line-opacity': 0.95 }
         });
 
         window.__setSelected = function (filter) {
@@ -344,9 +339,10 @@ export function MapLibreChoropleth({
 
   const [documentReady, setDocumentReady] = useState(false);
 
-  // The document depends on the boundary level only. It used to depend on the
-  // cells too, so every variable, period or view change reloaded the whole map.
-  const html = useMemo(() => buildHtml(geography), [geography]);
+  // The document depends on the boundary level and the colour scheme only. It
+  // used to depend on the cells too, so every variable, period or view change
+  // reloaded the whole map.
+  const html = useMemo(() => buildHtml(geography, theme.scheme), [geography, theme.scheme]);
 
   // A new document has not said it is ready yet. Adjusted during render rather
   // than in an effect, so no push is aimed at the page being replaced.
