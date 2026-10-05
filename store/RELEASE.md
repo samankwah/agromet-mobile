@@ -79,9 +79,27 @@ Android upload to the public listing. Do the Apple side during the 14 days.
    ```
 3. **[you]** Download the `.aab` from the EAS build page. Play Console >
    Test and release > Testing > Internal testing > Create new release.
-   Accept **Play App Signing** when asked, upload the `.aab`, add yourself as
-   a tester, and roll it out. Google does not allow the very first upload of a
-   new app through the API, so this one is by hand.
+   **App signing: do not take Google's default key.** The website APK (2e) is
+   already signed with our EAS key, and phones only take an update signed with
+   the same key. So that website installs can update from Google Play:
+   - **[run]** `eas credentials -p android` > production > Keystore >
+     Download. Keep the `.jks` file and the passwords it prints private.
+   - **[you]** In the release, click **Choose signing key** > **Use existing
+     app signing key from Java keystore**. Download the PEPK tool and the
+     encryption key Google shows, then run (Java needed):
+     ```
+     java -jar pepk.jar --keystore=agromet.jks --alias=<alias> --output=pepk_out.zip --include-cert --rsa-aes-encryption --encryption-key-path=encryption_public_key.pem
+     ```
+     Upload `pepk_out.zip`. Delete the `.jks` and the zip from your computer
+     afterwards.
+   - Check: Play Console > Test and release > App integrity > App signing.
+     The SHA-256 of the app signing key must match the one shown by
+     `eas credentials -p android`.
+
+   Then upload the `.aab`, add yourself as a tester, and roll it out. Google
+   does not allow the very first upload of a new app through the API, so this
+   one is by hand.
+
 4. **[you]** Make a Google Cloud service account so later uploads can be done
    with one command: follow https://docs.expo.dev/submit/android/ (create the
    service account, give it the Play Console "Release" permissions for this
@@ -166,18 +184,27 @@ day or two, then 100%.
 
 ### 2e. The website download (APK) for phones without Google Play
 
-1. **[you]** Play Console > Test and release > App bundle explorer > pick the
-   live version > Downloads > **Signed, universal APK**. This copy is signed
-   with Google's app signing key, so people who install it can later update
-   from Google Play. An APK built with `eas build` would not be.
-2. **[run]**
+This exists before Play does, so people can install the app from the website
+now. Never link the expo.dev build page: it only opens for someone signed in
+to the Expo account.
+
+1. **[run]** Build with the `apk` profile. It uses the production channel and
+   settings, but makes an ARM-only APK:
    ```
-   certutil -hashfile agromet-ghana-1.0.0.apk SHA256
-   gh release create v1.0.0 agromet-ghana-1.0.0.apk --repo samankwah/agromet-mobile --title "AgroMet Ghana 1.0.0" --notes "First release."
+   eas build -p android --profile apk
    ```
-3. **[run]** Fill `apk.url` (the release asset link), `version`, `sizeMb` and
-   `sha256` in `frontend/src/config/mobileApp.js`, set `android.live: true`,
-   and redeploy the website.
+   It is signed with our EAS key. Because Play is given the same key (2a),
+   people who install it can later update from Google Play.
+2. **[run]** Download it from the build's artifact link, then:
+   ```
+   certutil -hashfile agromet-ghana-<version>.apk SHA256
+   gh release create v<version> agromet-ghana-<version>.apk --repo samankwah/agromet-mobile --target release/store-1.0 --title "AgroMet Ghana <version>" --notes "..."
+   ```
+3. **[run]** Fill `apk.url` with the release asset link
+   (`https://github.com/samankwah/agromet-mobile/releases/download/v<version>/agromet-ghana-<version>.apk`),
+   plus `version`, `sizeMb` and `sha256` in `frontend/src/config/mobileApp.js`,
+   then redeploy the website. Set `android.live: true` only once the Play
+   listing is public.
 
 ## 3. Apple App Store
 
@@ -228,8 +255,10 @@ day or two, then 100%.
 - **Native changes or new permissions:** `eas build -p all --profile
 production`, then `eas submit` for each platform. Version numbers go up by
   themselves on EAS.
-- **Each Android release:** refresh the universal APK on GitHub Releases and
-  the numbers in `mobileApp.js`.
+- **Each Android release:** build a new APK with the `apk` profile, add it to
+  GitHub Releases (2e), and update the numbers in `mobileApp.js`. A
+  JavaScript-only `eas update --channel production` reaches website installs
+  too, with no new APK needed.
 - **Reports of AI answers** arrive in the `ai_reports` table; contact form
   messages in `contact_messages`. Read both every week.
 
