@@ -111,7 +111,7 @@ export function RegionHazardScreen({ region, initialHazard = 'flood' }: Props) {
                   </Text>
                 </View>
                 <Text variant="caption" muted>
-                  Issued by {block.issuedBy ?? 'GMet'}
+                  {block.issuedBy ? `Issued by ${block.issuedBy}` : 'Published bulletin'}
                   {block.computed ? ` · the model alone reads ${getHazardBandMeta(block.computed.band).label.toLowerCase()}` : ''}
                 </Text>
               </Card>

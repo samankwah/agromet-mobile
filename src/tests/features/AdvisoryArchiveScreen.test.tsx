@@ -6,9 +6,27 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 
 import { AdvisoryArchiveScreen } from '../../features/advisories/archive/AdvisoryArchiveScreen';
+import * as advisoryService from '../../shared/api/weeklyAdvisoryService';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
+import { MOCK_ADVISORY_ARCHIVE } from '../../shared/data/exampleWeeklyAdvisory';
 
 jest.mock('expo-router', () => ({ router: { back: jest.fn(), push: jest.fn() } }));
+
+/* The archive call is stubbed to serve the fixture records as if they had been
+   published, because the app no longer falls back to samples of its own. The
+   tests about what the server said run the real call over a stubbed fetch. */
+jest.mock('../../shared/api/weeklyAdvisoryService', () => ({
+  ...jest.requireActual('../../shared/api/weeklyAdvisoryService'),
+  listArchivedAdvisories: jest.fn(),
+}));
+
+const actualService = jest.requireActual<typeof advisoryService>('../../shared/api/weeklyAdvisoryService');
+const archiveMock = jest.mocked(advisoryService.listArchivedAdvisories);
+
+/** Runs the real call, so the stubbed fetch decides what comes back. */
+function useRealService() {
+  archiveMock.mockImplementation(actualService.listArchivedAdvisories);
+}
 
 // See HomeScreen.test.tsx for why initialMetrics is required in Jest.
 const TEST_SAFE_AREA_METRICS = {
@@ -65,11 +83,10 @@ beforeEach(async () => {
   // a later test would otherwise inherit an earlier one's payload.
   await AsyncStorage.clear();
   jest.clearAllMocks();
-  // Rejected by default so the tests exercise the seeded-sample path
-  // deterministically, without depending on a server.
-  globalThis.fetch = jest.fn(() =>
-    Promise.reject(new TypeError('Network request failed')),
-  ) as unknown as typeof fetch;
+  archiveMock.mockResolvedValue({ data: MOCK_ADVISORY_ARCHIVE, fallback: null });
+  // Anything that does reach the network is refused, so no test depends on a
+  // server.
+  globalThis.fetch = jest.fn(() => Promise.reject(new TypeError('Network request failed'))) as unknown as typeof fetch;
 });
 
 afterEach(() => {
@@ -78,7 +95,7 @@ afterEach(() => {
 });
 
 describe('AdvisoryArchiveScreen', () => {
-  it('lists the samples grouped by year, newest first', async () => {
+  it('lists the records grouped by year, newest first', async () => {
     renderScreen();
     await screen.findByText('2026');
 
@@ -89,24 +106,29 @@ describe('AdvisoryArchiveScreen', () => {
 
   /* "Nobody has published anything" and "your phone has no signal" are not the
      same news, and a farmer needs to be able to tell them apart. */
-  it('says the server was unreachable rather than that nothing is published', async () => {
+  it('says the server was unreachable, and lists no samples in its place', async () => {
+    useRealService();
     renderScreen();
     await screen.findByText(/Could not reach the AgroMet server/i);
 
-    expect(screen.queryByText(/Nothing has been published yet/i)).toBeNull();
+    expect(screen.getByText('Nothing in the archive')).toBeTruthy();
+    expect(screen.queryByText('Rice advisory — major season')).toBeNull();
   });
 
-  it('shows no notice or sample label when the server answers with an empty archive', async () => {
+  it('says the archive is empty when the server answers with nothing', async () => {
     // The connection is fine, so there is nothing for the farmer to act on.
+    useRealService();
     respondWith({ success: true, data: [] });
     renderScreen();
-    await screen.findByText('2026');
+    await screen.findByText('Nothing in the archive');
 
+    expect(screen.getByText('Published advisories will appear here.')).toBeTruthy();
     expect(screen.queryByText(/Could not reach the AgroMet server/i)).toBeNull();
-    expect(screen.queryByText(/samples?/i)).toBeNull();
+    expect(screen.queryByText('Rice advisory — major season')).toBeNull();
   });
 
-  it('renders real records without any sample notice', async () => {
+  it('renders real records without any notice', async () => {
+    useRealService();
     respondWith({
       success: true,
       data: [
@@ -141,7 +163,7 @@ describe('AdvisoryArchiveScreen', () => {
 
       fireEvent.changeText(screen.getByLabelText('Search advisories'), 'armyworm');
 
-      // Only the maize sample lists a fall armyworm watch.
+      // Only the maize record lists a fall armyworm watch.
       expect(screen.getByText('Maize advisory — minor season')).toBeTruthy();
       expect(screen.queryByText('Rice advisory — major season')).toBeNull();
     });

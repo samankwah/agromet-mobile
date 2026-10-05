@@ -1,21 +1,30 @@
 import { useMemo } from 'react';
 
 import { useCachedQuery } from '../../../shared/api/useCachedQuery';
-import {
-  getWeeklyAdvisory,
-  listAdvisoryActivities,
-  seededAdvisory,
-  type AdvisoryFallback,
-} from '../../../shared/api/weeklyAdvisoryService';
-import {
-  type AdvisoryFilterState,
-  type AdvisoryKind,
-  type WeeklyAdvisory,
-} from '../../../shared/domain/weeklyAdvisory';
+import { NetworkError } from '../../../shared/api/http';
+import { getWeeklyAdvisory, listAdvisoryActivities, type AdvisoryFallback } from '../../../shared/api/weeklyAdvisoryService';
+import { exampleAdvisory } from '../../../shared/data/exampleWeeklyAdvisory';
+import { type AdvisoryFilterState, type AdvisoryKind, type WeeklyAdvisory } from '../../../shared/domain/weeklyAdvisory';
 
 const HOUR = 60 * 60 * 1000;
 
-type Snapshot = { advisory: WeeklyAdvisory; fallback: AdvisoryFallback };
+/** `example` marks the labelled sample shown while nothing is published. */
+type Snapshot = { advisory: WeeklyAdvisory | null; fallback: AdvisoryFallback; example?: boolean };
+
+/** The words the screen shows when the server cannot be reached and nothing
+ * is saved on the phone. */
+const OFFLINE_MESSAGE = 'Could not reach the AgroMet server. Check your connection.';
+
+/**
+ * "Offline" is raised as an error rather than returned as a snapshot. That is
+ * what lets `useCachedQuery` put the last real bulletin saved on this phone on
+ * screen; a snapshot would succeed, overwrite that saved copy with nothing, and
+ * leave the farmer with less than they had.
+ */
+function settle(snapshot: Snapshot): Snapshot {
+  if (snapshot.fallback === 'offline') throw new NetworkError(OFFLINE_MESSAGE);
+  return snapshot;
+}
 
 /**
  * Find the bulletin for a district and fetch it whole.
@@ -30,17 +39,13 @@ type Snapshot = { advisory: WeeklyAdvisory; fallback: AdvisoryFallback };
  * activity — so paying for a round trip per tap would buy nothing, and would
  * stop working the moment the signal did.
  */
-async function fetchSnapshot(
-  kind: AdvisoryKind,
-  filter: AdvisoryFilterState,
-  advisoryId?: number,
-): Promise<Snapshot> {
+async function fetchSnapshot(kind: AdvisoryKind, filter: AdvisoryFilterState, advisoryId?: number): Promise<Snapshot> {
   // Opened from the archive: the record is already chosen, so skip the lookup
   // entirely. Without this the screen would search by filter and land on the
   // newest bulletin for the district rather than the one that was tapped.
   if (advisoryId !== undefined) {
-    const chosen = await getWeeklyAdvisory(advisoryId, kind, filter.subject);
-    return { advisory: chosen.data, fallback: chosen.fallback };
+    const chosen = await getWeeklyAdvisory(advisoryId);
+    return settle({ advisory: chosen.data, fallback: chosen.fallback });
   }
 
   // An unset field is not sent, so an empty filter asks the server for
@@ -48,15 +53,22 @@ async function fetchSnapshot(
   // on, before the farmer has narrowed it to their own district.
   const list = await listAdvisoryActivities(filter);
 
-  // Nothing to fetch: either the server is unreachable or it has published
-  // nothing here. Both fall back to the seeded bulletin, and the caller is told
-  // which, because "no signal" and "not written yet" need different words.
+  // The server answered and has published nothing here: show the example, which
+  // the screen labels as one. Offline is different and still fails the query,
+  // so a real bulletin saved on the phone is shown instead and never replaced
+  // by a sample.
+  if (list.fallback === 'empty') return withExample(kind, filter);
   if (list.fallback !== null) {
-    return { advisory: seededAdvisory(kind, filter.subject), fallback: list.fallback };
+    return settle({ advisory: null, fallback: list.fallback });
   }
 
-  const detail = await getWeeklyAdvisory(list.data[0].advisoryId, kind, filter.subject);
-  return { advisory: detail.data, fallback: detail.fallback };
+  const detail = await getWeeklyAdvisory(list.data[0].advisoryId);
+  if (detail.fallback === 'empty') return withExample(kind, filter);
+  return settle({ advisory: detail.data, fallback: detail.fallback });
+}
+
+function withExample(kind: AdvisoryKind, filter: AdvisoryFilterState): Snapshot {
+  return { advisory: exampleAdvisory(kind, filter.subject), fallback: 'empty', example: true };
 }
 
 /** A stable, order-independent cache key, per useCalendars' convention.
@@ -85,7 +97,10 @@ export function useWeeklyAdvisory(kind: AdvisoryKind, filter: AdvisoryFilterStat
     gcTime: 7 * 24 * HOUR,
   });
 
-  const advisory = query.data?.advisory ?? null;
+  // A real bulletin, or the labelled example. A snapshot saved by an older build
+  // may hold an unlabelled stand-in flagged as a fallback; that is never shown.
+  const isExample = query.data?.example === true;
+  const advisory = query.data && (query.data.fallback === null || isExample) ? query.data.advisory : null;
 
   // A bulletin can hold several activities; a poultry one holds none.
   const activities = useMemo(() => advisory?.activities ?? [], [advisory]);
@@ -95,5 +110,6 @@ export function useWeeklyAdvisory(kind: AdvisoryKind, filter: AdvisoryFilterStat
     advisory,
     activities,
     fallback: query.data?.fallback ?? null,
+    isExample,
   };
 }

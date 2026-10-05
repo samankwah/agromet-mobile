@@ -20,6 +20,7 @@ import { StatTile } from '../../shared/ui/StatTile';
 import { Text } from '../../shared/ui/Text';
 import { buildMarketOrderUrl, canPlaceOrder } from '../../shared/utils/buildMarketOrderText';
 import { MONTH_NAMES, formatCedi, formatMonths, getRegionalPrices, getTimingSignal } from '../../shared/utils/marketInsights';
+import { ExamplePricesNotice } from './components/ExamplePricesNotice';
 import { DemandRow, TrendBadge, timingColor, timingIcon } from './components/MarketBadges';
 import { CommodityDetailSkeleton } from './components/MarketSkeletons';
 import { useResolvedCommodity } from './useMarket';
@@ -136,6 +137,8 @@ function ChartAndDetail({
 
   return (
     <>
+      <ExamplePricesNotice />
+
       {/* Hero */}
       <Card style={{ padding: 0, overflow: 'hidden' }}>
         {image ? <Image source={image} style={{ width: '100%', height: 180 }} resizeMode="cover" /> : null}
@@ -168,7 +171,7 @@ function ChartAndDetail({
             <View>
               <Text variant="h1">{formatCedi(price)}</Text>
               <Text variant="caption" muted>
-                {market?.unit ?? 'per bag'}
+                Example price {market?.unit ?? 'per bag'}
                 {region && basePrice != null && price !== basePrice
                   ? ` · ${price > basePrice ? '+' : ''}${(((price - basePrice) / basePrice) * 100).toFixed(0)}% vs national`
                   : ''}
@@ -340,16 +343,15 @@ function ChartAndDetail({
                     note: Android drops a Pressable's own background and
                     border while still drawing its children. */}
                 {({ pressed }) => (
+                  // The chosen region wears the app's glass selection, the flat
+                  // grey fill a selected switch or tab shows, with no rim or
+                  // shadow. Keyed on the state so Android redraws its corners.
                   <View
+                    key={selected ? 'selected' : 'idle'}
                     style={{
-                      backgroundColor: selected ? theme.colors.focus : theme.colors.bg,
+                      backgroundColor: selected ? theme.colors.text + '3D' : theme.colors.bg,
                       borderRadius: theme.radii.md,
-                      borderWidth: 1,
-                      borderColor: selected ? theme.colors.focusRim : 'transparent',
-                      // The chosen region stays pressed in, and keeps its
-                      // highlight fill and rim so the state never rests on
-                      // the shadow alone.
-                      boxShadow: selected || pressed ? theme.sunken('sm') : theme.raised('sm'),
+                      boxShadow: selected ? undefined : pressed ? theme.sunken('sm') : theme.raised('sm'),
                       padding: theme.spacing.md,
                       gap: 2,
                       minHeight: theme.minTouchTarget,

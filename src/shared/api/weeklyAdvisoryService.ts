@@ -1,9 +1,3 @@
-import {
-  MOCK_ADVISORY_ARCHIVE,
-  MOCK_CROP_ADVISORY,
-  MOCK_LAYER_ADVISORY,
-  MOCK_POULTRY_ADVISORY,
-} from '../data/mockWeeklyAdvisory';
 import type {
   AdvisoryActivity,
   AdvisoryActivityRef,
@@ -29,12 +23,13 @@ import { getJson, NetworkError } from './http';
  *      reach across three objects or decide what a missing cell means.
  *   3. `"REG02/Ashanti Region"` is split to its readable half.
  *
- * Falls back to the seeded copy the same way calendarService does, and reports
- * which of the two reasons applied.
+ * Never stands in invented content. When the server has nothing, or cannot be
+ * reached, the caller gets no bulletin and is told which of the two reasons
+ * applied, so the screen can say so plainly.
  */
 
 /**
- * Why seeded data is on screen, if it is.
+ * Why no published data came back, if none did.
  *
  *   'offline'  the server could not be reached
  *   'empty'    the server answered, and has published nothing for this district
@@ -241,9 +236,7 @@ function toArchivedAdvisory(dto: AdvisoryListDto): ArchivedAdvisory {
     // Guarded because `advisories` carries parsed objects on the detail
     // endpoint and plain names here; anything else is dropped rather than
     // rendered as "[object Object]".
-    activities: Array.isArray(dto.activities)
-      ? dto.activities.filter((name): name is string => typeof name === 'string')
-      : [],
+    activities: Array.isArray(dto.activities) ? dto.activities.filter((name): name is string => typeof name === 'string') : [],
     weekLabels: (dto.weekLabels ?? []).filter((label): label is string => Boolean(label)),
   };
 }
@@ -261,16 +254,6 @@ function toActivityRef(dto: ActivityRefDto): AdvisoryActivityRef {
   };
 }
 
-/** The seeded bulletin for a kind, used when the server has nothing. */
-export function seededAdvisory(kind: AdvisoryKind, subject?: string): WeeklyAdvisory {
-  if (kind !== 'poultry') return MOCK_CROP_ADVISORY;
-  // Broiler and layer are genuinely different programmes — 4 stages against 16,
-  // eight weeks against a year — so one poultry stand-in cannot represent both.
-  // A farmer who picked Layer and was shown a broiler cycle would reasonably
-  // conclude the app does not know the difference.
-  return subject?.trim().toLowerCase() === 'layer' ? MOCK_LAYER_ADVISORY : MOCK_POULTRY_ADVISORY;
-}
-
 /**
  * Which activities exist for a district, so the farmer can pick one.
  *
@@ -278,9 +261,7 @@ export function seededAdvisory(kind: AdvisoryKind, subject?: string): WeeklyAdvi
  * " Region" suffix) but matches district and crop exactly, so the values sent
  * here must be the catalogue's own spellings.
  */
-export async function listAdvisoryActivities(
-  filter: AdvisoryFilterState,
-): Promise<AdvisoryResult<AdvisoryActivityRef[]>> {
+export async function listAdvisoryActivities(filter: AdvisoryFilterState): Promise<AdvisoryResult<AdvisoryActivityRef[]>> {
   try {
     const data = await getJson<ActivityRefDto[]>('/api/weekly-advisories/activities', {
       region: filter.region,
@@ -320,26 +301,21 @@ export async function listArchivedAdvisories(): Promise<AdvisoryResult<ArchivedA
     const entries = (data ?? []).map(toArchivedAdvisory);
     // Nothing published is not a failure, and it is not the same as being
     // offline — the archive says something different for each.
-    if (entries.length === 0) return { data: MOCK_ADVISORY_ARCHIVE, fallback: 'empty' };
+    if (entries.length === 0) return { data: [], fallback: 'empty' };
     return { data: entries, fallback: null };
   } catch (error) {
-    if (error instanceof NetworkError) return { data: MOCK_ADVISORY_ARCHIVE, fallback: 'offline' };
+    if (error instanceof NetworkError) return { data: [], fallback: 'offline' };
     throw error;
   }
 }
 
-export async function getWeeklyAdvisory(
-  advisoryId: number,
-  kind: AdvisoryKind,
-  /** The chosen bird or commodity, so a stand-in matches what was asked for. */
-  subject?: string,
-): Promise<AdvisoryResult<WeeklyAdvisory>> {
+export async function getWeeklyAdvisory(advisoryId: number): Promise<AdvisoryResult<WeeklyAdvisory | null>> {
   try {
     const data = await getJson<AdvisoryDto>(`/api/weekly-advisories/${advisoryId}`);
-    if (!data) return { data: seededAdvisory(kind, subject), fallback: 'empty' };
+    if (!data) return { data: null, fallback: 'empty' };
     return { data: toWeeklyAdvisory(data), fallback: null };
   } catch (error) {
-    if (error instanceof NetworkError) return { data: seededAdvisory(kind, subject), fallback: 'offline' };
+    if (error instanceof NetworkError) return { data: null, fallback: 'offline' };
     throw error;
   }
 }

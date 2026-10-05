@@ -29,10 +29,13 @@ export function useAdvisoryArchive() {
 
   return {
     ...query,
-    entries: query.data?.data ?? [],
+    // Only real records. A snapshot saved by an older build may still hold the
+    // bundled samples it used to fall back to, flagged as a fallback; those are
+    // never shown.
+    entries: query.data && query.data.fallback === null ? query.data.data : [],
     /**
-     * `'empty'` — nothing has ever been published, so the rows on screen are
-     * the bundled samples. `'offline'` — the server was unreachable, likewise.
+     * `'empty'` — nothing has ever been published, so the archive is empty.
+     * `'offline'` — the server was unreachable, and there is nothing to list.
      * `null` — these are real records. The screen says something different for
      * each, because "nobody has published anything" and "your phone has no
      * signal" are not the same news.

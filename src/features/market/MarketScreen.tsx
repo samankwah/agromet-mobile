@@ -14,6 +14,7 @@ import { formatRelativeTime } from '../../shared/utils/formatRelativeTime';
 import type { ResolvedCommodity } from '../../shared/utils/marketInsights';
 import { CartSheet } from './components/CartSheet';
 import { CommodityCard } from './components/CommodityCard';
+import { ExamplePricesNotice } from './components/ExamplePricesNotice';
 import { MarketGridSkeleton } from './components/MarketSkeletons';
 import { QuickViewSheet } from './components/QuickViewSheet';
 import { useResolvedCatalogue } from './useMarket';
@@ -44,8 +45,7 @@ export function MarketScreen() {
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
     return resolved.filter(({ entry }) => {
-      const matchesSearch =
-        !term || entry.name.toLowerCase().includes(term) || entry.description.toLowerCase().includes(term);
+      const matchesSearch = !term || entry.name.toLowerCase().includes(term) || entry.description.toLowerCase().includes(term);
       return matchesSearch && (category === 'All' || entry.category === category);
     });
   }, [resolved, search, category]);
@@ -67,10 +67,7 @@ export function MarketScreen() {
   // width before it lays its photograph out.
   const cardWidth = Math.floor((width - theme.spacing.lg * 2 - theme.spacing.md) / 2);
 
-  const regionOptions = [
-    { id: '', label: 'National average' },
-    ...centers.map((center) => ({ id: center.region, label: center.region })),
-  ];
+  const regionOptions = [{ id: '', label: 'National average' }, ...centers.map((center) => ({ id: center.region, label: center.region }))];
 
   return (
     <Screen>
@@ -117,6 +114,10 @@ export function MarketScreen() {
           ) : null}
         </Pressable>
       </View>
+
+      {/* Always, not only on a fallback: none of these figures is a live
+          quote, and a farmer should never have to guess that. */}
+      <ExamplePricesNotice />
 
       {usingCachedFallback ? (
         <Text variant="caption" muted>
@@ -197,12 +198,7 @@ export function MarketScreen() {
             return (
               <View key={row} style={{ flexDirection: 'row', gap: theme.spacing.md }}>
                 {pair.map((item) => (
-                  <CommodityCard
-                    key={item.entry.slug}
-                    resolved={item}
-                    width={cardWidth}
-                    onQuickView={setQuickViewSlug}
-                  />
+                  <CommodityCard key={item.entry.slug} resolved={item} width={cardWidth} onQuickView={setQuickViewSlug} />
                 ))}
                 {/* Keeps a lone last card in the left column. */}
                 {pair.length === 1 ? <View style={{ width: cardWidth }} /> : null}
@@ -213,12 +209,7 @@ export function MarketScreen() {
       </AsyncStateView>
 
       {quickViewed ? (
-        <QuickViewSheet
-          resolved={quickViewed}
-          region={region}
-          onClose={() => setQuickViewSlug(null)}
-          onAddToCart={addToCart}
-        />
+        <QuickViewSheet resolved={quickViewed} region={region} onClose={() => setQuickViewSlug(null)} onAddToCart={addToCart} />
       ) : null}
 
       {cartOpen ? <CartSheet region={region} onClose={() => setCartOpen(false)} /> : null}

@@ -1,4 +1,4 @@
-import { getHourlyForecast, getSeasonalOutlook, getWeeklyForecast } from '../../shared/api/forecastService';
+import { getHourlyForecast, getWeeklyForecast } from '../../shared/api/forecastService';
 import { getCurrentConditions } from '../../shared/api/weatherService';
 import { buildOpenMeteoFixture, stubWeatherFetch } from '../fixtures/openMeteo';
 
@@ -61,18 +61,6 @@ describe('forecastService', () => {
       expect(day.humidityPct).toBeGreaterThan(0);
       expect(day.humidityPct).toBeLessThanOrEqual(100);
     }
-  });
-
-  it('getSeasonalOutlook rainfall probability categories sum to ~100 — a probabilistic outlook should never imply more or less than full coverage across its own categories', async () => {
-    const outlook = await getSeasonalOutlook('northern');
-    const total =
-      outlook.rainfallProbability.belowNormalPct + outlook.rainfallProbability.normalPct + outlook.rainfallProbability.aboveNormalPct;
-    expect(total).toBe(100);
-  });
-
-  it('getSeasonalOutlook always carries a non-empty plain-language summary', async () => {
-    const outlook = await getSeasonalOutlook('northern');
-    expect(outlook.plainLanguageSummary.length).toBeGreaterThan(0);
   });
 });
 

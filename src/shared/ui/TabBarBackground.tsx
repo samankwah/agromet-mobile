@@ -1,17 +1,19 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 
+import { tint } from '../theme/blend';
 import { useTheme } from '../theme/ThemeProvider';
 import { Surface } from './Surface';
 
 /**
- * The bottom tab bar's surface: a floating rounded panel, outlined in an
- * accent-tinted rim rather than the neutral hairline.
+ * The bottom tab bar's surface: a floating capsule in the same glass style as
+ * SegmentedControl, with no rim.
  *
  * The bar is a *floating* panel — inset from the screen edges rather than a
- * full-width strip welded to the bottom — and its outline is visibly green
- * where a card's is blue-grey. That tint is what marks it as chrome rather
- * than content, so it is worth keeping distinct from `colors.border`.
+ * full-width strip welded to the bottom. Its fill is the switch track's colour
+ * (the text colour at 12% over the page), blended down to an opaque colour
+ * rather than left see-through: the bar floats over maps and photographs, and
+ * labels on a see-through fill would sit on whatever is scrolling past.
  *
  * It takes the deepest raise in the app. The bar genuinely floats over the
  * scrolling content, and that is the one relationship here the depth language
@@ -19,7 +21,8 @@ import { Surface } from './Surface';
  * sat *behind* the page: under soft UI a recessed floating bar reads as a hole
  * cut in the screen. The `chrome` fill is kept, though — a shade below the
  * page keeps the bar reading as navigation rather than as one more card, and
- * the lift now carries the separation the darkness used to.
+ * the lift now carries the separation the darkness used to. With the rim gone
+ * the lift is also the bar's only edge over content of a similar colour.
  *
  * The inset itself is not set here; it comes from `tabBarStyle`'s margins in
  * app/(tabs)/_layout.tsx, so the navigator still measures the bar's full box
@@ -43,9 +46,9 @@ export function TabBarBackground() {
       // that page is already near-white.
       depth="lifted"
       level="lg"
-      radius={theme.radii.xl}
-      background={theme.colors.chrome}
-      borderColor={theme.colors.accentStrong}
+      radius={theme.radii.pill}
+      background={tint(theme.colors.text, theme.colors.bg, 0.12)}
+      bordered={false}
       style={StyleSheet.absoluteFill}
     />
   );

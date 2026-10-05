@@ -2,16 +2,51 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { WeeklyAdvisoryScreen } from '../../features/advisories/weekly/WeeklyAdvisoryScreen';
 import { queryClient } from '../../shared/api/queryClient';
+import * as advisoryService from '../../shared/api/weeklyAdvisoryService';
+import type { WeeklyAdvisory } from '../../shared/domain/weeklyAdvisory';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
+import { MOCK_CROP_ADVISORY, MOCK_LAYER_ADVISORY, MOCK_POULTRY_ADVISORY } from '../../shared/data/exampleWeeklyAdvisory';
 
 jest.mock('expo-router', () => ({ router: { back: jest.fn(), push: jest.fn() } }));
 
-// Every request is refused, so the screen exercises the seeded-fallback path
-// deterministically. That is also the real state of the backend today: the
-// weekly_advisories table is empty in every database.
+/* The two calls the screen makes are stubbed to serve the fixture bulletins as
+   if the server had published them. The app no longer has a seeded fallback to
+   lean on: with nothing published it shows nothing, which is what the last
+   suite in this file pins. Everything else is real, including the reshaping in
+   the service for the one test that drives raw responses through it. */
+jest.mock('../../shared/api/weeklyAdvisoryService', () => ({
+  ...jest.requireActual('../../shared/api/weeklyAdvisoryService'),
+  listAdvisoryActivities: jest.fn(),
+  getWeeklyAdvisory: jest.fn(),
+}));
+
+const actualService = jest.requireActual<typeof advisoryService>('../../shared/api/weeklyAdvisoryService');
+const listMock = jest.mocked(advisoryService.listAdvisoryActivities);
+const getMock = jest.mocked(advisoryService.getWeeklyAdvisory);
+
+const FIXTURES: Record<number, WeeklyAdvisory> = { 1: MOCK_CROP_ADVISORY, 2: MOCK_POULTRY_ADVISORY, 3: MOCK_LAYER_ADVISORY };
+
+/** The list call does not carry the kind, so the fixture is picked from the
+ * kind the test rendered and the bird it chose. */
+let renderedKind: 'crop' | 'poultry' = 'crop';
+
+function serveFixtures() {
+  listMock.mockImplementation(async (filter) => {
+    const advisoryId = renderedKind === 'crop' ? 1 : filter.subject === 'Layer' ? 3 : 2;
+    return {
+      data: [{ id: advisoryId, advisoryId, activity: '', weekLabel: null, region: '', district: '', crop: filter.subject, year: null }],
+      fallback: null,
+    };
+  });
+  getMock.mockImplementation(async (advisoryId) => ({ data: FIXTURES[advisoryId] ?? null, fallback: null }));
+}
+
+// Any request that does reach the network is refused, so nothing in this file
+// depends on a server.
 const mockFetch = jest.fn(() => Promise.reject(new TypeError('Network request failed')));
 globalThis.fetch = mockFetch as unknown as typeof fetch;
 
@@ -21,6 +56,7 @@ const TEST_SAFE_AREA_METRICS = {
 };
 
 function renderScreen(kind: 'crop' | 'poultry') {
+  renderedKind = kind;
   return render(
     <SafeAreaProvider initialMetrics={TEST_SAFE_AREA_METRICS}>
       <ThemeProvider>
@@ -56,9 +92,13 @@ async function selectCrop() {
   await screen.findByText('DETAILED FORECAST');
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   queryClient.clear();
+  // The offline cache is AsyncStorage, not memory, so it outlives the client;
+  // a later test would otherwise inherit an earlier one's saved bulletin.
+  await AsyncStorage.clear();
   jest.clearAllMocks();
+  serveFixtures();
 });
 
 describe('WeeklyAdvisoryScreen — before anything is narrowed', () => {
@@ -72,9 +112,7 @@ describe('WeeklyAdvisoryScreen — before anything is narrowed', () => {
     // so it pays for module load and the first query on a machine that may be
     // busy. A bare getByText here fails on timing rather than on behaviour.
     expect(await screen.findByText('DETAILED FORECAST', {}, { timeout: 15000 })).toBeTruthy();
-    expect(
-      await screen.findByText(/latest bulletin published anywhere in Ghana/, {}, { timeout: 15000 }),
-    ).toBeTruthy();
+    expect(await screen.findByText(/latest bulletin published anywhere in Ghana/, {}, { timeout: 15000 })).toBeTruthy();
   });
 
   it('reads the unset fields as the whole country, not as unanswered questions', async () => {
@@ -135,10 +173,10 @@ describe('WeeklyAdvisoryScreen — a crop advisory', () => {
     renderScreen('crop');
     await selectCrop();
 
-    const callsAfterLoad = mockFetch.mock.calls.length;
+    const callsAfterLoad = getMock.mock.calls.length + mockFetch.mock.calls.length;
     fireEvent.press(screen.getByLabelText('Land preparation'));
 
-    expect(mockFetch.mock.calls.length).toBe(callsAfterLoad);
+    expect(getMock.mock.calls.length + mockFetch.mock.calls.length).toBe(callsAfterLoad);
   });
 
   /* The advisory is the answer to the column it sits in, so it stays in the
@@ -192,9 +230,7 @@ describe('WeeklyAdvisoryScreen — a poultry advisory', () => {
 
     await screen.findByText('DETAILED FORECAST');
     // Poultry advice, not crop advice — the opening stage of the bird programme.
-    expect(
-      screen.getByText(/Choose ground that drains, away from other poultry/),
-    ).toBeTruthy();
+    expect(screen.getByText(/Choose ground that drains, away from other poultry/)).toBeTruthy();
   });
 
   /* Layer bulletins label their weeks in prose — "1 - End", "From point of lay
@@ -212,9 +248,11 @@ describe('WeeklyAdvisoryScreen — a poultry advisory', () => {
 
   /* The older generated template produces no worksheets, only a target table
      and a list of actions. That path is still supported, and is the one thing
-     the guidance card now exists for. Driven through real responses rather than
-     the seed, because the seed is deliberately a parsed bulletin. */
+     the guidance card now exists for. Driven through real responses and the
+     real service rather than the fixtures, because those are parsed bulletins. */
   it('falls back to management targets when the upload had no worksheets', async () => {
+    listMock.mockImplementationOnce(actualService.listAdvisoryActivities);
+    getMock.mockImplementationOnce(actualService.getWeeklyAdvisory);
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -265,11 +303,10 @@ describe('WeeklyAdvisoryScreen — a poultry advisory', () => {
     expect(screen.queryByText('spreadsheet')).toBeNull();
   });
 
-  /* The stand-in bulletin is a real Jasikan one. Its worksheets are headed
+  /* The fixture bulletin is a real Jasikan one. Its worksheets are headed
      "...FOR BROILER FARMERS IN THE OTI REGION", which is true of the file and
-     false on screen the moment it stands in for a district that has published
-     nothing — a farmer who picked Ashanti got a card titled after Oti. Where
-     the sample came from is the fallback notice's job to say, not the card's. */
+     false on screen once it is shown for another district — a farmer who
+     picked Ashanti got a card titled after Oti. */
   it('never titles the summary card after the sample own region', async () => {
     renderScreen('poultry');
     choose('Region', 'All regions', 'Ashanti Region');
@@ -283,7 +320,7 @@ describe('WeeklyAdvisoryScreen — a poultry advisory', () => {
 
   /* A layer runs to point of lay and beyond: sixteen stages against the
      broiler's four, a year against eight weeks. One poultry stand-in cannot
-     represent both, so the seed follows the chosen bird. */
+     represent both, so the bulletin follows the chosen bird. */
   it('shows the layer programme, not the broiler one, when Layer is chosen', async () => {
     renderScreen('poultry');
     choose('Bird', 'All birds', 'Layer');
@@ -343,9 +380,9 @@ describe('WeeklyAdvisoryScreen — every field is its own control', () => {
     expect(await screen.findByText('SHOWERS RETURN, SOIL BECOMES WORKABLE')).toBeTruthy();
   });
 
-  /* The panel shows what the farmer chose, not what the stand-in bulletin says
-     — otherwise an Ashanti search would silently relabel itself to Eastern. */
-  it('shows the chosen district, not the one the stand-in bulletin was written for', async () => {
+  /* The panel shows what the farmer chose, not what the bulletin's own header
+     says — otherwise an Ashanti search would silently relabel itself to Eastern. */
+  it('shows the chosen district, not the one the bulletin header names', async () => {
     renderScreen('crop');
     await selectCrop();
 
@@ -375,13 +412,64 @@ describe('WeeklyAdvisoryScreen — every field is its own control', () => {
   });
 });
 
-describe('WeeklyAdvisoryScreen — saying where the data came from', () => {
-  it('says the server could not be reached, and which district the bulletin was written for', async () => {
+describe('WeeklyAdvisoryScreen — when there is nothing published to show', () => {
+  /* Clients asked that the screen never be empty before the first upload, so a
+     labelled example is shown. The label is the whole point: a farmer must
+     never take the example for advice written for their district. */
+  it('shows the example crop advisory, labelled as an example', async () => {
+    listMock.mockResolvedValue({ data: [], fallback: 'empty' });
     renderScreen('crop');
-    await selectCrop();
 
-    expect(screen.getByText(/Could not reach the AgroMet server/)).toBeTruthy();
-    expect(screen.getByText(/The bulletin below was written for/)).toBeTruthy();
-    expect(screen.queryByText(/sample/i)).toBeNull();
+    expect(await screen.findByText('Example advisory')).toBeTruthy();
+    expect(
+      screen.getByText(/No crop advisory has been published anywhere in Ghana yet\..*Do not plan your farm work from it\./),
+    ).toBeTruthy();
+    expect(screen.getByText('DETAILED FORECAST')).toBeTruthy();
+    // It is not a real bulletin, so it is never described as the latest one.
+    expect(screen.queryByText(/latest bulletin published anywhere in Ghana/)).toBeNull();
+  });
+
+  it('names the crop and district that were searched in the example notice', async () => {
+    listMock.mockResolvedValue({ data: [], fallback: 'empty' });
+    renderScreen('crop');
+    choose('Region', 'All regions', 'Ashanti Region');
+    choose('District', 'Select district', 'Adansi Akrofuom');
+    choose('Commodity', 'All commodities', 'Maize');
+
+    expect(await screen.findByText(/No crop advisory has been published for Maize in Adansi Akrofuom yet\./)).toBeTruthy();
+  });
+
+  it('shows the poultry example, labelled, for the poultry advisory', async () => {
+    listMock.mockResolvedValue({ data: [], fallback: 'empty' });
+    renderScreen('poultry');
+
+    expect(await screen.findByText('Example advisory')).toBeTruthy();
+    expect(screen.getByText(/No poultry advisory has been published/)).toBeTruthy();
+  });
+
+  it('says the server could not be reached, offers a retry, and shows no bulletin', async () => {
+    listMock.mockResolvedValue({ data: [], fallback: 'offline' });
+    renderScreen('crop');
+
+    // Given room: an unreachable server is retried once before it fails.
+    expect(await screen.findByText('Could not reach the AgroMet server. Check your connection.', {}, { timeout: 10000 })).toBeTruthy();
+    expect(screen.getByText('Retry')).toBeTruthy();
+    expect(screen.queryByText('DETAILED FORECAST')).toBeNull();
+    expect(screen.queryByText(/written for/)).toBeNull();
+  });
+
+  it('shows the real bulletin saved on this phone when the server cannot be reached', async () => {
+    const first = renderScreen('crop');
+    await screen.findByText('DETAILED FORECAST');
+    first.unmount();
+    queryClient.clear();
+
+    listMock.mockResolvedValue({ data: [], fallback: 'offline' });
+    renderScreen('crop');
+
+    expect(
+      await screen.findByText('Showing the copy saved on this phone. The server could not be reached.', {}, { timeout: 10000 }),
+    ).toBeTruthy();
+    expect(screen.getByText('DETAILED FORECAST')).toBeTruthy();
   });
 });

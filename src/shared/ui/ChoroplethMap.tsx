@@ -19,9 +19,9 @@ type Props = {
    * online/offline never changes what a colour means. */
   isTercile?: boolean;
   /** Overrides `TERCILE_CATEGORIES` when the variable has a published colour
-   * convention of its own. The Subseasonal map passes rainfall and temperature
-   * ramps; Seasonal omits it and keeps the neutral default, because "above" has
-   * no agreed colour for a variable like dry-spell length. */
+   * convention of its own. Both outlook maps pass their rainfall and
+   * temperature ramps; omitting it keeps the neutral default, for a variable
+   * like dry-spell length where "above" has no agreed colour. */
   palette?: { label: string; color: string; sublabel?: string }[];
   /** The continuous ramp, so the offline renderer follows the same per-variable
    * convention the online one does. */

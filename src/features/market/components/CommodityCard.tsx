@@ -55,56 +55,62 @@ export function CommodityCard({ resolved, width, onQuickView }: Props) {
       <Pressable
         onPress={() => router.push(`/commodity/${entry.slug}`)}
         accessibilityRole="button"
-        accessibilityLabel={`${entry.name}, ${price != null ? formatCedi(price) : 'price unavailable'}`}
+        accessibilityLabel={`${entry.name}, ${price != null ? `example price ${formatCedi(price)}` : 'price unavailable'}`}
       >
         {({ pressed }) => (
-        <View
-          style={{
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.radii.lg,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-            // Clips the photo to the rounded corner, which also means this
-            // card cannot cast from a child — the shadow has to live here.
-            overflow: 'hidden',
-            boxShadow: pressed ? theme.sunken('sm') : theme.raised('md'),
-          }}
-        >
-        {image ? <Image source={image} style={{ width, height: imageHeight }} resizeMode="cover" /> : null}
+          <View
+            style={{
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.radii.lg,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              // Clips the photo to the rounded corner, which also means this
+              // card cannot cast from a child — the shadow has to live here.
+              overflow: 'hidden',
+              boxShadow: pressed ? theme.sunken('sm') : theme.raised('md'),
+            }}
+          >
+            {image ? <Image source={image} style={{ width, height: imageHeight }} resizeMode="cover" /> : null}
 
-        <View style={{ padding: theme.spacing.md, gap: theme.spacing.xs }}>
-          <Text variant="bodyStrong" numberOfLines={1}>
-            {entry.name}
-          </Text>
+            <View style={{ padding: theme.spacing.md, gap: theme.spacing.xs }}>
+              <Text variant="bodyStrong" numberOfLines={1}>
+                {entry.name}
+              </Text>
 
-          {price != null ? (
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: theme.spacing.xs }}>
-              <View style={{ flexShrink: 1 }}>
-                <Text variant="h3">{formatCedi(price)}</Text>
-                <Text variant="caption" muted numberOfLines={1}>
-                  {market?.unit ?? 'per bag'}
+              {price != null ? (
+                <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: theme.spacing.xs }}>
+                  <View style={{ flexShrink: 1 }}>
+                    {/* One line always: beside the sparkline a narrow card left
+                        "GH₵299.99" breaking after "299.9", which reads as two
+                        numbers. A slight shrink is better than a split. */}
+                    <Text variant="h3" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                      {formatCedi(price)}
+                    </Text>
+                    {/* "Example price per bag": the figure is an example, and the
+                    word sits on the card itself so it survives a glance. */}
+                    {/* Two lines allowed: on a narrow card one line cut it to
+                        "Example pri…", losing both the word and the unit. */}
+                    <Text variant="caption" muted numberOfLines={2}>
+                      Example price {market?.unit ?? 'per bag'}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Sparkline data={series} width={72} height={28} />
+                    {change && change.direction !== 'flat' ? (
+                      <Text variant="caption" color={change.direction === 'up' ? theme.colors.accent : theme.colors.danger}>
+                        {change.pct >= 0 ? '+' : ''}
+                        {change.pct.toFixed(1)}%
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              ) : (
+                <Text variant="caption" muted>
+                  Price unavailable
                 </Text>
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Sparkline data={series} width={72} height={28} />
-                {change && change.direction !== 'flat' ? (
-                  <Text
-                    variant="caption"
-                    color={change.direction === 'up' ? theme.colors.accent : theme.colors.danger}
-                  >
-                    {change.pct >= 0 ? '+' : ''}
-                    {change.pct.toFixed(1)}%
-                  </Text>
-                ) : null}
-              </View>
+              )}
             </View>
-          ) : (
-            <Text variant="caption" muted>
-              Price unavailable
-            </Text>
-          )}
-        </View>
-        </View>
+          </View>
         )}
       </Pressable>
 

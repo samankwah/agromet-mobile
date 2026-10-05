@@ -68,7 +68,7 @@ export function ColorScaleLegend({ min, max, unit, valueFormat = 'number', mode 
             floating over a block's middle, where it would not say which side
             it belonged to. The colour carries the direction, so the number
             does not repeat it. Palettes with no boundaries defined keep their
-            names, which is what the seasonal key still uses. */}
+            names. */}
         {bounds ? (
           <View style={{ flexDirection: 'row' }}>
             {bounds.slice(0, -1).map((bound, index) => (

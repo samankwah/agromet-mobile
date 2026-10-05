@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import type { DiagnosisConfidenceBand, DiagnosisResult } from '../../../../shared/domain/diagnosis';
@@ -7,8 +7,13 @@ import { useTheme, type Theme } from '../../../../shared/theme/ThemeProvider';
 import { Card } from '../../../../shared/ui/Card';
 import { Text } from '../../../../shared/ui/Text';
 import { formatConfidenceRange } from '../../../../shared/utils/formatConfidenceRange';
+import { useReportAnswer } from '../../../ai-report/useReportAnswer';
 
-type Props = { result: DiagnosisResult };
+type Props = {
+  result: DiagnosisResult;
+  /** The AI explanation for this result is still on its way. */
+  isExplaining?: boolean;
+};
 
 /** Low confidence is a warning, not a neutral fact — it changes what to do next. */
 function confidenceColor(band: DiagnosisConfidenceBand, theme: Theme): string {
@@ -29,9 +34,10 @@ function confidenceColor(band: DiagnosisConfidenceBand, theme: Theme): string {
  * afternoon is the entire point, and it used to look identical to the
  * prevention advice below it.
  */
-export function DiagnosisResultCard({ result }: Props) {
+export function DiagnosisResultCard({ result, isExplaining = false }: Props) {
   const theme = useTheme();
   const tone = confidenceColor(result.confidenceBand, theme);
+  const report = useReportAnswer('diagnosis');
 
   return (
     <View style={{ gap: theme.spacing.md }}>
@@ -64,11 +70,7 @@ export function DiagnosisResultCard({ result }: Props) {
           </Text>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
-            <Ionicons
-              name={result.confidenceBand === 'low' ? 'help-circle-outline' : 'analytics-outline'}
-              size={15}
-              color={tone}
-            />
+            <Ionicons name={result.confidenceBand === 'low' ? 'help-circle-outline' : 'analytics-outline'} size={15} color={tone} />
             <Text variant="caption" color={tone}>
               {formatConfidenceRange(result.confidenceBand, result.confidenceRangePct)}
             </Text>
@@ -86,7 +88,7 @@ export function DiagnosisResultCard({ result }: Props) {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
             <Ionicons name="phone-portrait-outline" size={15} color={theme.colors.teal} />
             <Text variant="caption" color={theme.colors.teal}>
-              Checked on your phone, without internet. Cassava diseases only.
+              Checked on your phone. Cassava diseases only.
             </Text>
           </View>
         ) : null}
@@ -99,6 +101,49 @@ export function DiagnosisResultCard({ result }: Props) {
           </Text>
         ) : null}
       </Card>
+
+      {/* The AI's plain-words version of the phone's answer. Labelled,
+          because it was written by a language model from the bundled advice,
+          not by the classifier and not by a person, and the farmer should
+          know which of those they are reading. */}
+      {result.explanation ? (
+        <Card raised style={{ gap: theme.spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+            <Ionicons name="chatbubble-ellipses-outline" size={18} color={theme.colors.accent} />
+            <Text variant="h3">What this means</Text>
+          </View>
+          <Text variant="body">{result.explanation}</Text>
+          <Text variant="caption" muted>
+            Explained by AI from the advice on your phone.
+          </Text>
+          {/* In the open rather than behind a hold, unlike the chat: this card
+              is the only AI text on the screen, and Google Play asks that
+              generated content can be flagged without leaving the app. A text
+              link, so there is no chrome for Android to drop. */}
+          <Pressable
+            onPress={() => result.explanation && report.requestReport(result.explanation)}
+            accessibilityRole="button"
+            accessibilityLabel="Report this answer"
+            hitSlop={12}
+            style={{ alignSelf: 'flex-start' }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+              <Ionicons name="flag-outline" size={14} color={theme.colors.muted} />
+              <Text variant="caption" muted style={{ textDecorationLine: 'underline' }}>
+                Report this answer
+              </Text>
+            </View>
+          </Pressable>
+          {report.sheet}
+        </Card>
+      ) : isExplaining ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }} accessibilityLiveRegion="polite">
+          <ActivityIndicator size="small" color={theme.colors.muted} />
+          <Text variant="caption" muted>
+            Getting a simpler explanation…
+          </Text>
+        </View>
+      ) : null}
 
       {result.immediateActions.length > 0 ? (
         <Card raised style={{ gap: theme.spacing.sm }}>

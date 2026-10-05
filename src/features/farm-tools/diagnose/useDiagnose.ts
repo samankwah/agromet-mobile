@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
-import { submitDiagnosis } from '../../../shared/api/diagnosisService';
+import { fetchDiagnosisExplanation, submitDiagnosis } from '../../../shared/api/diagnosisService';
 import type { DiagnosisRequest, DiagnosisResult, DiagnosisUnavailable } from '../../../shared/domain/diagnosis';
 import { isDiagnosisUnavailable } from '../../../shared/domain/diagnosis';
 import { useNetworkStatus } from '../../../shared/net/useNetworkStatus';
 import { useSettingsStore } from '../../../shared/state/settingsStore';
-import { recordDiagnosis } from '../../../shared/storage/diagnosisHistory';
+import { recordDiagnosis, updateDiagnosis } from '../../../shared/storage/diagnosisHistory';
 import { diagnoseOffline, isCropSupportedOffline } from './localModel';
 import {
   enqueueDiagnosisSubmission,
@@ -39,6 +39,8 @@ export function useDiagnose() {
    * for later" apart from "here is your answer" without inferring it from
    * queue-count deltas. */
   const [lastOutcome, setLastOutcome] = useState<'result' | 'queued' | 'unavailable' | null>(null);
+  /** True while the AI explanation for the result on screen is on its way. */
+  const [isExplaining, setIsExplaining] = useState(false);
 
   const mutation = useMutation({ mutationFn: submitDiagnosis });
 
@@ -103,6 +105,28 @@ export function useDiagnose() {
   }, []);
 
   /**
+   * Swap the on-device answer's bundled advice for the AI's plain-words
+   * version, if it arrives.
+   *
+   * Not awaited by `submit`: the farmer reads the knowledge-base answer
+   * straight away and the explanation replaces it when it lands. The id check
+   * stops a slow reply for one photo from overwriting the answer to the next.
+   */
+  const explain = useCallback(async (outcome: DiagnosisResult, request: DiagnosisRequest) => {
+    setIsExplaining(true);
+    try {
+      const extra = await fetchDiagnosisExplanation(outcome, request);
+      if (!extra) return;
+
+      const enriched = { ...outcome, ...extra };
+      setResult((current) => (current?.id === outcome.id ? enriched : current));
+      await updateDiagnosis(enriched);
+    } finally {
+      setIsExplaining(false);
+    }
+  }, []);
+
+  /**
    * Try the phone's own model, and say whether it produced anything.
    *
    * Returns false for every reason the on-device path can decline: the crop is
@@ -111,14 +135,14 @@ export function useDiagnose() {
    * queue it rather than leave the farmer with nothing.
    */
   const tryOffline = useCallback(
-    async (request: DiagnosisRequest): Promise<boolean> => {
-      if (!isCropSupportedOffline(request.crop)) return false;
+    async (request: DiagnosisRequest): Promise<DiagnosisResult | null> => {
+      if (!isCropSupportedOffline(request.crop)) return null;
 
       const outcome = await diagnoseOffline(request);
-      if (isDiagnosisUnavailable(outcome)) return false;
+      if (isDiagnosisUnavailable(outcome)) return null;
 
       await acceptResult(outcome);
-      return true;
+      return outcome;
     },
     [acceptResult],
   );
@@ -128,23 +152,27 @@ export function useDiagnose() {
       setResult(null);
       setUnavailable(null);
       setLastOutcome(null);
+      setIsExplaining(false);
 
-      // The farmer asked for the on-device model explicitly. Honour it even on
-      // a good connection: that is the whole point of the setting, and it is
-      // also how the two engines get run over the same photograph for
-      // comparison.
-      if (preferOfflineDiagnosis && (await tryOffline(request))) {
-        return;
+      const onPhone = isCropSupportedOffline(request.crop);
+
+      // Cassava is always checked on the phone first, whatever the network.
+      // This is the pipeline the on-device model exists for: the CNN names the
+      // disease, and when there is a connection the backend's language model
+      // explains it in plain words. Kindwise is the fallback for when the
+      // phone will not commit to an answer, not the other way round.
+      if (onPhone) {
+        const offline = await tryOffline(request);
+        if (offline) {
+          if (isOnline && !preferOfflineDiagnosis) void explain(offline, request);
+          return;
+        }
       }
 
       if (!isOnline) {
-        // Cassava gets an answer now instead of a promise of one later. The
-        // submission is deliberately not also queued: a queued copy would come
-        // back with the provider's answer and write a second, possibly
-        // different, diagnosis of the same photo into history, which is worse
-        // than one clear answer the farmer can act on today.
-        if (await tryOffline(request)) return;
-
+        // Nothing on the phone could answer, so keep the photo for later. A
+        // cassava photo only gets here when the model declined, and sending it
+        // to the provider once the connection returns is the right next try.
         await enqueueDiagnosisSubmission(request);
         await refreshQueueCount();
         setLastOutcome('queued');
@@ -156,9 +184,8 @@ export function useDiagnose() {
 
         // "The provider could not answer" is a settled outcome, not a failure
         // to retry: sending the same photo again produces the same nothing.
-        // The on-device model is not consulted here either. The stronger engine
-        // has already declined, and letting the weaker one answer over the top
-        // of it would be shopping for the reply we preferred.
+        // For cassava the phone has already declined too, so there is nobody
+        // left to ask.
         if (isDiagnosisUnavailable(outcome)) {
           setUnavailable(outcome);
           setLastOutcome('unavailable');
@@ -168,16 +195,15 @@ export function useDiagnose() {
         await acceptResult(outcome);
       } catch {
         // Appeared online but the request failed anyway (a timeout, a dropped
-        // connection mid-upload). The phone can still answer for cassava.
-        if (await tryOffline(request)) return;
-
-        // Queue it rather than lose the farmer's work.
+        // connection mid-upload). Cassava already had its turn on the phone,
+        // so there is no second on-device try to make. Queue it rather than
+        // lose the farmer's work.
         await enqueueDiagnosisSubmission(request);
         await refreshQueueCount();
         setLastOutcome('queued');
       }
     },
-    [acceptResult, isOnline, mutation, preferOfflineDiagnosis, refreshQueueCount, tryOffline],
+    [acceptResult, explain, isOnline, mutation, preferOfflineDiagnosis, refreshQueueCount, tryOffline],
   );
 
   /** Back to a blank form. The queue is untouched: a queued submission is still
@@ -186,6 +212,7 @@ export function useDiagnose() {
     setResult(null);
     setUnavailable(null);
     setLastOutcome(null);
+    setIsExplaining(false);
   }, []);
 
   return {
@@ -195,6 +222,7 @@ export function useDiagnose() {
     unavailable,
     lastOutcome,
     isSubmitting: mutation.isPending,
+    isExplaining,
     queuedCount,
     abandonedCount,
   };

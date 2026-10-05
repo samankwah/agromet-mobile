@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { isSampleCalendarId } from '../../../shared/api/calendarService';
 import type { CalendarActivity } from '../../../shared/domain/calendar';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../../shared/ui/AsyncStateView';
@@ -37,6 +38,9 @@ export function CalendarDetailScreen({ id }: Props) {
 
   const { status, error, calendar, activities, fallback, usingCachedFallback, cachedAt, refetch } = useCalendarDetail(id);
   const { cycle, start, isStarting, startError, resetStartError, setStatus, isUpdating } = useProductionCycle(id);
+  // A bundled reference calendar has no row on the server, so a cycle cannot
+  // be started against it: the request would post `Number('sample-...')`.
+  const isReference = isSampleCalendarId(id);
 
   // A running cycle is what turns week numbers into dates a farmer can act
   // on; without one the calendar is a relative schedule and stays that way.
@@ -95,6 +99,10 @@ export function CalendarDetailScreen({ id }: Props) {
               </View>
             </View>
 
+            {/* Up top, before anything a farmer might act on: this schedule
+                was written for somewhere else. */}
+            {isReference ? <SampleDataNotice reason={null} isReference /> : null}
+
             {calendar.description ? (
               <Text variant="body" muted>
                 {calendar.description}
@@ -109,7 +117,7 @@ export function CalendarDetailScreen({ id }: Props) {
                 onSetStatus={setStatus}
                 isUpdating={isUpdating}
               />
-            ) : (
+            ) : isReference ? null : (
               <Button
                 label={calendar.calendarType === 'cycle' ? 'Start a flock cycle' : 'Start a planting'}
                 variant="outline"
@@ -146,6 +154,8 @@ export function CalendarDetailScreen({ id }: Props) {
               </View>
             )}
 
+            {/* The reference note is already up top; this one now only ever
+                says the connection was lost. */}
             <SampleDataNotice reason={fallback} />
 
             {/* Said once, plainly. A production calendar is a planning guide
@@ -155,7 +165,9 @@ export function CalendarDetailScreen({ id }: Props) {
               <Text variant="caption" muted>
                 {weekOneDate
                   ? 'Dates come from your cycle start date. This is a planning guide. Use it alongside the weekly forecast rather than instead of it.'
-                  : 'Week numbers are counted from the start of the cycle, not from a date in the year. Start a cycle to see them as dates.'}
+                  : isReference
+                    ? 'Week numbers are counted from the start of the cycle, not from a date in the year.'
+                    : 'Week numbers are counted from the start of the cycle, not from a date in the year. Start a cycle to see them as dates.'}
               </Text>
             </Card>
           </View>

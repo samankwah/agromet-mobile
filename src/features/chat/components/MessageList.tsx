@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { FlatList, Share, View } from 'react-native';
+import { FlatList, Platform, Share, View } from 'react-native';
 
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { OptionSheet, type SheetOption } from '../../../shared/ui/OptionSheet';
 import type { ChatMessage } from '../../../shared/domain/chat';
+import { useReportAnswer } from '../../ai-report/useReportAnswer';
 import { dayLabel, startsNewDay } from '../dayLabel';
 import { toPlainText } from '../richText';
 import { DateSeparator } from './DateSeparator';
@@ -62,9 +63,7 @@ const MessageRow = React.memo(function MessageRow({
         retryDisabled={isSending}
         // Only finished answers: reading the farmer's own words back, or
         // speaking a reply that failed to arrive, would be noise.
-        onToggleSpeech={
-          onToggleSpeech && item.message.role === 'assistant' && item.state !== 'failed' ? handleToggleSpeech : undefined
-        }
+        onToggleSpeech={onToggleSpeech && item.message.role === 'assistant' && item.state !== 'failed' ? handleToggleSpeech : undefined}
         isSpeaking={speakingId === item.message.id}
         onLongPress={handleLongPress}
       />
@@ -113,10 +112,16 @@ export function MessageList({ messages, isSending, onRetry, onToggleSpeech, spea
   // every cell of a recycling list is a modal per turn, and this transcript can
   // run to a couple of hundred.
   const [actionsFor, setActionsFor] = useState<ChatMessage | null>(null);
+  const report = useReportAnswer('chat');
 
   const actions = useMemo<SheetOption[]>(() => {
     if (!actionsFor) return [];
     const options: SheetOption[] = [{ id: 'share', label: 'Share this answer' }];
+    // Only the assistant's finished answers can be reported: Google Play asks
+    // apps with generated content to let people flag it without leaving.
+    if (actionsFor.role === 'assistant' && !actionsFor.failed) {
+      options.push({ id: 'report', label: 'Report this answer' });
+    }
     if (onToggleSpeech && actionsFor.role === 'assistant' && !actionsFor.failed) {
       options.unshift({
         id: 'speak',
@@ -137,6 +142,15 @@ export function MessageList({ messages, isSending, onRetry, onToggleSpeech, spea
         return;
       }
 
+      if (id === 'report') {
+        // iOS drops a modal presented while another is still fading out, so
+        // the reason sheet waits for this one to finish closing.
+        const text = toPlainText(message.text);
+        if (Platform.OS === 'ios') setTimeout(() => report.requestReport(text), 350);
+        else report.requestReport(text);
+        return;
+      }
+
       // React Native's own share sheet, so this needs no native module and no
       // new build. Sharing the words is the point: an answer about a spray
       // window is worth forwarding to whoever else is farming that plot.
@@ -145,7 +159,7 @@ export function MessageList({ messages, isSending, onRetry, onToggleSpeech, spea
         // banner. The farmer still has the answer on screen.
       });
     },
-    [actionsFor, onToggleSpeech],
+    [actionsFor, onToggleSpeech, report],
   );
 
   const rows = useMemo<Row[]>(() => {
@@ -262,6 +276,8 @@ export function MessageList({ messages, isSending, onRetry, onToggleSpeech, spea
         onClose={() => setActionsFor(null)}
         title="This message"
       />
+
+      {report.sheet}
     </>
   );
 }

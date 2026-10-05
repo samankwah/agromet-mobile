@@ -22,11 +22,16 @@ function appVersion(): string {
   return Constants.expoConfig?.version ?? 'in development';
 }
 
+// Each line names where the data really comes from. The app is independent,
+// so nothing here may claim an agency as its publisher, and the market line
+// says what those prices are rather than where real ones would come from.
 const SOURCES = [
-  'Forecasts and warnings from the Ghana Meteorological Agency.',
-  'Crop and poultry advisories published by agricultural extension officers.',
-  'Market prices collected from regional market centres.',
+  'Daily and weekly forecasts from Open-Meteo, a free public weather service.',
+  'Outlooks for the coming weeks from NOAA, the United States weather service.',
+  'Seasonal outlooks from ECMWF, through Open-Meteo.',
+  'Crop and poultry advisories, when they are published for your district.',
   'Flood and drought readings from the AgroMet hazard model.',
+  "Market prices are examples, not today's prices.",
 ];
 
 export function AboutScreen() {
@@ -61,13 +66,12 @@ export function AboutScreen() {
       <Card style={{ gap: theme.spacing.sm }}>
         <Text variant="h3">What this app is for</Text>
         <Text variant="body">
-          Weather and farming guidance for Ghanaian farmers: what the sky is going to do, what that
-          means for your crop and your district, and what to do about it this week.
+          Weather and farming guidance for Ghanaian farmers: what the sky is going to do, what that means for your crop and your district,
+          and what to do about it this week.
         </Text>
         <Text variant="body">
-          It is built to work on a modest phone and a weak connection. Anything you have already
-          opened stays readable when the signal goes, so a forecast you checked in town is still
-          there in the field.
+          It is built to work on a modest phone and a weak connection. Anything you have already opened stays readable when the signal goes,
+          so a forecast you checked in town is still there in the field.
         </Text>
       </Card>
 
@@ -82,16 +86,15 @@ export function AboutScreen() {
             probability, and an app that implies otherwise costs a farmer a
             harvest. */}
         <Text variant="body">
-          A forecast is a best estimate, not a promise, and an advisory is decision support rather
-          than instruction. Where the stakes are high, weigh what you see here against what you see
-          in your own field and what your extension officer advises.
+          A forecast is a best estimate, not a promise, and an advisory is decision support rather than instruction. Where the stakes are
+          high, weigh what you see here against what you see in your own field and what your extension officer advises.
         </Text>
       </Card>
 
       <Card style={{ gap: theme.spacing.sm }}>
         <Text variant="h3">This build</Text>
         <DetailRow label="Version" value={appVersion()} />
-        <DetailRow label="Published by" value="Ghana Meteorological Agency" stacked />
+        <DetailRow label="Made by" value="AgroMet Ghana, an independent app. Not an official government app." stacked />
       </Card>
     </Screen>
   );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable } from 'react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
 import { Surface } from './Surface';
@@ -13,16 +13,16 @@ type Props = {
   onChange: (index: number) => void;
   accessibilityLabel: string;
   /**
-   * 'tab' (default) — compact, subtle, for page-level navigation (the
-   * Forecasts tab's timescale switch).
-   * 'pill' — chunkier, fully-rounded, taller target; for a prominent
-   * filter/form control (the spatial outlook drawer's Forecast View /
-   * Geography toggles). Same underlying behavior either way — one
-   * component, a themed appearance, not two parallel implementations.
+   * 'tab' (default) — compact, for page-level navigation (the Forecasts
+   * tab's timescale switch).
+   * 'pill' — taller target; for a prominent filter/form control (the flood
+   * and drought screen's hazard switch, the reminder form). The map drawers
+   * use 'tab': stacked three deep, the taller size crowded the sheet. Same underlying
+   * behavior either way — one component, not two parallel implementations.
    *
-   * The two used to differ in colour as well, `focus` against `accent`. They
-   * no longer do: one selection colour across the app is the point, so the
-   * variants now differ only in shape and size.
+   * The two used to differ in shape and colour as well. They no longer do:
+   * every switch in the app is the same glass capsule, so the variants now
+   * differ only in size.
    */
   variant?: Variant;
   /**
@@ -45,26 +45,31 @@ export function SegmentedControl({ segments, selectedIndex, onChange, accessibil
   const theme = useTheme();
   const isPill = variant === 'pill';
 
-  const trackRadius = isPill ? theme.radii.pill : theme.radii.md;
-  const segmentRadius = isPill ? theme.radii.pill : theme.radii.sm;
+  // A flat glass capsule: a faint see-through track with the selected segment
+  // a brighter pill inside it, no rims and no shadows. The Forecasts header
+  // lays it over a photograph, where a sunken well and its white highlight
+  // would fog the picture behind it. Both fills are the text colour at low
+  // opacity, so the same control reads on a photo, a dark card and a light one.
+  //
+  // Translucent on purpose: the control is flat, so there is no Android
+  // elevation shadow for the see-through fill to let show (see theme/blend.ts).
+  const trackFill = theme.colors.text + '1F';
+  const selectedFill = theme.colors.text + '3D';
+  const segmentHeight = isPill ? theme.minTouchTarget + 8 : theme.minTouchTarget - 6;
 
   return (
-    // The track is a well and the selected segment is a tile lifted out of
-    // it — the clearest statement of the depth language anywhere in the app.
-    // The track fills with `bg` rather than `surface` so it reads as a groove
-    // cut into the card it sits on, not as one more panel laid on top.
     <Surface
-      depth="sunken"
+      depth="flat"
       level="sm"
-      radius={trackRadius}
-      background={theme.colors.bg}
-      bordered={!isPill}
+      radius={theme.radii.pill}
+      background={trackFill}
+      bordered={false}
       accessibilityRole="tablist"
       accessibilityLabel={accessibilityLabel}
       style={{
         flexDirection: 'row',
-        padding: isPill ? 4 : 3,
-        gap: isPill ? 6 : 3,
+        padding: 4,
+        gap: 2,
       }}
     >
       {segments.map((segment, index) => {
@@ -93,20 +98,19 @@ export function SegmentedControl({ segments, selectedIndex, onChange, accessibil
             {/* Chrome on a nested View, never on the Pressable — Android
                 drops a Pressable's own background while still drawing its
                 children, which leaves the selected segment unstyled. */}
+            {/* Keyed on the selection so a newly selected segment is a fresh
+                view. Android drew a segment square once its fill changed in
+                place (the header's Subseasonal-to-Seasonal tap), while the
+                same pill came out round whenever it was first mounted. */}
             <Surface
-              depth={isSelected ? 'raised' : 'flat'}
+              key={isSelected ? 'selected' : 'idle'}
+              depth="flat"
               level="sm"
-              radius={segmentRadius}
-              // The selected segment is rimmed as well as filled. `focus` is a
-              // pale ice blue that lands around 1.1:1 on this palette's light
-              // surfaces, so the fill alone cannot say "this one" — the border
-              // is what carries the state there, and the fill is what makes it
-              // the selection colour rather than just an outline.
-              bordered={isSelected}
-              borderColor={theme.colors.focusRim}
-              background={isSelected ? theme.colors.focus : 'transparent'}
+              radius={segmentHeight / 2}
+              bordered={false}
+              background={isSelected ? selectedFill : 'transparent'}
               style={{
-                minHeight: isPill ? theme.minTouchTarget + 8 : theme.minTouchTarget - 6,
+                minHeight: segmentHeight,
                 alignItems: 'center',
                 justifyContent: 'center',
                 paddingHorizontal: theme.spacing.sm,
@@ -114,7 +118,7 @@ export function SegmentedControl({ segments, selectedIndex, onChange, accessibil
             >
               <Text
                 variant="bodyStrong"
-                color={isSelected ? theme.colors.onFocus : theme.colors.muted}
+                color={theme.colors.text}
                 numberOfLines={1}
                 // Safety net only — with content-based sizing the labels
                 // normally render at full size; this keeps a very long label

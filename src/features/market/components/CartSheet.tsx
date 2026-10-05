@@ -129,11 +129,11 @@ export function CartSheet({ region, onClose }: Props) {
                 </Text>
                 <Text variant="h3">{formatCedi(total)}</Text>
               </View>
-              {region ? (
-                <Text variant="caption" muted>
-                  Prices reflect {region} market rates.
-                </Text>
-              ) : null}
+              {/* The subtotal is built from example prices, so it is not what
+                  the order will cost. Said here, before the order is sent. */}
+              <Text variant="caption" muted>
+                {region ? `Example prices for ${region}.` : 'Example prices.'} The seller will confirm the real price.
+              </Text>
 
               {canPlaceOrder() && orderUrl ? (
                 <Button
@@ -155,7 +155,7 @@ export function CartSheet({ region, onClose }: Props) {
                 >
                   <Ionicons name="alert-circle-outline" size={18} color={theme.colors.warning} />
                   <Text variant="caption" muted style={{ flex: 1 }}>
-                    No order desk is configured yet. Set EXPO_PUBLIC_MARKET_WHATSAPP to enable ordering.
+                    Ordering on WhatsApp is not available yet.
                   </Text>
                 </View>
               )}

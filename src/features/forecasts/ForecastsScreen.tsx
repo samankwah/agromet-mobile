@@ -9,10 +9,10 @@ import { useTabBarClearance } from '../../shared/ui/tabBarLayout';
 import { Screen } from '../../shared/ui/Screen';
 import { SegmentedControl } from '../../shared/ui/SegmentedControl';
 import { ON_BACKDROP_COLOR, ON_BACKDROP_MUTED, WeatherBackdrop } from '../../shared/ui/WeatherBackdrop';
+import { SeasonalSection } from './components/SeasonalSection';
 import { SubseasonalSection } from './components/SubseasonalSection';
 import { TodaySection } from './components/TodaySection';
 import { WeekSection } from './components/WeekSection';
-import { SpatialOutlookView } from './spatial-outlook/SpatialOutlookView';
 import { useForecastsData } from './useForecastsData';
 import { ForecastSectionSkeleton } from './components/ForecastSkeletons';
 
@@ -42,7 +42,6 @@ export function forecastSegmentIndex(segment: string | undefined): number {
   return SEGMENT_INDEX[segment as ForecastSegment] ?? 0;
 }
 const SUBSEASONAL_INDEX = 2;
-const OUTLOOK_INDEX = 3;
 
 function combineStatus(...statuses: ('pending' | 'error' | 'success')[]): 'pending' | 'error' | 'success' {
   if (statuses.includes('pending')) return 'pending';
@@ -75,12 +74,11 @@ export function ForecastsScreen({ requestedSegment }: Props = {}) {
     if (requestedSegment) setSegmentIndex(forecastSegmentIndex(requestedSegment));
   }, [requestedSegment]);
 
-  const { locationName, conditions, hourly, weekly, subseasonal, subseasonalSet, seasonal } = useForecastsData();
+  const { locationId, locationName, conditions, hourly, weekly, subseasonal, subseasonalSet, seasonalSet } = useForecastsData();
 
   const todayStatus = combineStatus(conditions.status, hourly.status, weekly.status);
   const todayError = conditions.error ?? hourly.error ?? weekly.error;
   const today = weekly.data?.days[0];
-  const isOutlook = segmentIndex === OUTLOOK_INDEX;
   const isSubseasonal = segmentIndex === SUBSEASONAL_INDEX;
 
   // The tab bar floats over this screen, so every scroll container here owns
@@ -106,28 +104,24 @@ export function ForecastsScreen({ requestedSegment }: Props = {}) {
   );
   const header = renderHeader(false);
 
-  // Subseasonal and Outlook are both full-bleed spatial views with their own
-  // bottom drawer, so they manage their own layout instead of sitting inside the
+  // Subseasonal and Seasonal are full-bleed spatial views with their own bottom
+  // drawer, so they manage their own layout instead of sitting inside the
   // shared scroll container Daily and Weekly use.
-  if (isOutlook || isSubseasonal) {
+  if (isSubseasonal) {
     return (
       <Screen scroll={false} padded={false}>
         <View style={{ paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.lg, gap: theme.spacing.lg }}>{header}</View>
         <View style={{ flex: 1, marginTop: theme.spacing.lg, paddingBottom: tabBarClearance }}>
-          {isSubseasonal ? (
-            <SubseasonalSection
-              outlook={subseasonal.data}
-              set={subseasonalSet.data}
-              status={subseasonalSet.status}
-              error={subseasonalSet.error}
-              onRetry={subseasonalSet.refetch}
-              outlookStatus={subseasonal.status}
-              outlookError={subseasonal.error}
-              onRetryOutlook={subseasonal.refetch}
-            />
-          ) : (
-            <SpatialOutlookView seasonal={seasonal.data} />
-          )}
+          <SubseasonalSection
+            outlook={subseasonal.data}
+            set={subseasonalSet.data}
+            status={subseasonalSet.status}
+            error={subseasonalSet.error}
+            onRetry={subseasonalSet.refetch}
+            outlookStatus={subseasonal.status}
+            outlookError={subseasonal.error}
+            onRetryOutlook={subseasonal.refetch}
+          />
         </View>
       </Screen>
     );
@@ -204,17 +198,19 @@ export function ForecastsScreen({ requestedSegment }: Props = {}) {
     );
   }
 
+  // Seasonal, the same full-bleed map-and-drawer layout as Subseasonal.
   return (
     <Screen scroll={false} padded={false}>
-      <ScrollView
-        contentContainerStyle={{
-          padding: theme.spacing.lg,
-          paddingBottom: theme.spacing.lg + tabBarClearance,
-          gap: theme.spacing.lg,
-        }}
-      >
-        {header}
-      </ScrollView>
+      <View style={{ paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.lg, gap: theme.spacing.lg }}>{header}</View>
+      <View style={{ flex: 1, marginTop: theme.spacing.lg, paddingBottom: tabBarClearance }}>
+        <SeasonalSection
+          set={seasonalSet.data}
+          status={seasonalSet.status}
+          error={seasonalSet.error}
+          onRetry={seasonalSet.refetch}
+          locationId={locationId}
+        />
+      </View>
     </Screen>
   );
 }

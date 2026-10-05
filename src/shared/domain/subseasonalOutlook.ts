@@ -27,7 +27,7 @@ export type ConfidenceLevel = 'low' | 'moderate' | 'high';
 export type TercileCategory = 'below' | 'normal' | 'above';
 
 /** Which of the two things the map is drawing. Mirrors the Seasonal segment's
- * `SpatialForecastView`, deliberately: the two maps should feel like one idea. */
+ * `SeasonalView`, deliberately: the two maps should feel like one idea. */
 export type SubseasonalView = 'probability' | 'deterministic';
 export type SubseasonalVariableId = 'rainfall' | 'temperature';
 

@@ -5,7 +5,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ForecastsScreen } from '../../features/forecasts/ForecastsScreen';
 import { createTestQueryClient } from '../testQueryClient';
+import { useLocationStore } from '../../shared/state/locationStore';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
+import { seasonalPayload } from '../fixtures/seasonal';
 
 // See HomeScreen.test.tsx for why initialMetrics is required in Jest.
 const TEST_SAFE_AREA_METRICS = {
@@ -23,9 +25,7 @@ let client: QueryClient;
 
 beforeEach(() => {
   client = createTestQueryClient();
-  globalThis.fetch = jest.fn(() =>
-    Promise.reject(new TypeError('Network request failed')),
-  ) as unknown as typeof fetch;
+  globalThis.fetch = jest.fn(() => Promise.reject(new TypeError('Network request failed'))) as unknown as typeof fetch;
 });
 
 afterEach(() => {
@@ -85,6 +85,29 @@ describe('ForecastsScreen', () => {
       renderScreen('weekly');
 
       expect(selected()).toBe('Weekly');
+    });
+
+    /* The Seasonal segment draws the real outlook: the same map-and-drawer
+       layout as Subseasonal, fed by /api/outlook/seasonal. */
+    it('draws the seasonal outlook, with its season control and the town card', async () => {
+      const previous = useLocationStore.getState();
+      useLocationStore.setState({ selectedLocationId: 'accra', hasHydrated: true });
+      globalThis.fetch = jest.fn((url: string) =>
+        String(url).includes('/api/outlook/seasonal')
+          ? Promise.resolve({ ok: true, status: 200, json: async () => ({ success: true, data: seasonalPayload() }) })
+          : Promise.reject(new TypeError('Network request failed')),
+      ) as unknown as typeof fetch;
+
+      try {
+        renderScreen('seasonal');
+
+        expect(selected()).toBe('Seasonal');
+        expect(await screen.findByText('SEASON')).toBeTruthy();
+        expect(screen.getByText(/60% chance the rainfall in Greater Accra is more than usual, about 420 mm/)).toBeTruthy();
+        expect(screen.queryByText('Seasonal outlook coming soon')).toBeNull();
+      } finally {
+        useLocationStore.setState({ selectedLocationId: previous.selectedLocationId, hasHydrated: previous.hasHydrated });
+      }
     });
 
     it('opens on Daily when asked for nothing', () => {

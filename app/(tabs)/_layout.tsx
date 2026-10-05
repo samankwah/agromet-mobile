@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // A tab icon normally has to tint — that is how a bar shows which tab is
 // current, and it is why this file used to pass `color` through from the
 // navigator. This bar does not work that way: `ui/TabBarButton.tsx` marks the
-// active tab with a filled accent pill behind the icon, so selection is already
+// active tab with a filled glass pill behind the icon, so selection is already
 // carried by the background and nothing was relying on the glyph changing
 // colour. That is the one condition under which untintable art is safe in a tab
 // bar, and it is why `color` is now deliberately ignored below.
@@ -41,18 +41,17 @@ export default function TabsLayout() {
         <Tabs
           screenOptions={{
             headerShown: false,
-            // Reads against the focused tab's `colors.focus` fill, which
-            // TabBarButton paints behind the icon and label — not against the
-            // bar. `onFocus` is deliberately scheme-independent, so one value
-            // serves both themes.
-            tabBarActiveTintColor: theme.colors.onFocus,
-            tabBarInactiveTintColor: theme.colors.muted,
-            // Paints the selected tab's chamfered highlight. Every slot is the
+            // One label colour for every tab, as on SegmentedControl: the
+            // glass pill TabBarButton paints behind the focused tab carries
+            // the selection, so the text does not have to.
+            tabBarActiveTintColor: theme.colors.text,
+            tabBarInactiveTintColor: theme.colors.text,
+            // Paints the selected tab's pill highlight. Every slot is the
             // same width, so every highlight is, which puts the selected block
             // on an even rhythm the labels alone cannot hold.
             tabBarButton: (props) => <TabBarButton {...props} />,
-            // The bar is a floating, chamfered panel with an accent-tinted rim
-            // (see ui/TabBarBackground). The surface and outline are painted there,
+            // The bar is a floating glass capsule (see ui/TabBarBackground).
+            // The surface is painted there,
             // so the bar itself is transparent and drops its top divider.
             //
             // Inset with margins rather than `position: 'absolute'` on purpose: the

@@ -25,7 +25,7 @@ import { MIN_REPORTABLE_CONFIDENCE } from './labels';
 const SUPPORTED_CROP = 'cassava';
 
 const OFFLINE_DISCLAIMER =
-  'Answered on your phone with no internet, using a model trained on cassava only. It is decision support, not a verified diagnosis. Confirm with an agricultural extension officer before spending money on treatment.';
+  'Checked on your phone by a model trained on cassava only. It is a guide, not a sure answer. Ask an agricultural extension officer before you spend money on treatment.';
 
 export function isCropSupportedOffline(crop: string | undefined): boolean {
   return (crop ?? '').trim().toLowerCase() === SUPPORTED_CROP;
@@ -79,6 +79,8 @@ export function adaptPrediction(
     disclaimer: OFFLINE_DISCLAIMER,
     diagnosedAt: new Date().toISOString(),
     source: 'offline-model',
+    classId: prediction.classId,
+    adviceSource: 'knowledge-base',
   };
 }
 

@@ -120,14 +120,15 @@ export function SettingsScreen() {
 
           <Divider />
 
-          {/* Off by default, because it is a downgrade for most farmers: the
-              online check covers many more crops and returns fuller advice.
-              Offered anyway because on a metered connection the answer that
-              costs no data is worth having, and the description says plainly
-              what is given up rather than selling it as a feature. */}
+          {/* Cassava is always checked on the phone first now, so what is
+              left for this switch is the extra call that asks the AI to
+              explain the answer. Off by default because the explanation is
+              easier to act on; offered because on a metered connection a
+              farmer may not want to pay for it. The field keeps its old name
+              so saved settings still load. */}
           <ToggleSetting
-            label="Diagnose crops on this phone"
-            description="Use the offline check even when you have internet. It uses no data and works anywhere, but it only knows cassava diseases."
+            label="No AI explanations"
+            description="Skip the AI explanation to save data. You still get the phone's answer and its advice."
             value={preferOfflineDiagnosis}
             onChange={setPreferOfflineDiagnosis}
           />

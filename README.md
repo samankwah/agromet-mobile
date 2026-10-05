@@ -14,12 +14,12 @@ expo-router. Styling is inline style objects over a design-token module
 
 Five bottom tabs, each covering a distinct area of the product:
 
-| Tab            | Status this increment                                                                                                                                                                                                      |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Home**       | Real — alert banner, city carousel, current conditions, quick actions, featured forecast, latest advisory, latest news                                                                                                     |
-| **Forecasts**  | Real — Today (hourly strip + stats + a farm-actionable card), 7-Day (expandable list with a min–max range bar), and Outlook (subseasonal + seasonal, marked as probabilistic), plus a lightweight, honest map preview card |
-| **Advisories** | Real — weather alerts derived from the hazard index, crop and poultry advisories, flood/drought monitoring, and a searchable advisory archive        |
-| **Farm Tools** | Crop Diagnose, crop/poultry calendars, market prices and farm reminders — every tool on this tab is built and routes out from here                                                                                        |
+| Tab            | Status this increment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Home**       | Real — alert banner, city carousel, current conditions, quick actions, featured forecast, latest advisory, latest news                                                                                                                                                                                                                                                                                                                                                                                   |
+| **Forecasts**  | Real — Today (hourly strip + stats + a farm-actionable card), 7-Day (expandable list with a min–max range bar), and Outlook (subseasonal + seasonal, marked as probabilistic), plus a lightweight, honest map preview card                                                                                                                                                                                                                                                                               |
+| **Advisories** | Real — weather alerts derived from the hazard index, crop and poultry advisories, flood/drought monitoring, and a searchable advisory archive                                                                                                                                                                                                                                                                                                                                                            |
+| **Farm Tools** | Crop Diagnose, crop/poultry calendars, market prices and farm reminders — every tool on this tab is built and routes out from here                                                                                                                                                                                                                                                                                                                                                                       |
 | **Consult**    | Real — a conversational assistant over the backend's `/api/chat`, in a messaging layout: multi-turn context, day-grouped tailed bubbles, starter questions, inline retry, voice input, photo questions, read-aloud. Answers are grounded server-side in the farmer's own forecast, hazard bands and prices. The transcript survives a restart for 24 hours (`storage/chatHistory`) and clears itself after. The tab is named for the action; the assistant itself is still AgroMet AI wherever it speaks |
 
 Settings live at `app/settings.tsx`, reached from the app menu — the button at
@@ -32,7 +32,7 @@ actually opens the app to do.
 The fifth tab used to be **Library**, a single card of four FAQ answers. The
 assistant replaced it: the backend had been serving `/api/chat` all along with
 nothing in this app calling it, and a conversation is a better use of the slot
-than a static list. The FAQ *data layer* is deliberately retained, currently
+than a static list. The FAQ _data layer_ is deliberately retained, currently
 unplaced — see `src/features/library/useFaqs.ts`, which explains which five
 files that covers and why none of them is dead code.
 
@@ -371,29 +371,35 @@ town-to-district mapping, `shared/api/forecastService.ts` (including that
 `SeasonalOutlook.rainfallProbability`'s three categories sum to 100), and
 a Home screen smoke render test.
 
-## Deployment roadmap (not run by this increment)
+## Releasing to Google Play and the App Store
 
-1. **Expo Go** (this increment) — fastest loop for iterating on screens.
-2. **EAS Build** — `eas.json` has `development`, `preview`, and
-   `production` Android build profiles ready. Requires an
-   [EAS](https://expo.dev/eas) account: `npx eas login`, then
-   `npx eas build --platform android --profile preview` for an installable
-   internal APK.
-3. **Field testing** — install the preview APK on field officers' and a
-   small farmer group's devices directly.
-4. **Google Play Console** — once stable, `npx eas build --profile
-production` produces an app bundle, submitted via `npx eas submit` or
-   manually. Needs a Google Play Developer account and EAS signing
-   configuration first.
+The full runbook, from creating the store accounts to the Play closed test
+and App Review, is in [`store/RELEASE.md`](store/RELEASE.md). The listing
+text, data safety and privacy answers are in
+[`store/listing.md`](store/listing.md).
 
-Before an EAS build, replace the placeholder icon/splash assets in
-`assets/` with AgroMet Ghana branding — they're currently the Expo default
-template's.
+In short:
+
+- `eas build -p android --profile preview` makes an APK to install directly
+  on test phones.
+- `eas build -p all --profile production` makes the store builds (an app
+  bundle for Play, an IPA for the App Store), and `eas submit` uploads them.
+  The very first Play upload is done by hand in Play Console.
+- Build numbers live on EAS (`appVersionSource: remote`) and go up by
+  themselves. The runtime version follows the app `version` (`appVersion`
+  policy), so an `eas update` only reaches builds of the same version.
+  **Bump `version` in app.json whenever a native module, permission or plugin
+  changes**, or an update could reach a build that cannot run it. (The
+  `fingerprint` policy would catch this automatically, but it makes
+  `expo start` hash the project on every manifest request, 30 to 130 seconds
+  on the dev PC, which times out Expo Go.)
+- The icons in `assets/` are the AgroMet mark on brand green, made from
+  `assets/agromet-mark.png`. The 512 px store icon is `store/store-icon-512.png`.
 
 ## CI
 
-`.github/workflows/mobile-ci.yml` (repo root), path-filtered to
-`mobile/**`: installs, then runs `format:check`, `lint`, `tsc --noEmit`,
-`test`, and an `expo export --platform ios` smoke bundle. Single Node
-version, no device matrix — deliberately minimal for a mock-data
-increment.
+`.github/workflows/ci.yml` in this repo runs on pushes to `main` and on pull
+requests: installs, then `lint`, `tsc --noEmit`, `test`, and an
+`expo export --platform android` smoke bundle. It lives here rather than in
+the parent repo, whose `mobile-ci.yml` never ran because the parent ignores
+`mobile/`.

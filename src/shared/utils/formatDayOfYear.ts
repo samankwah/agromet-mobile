@@ -12,11 +12,13 @@
  */
 const REFERENCE_YEAR = 2025; // non-leap
 
-/** Week of the month, 1-5 — calendar weeks counted from the 1st, not ISO
+/** Week of the month, 1-4 — calendar weeks counted from the 1st, not ISO
  * weeks, since "the second week of April" is how the target audience
- * talks about planting windows. */
+ * talks about planting windows. Days 29 to 31 count as week 4, as the
+ * backend writes them ("Week 4 of May"), so the legend and the cards never
+ * disagree and no reader meets a "week 5". */
 export function weekOfMonth(dayOfMonth: number): number {
-  return Math.ceil(dayOfMonth / 7);
+  return Math.min(Math.ceil(dayOfMonth / 7), 4);
 }
 
 export function formatDayOfYearAsWeekOfMonth(dayOfYear: number): string {

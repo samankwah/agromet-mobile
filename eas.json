@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 13.0.0",
-    "appVersionSource": "local"
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -27,7 +27,11 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://agromet-backend.vercel.app",
         "EXPO_PUBLIC_MARKET_WHATSAPP": "233243999631",
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+        "EXPO_PUBLIC_CONTACT_PHONE": "+233243999631",
+        "EXPO_PUBLIC_CONTACT_EMAIL": "0243999631a@gmail.com",
+        "EXPO_PUBLIC_SITE_URL": "https://agromet-ghana.vercel.app",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "AGROMET_ARM_ONLY": "1"
       }
     },
     "production": {
@@ -39,11 +43,35 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://agromet-backend.vercel.app",
         "EXPO_PUBLIC_MARKET_WHATSAPP": "233243999631",
+        "EXPO_PUBLIC_CONTACT_PHONE": "+233243999631",
+        "EXPO_PUBLIC_CONTACT_EMAIL": "0243999631a@gmail.com",
+        "EXPO_PUBLIC_SITE_URL": "https://agromet-ghana.vercel.app",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      }
+    },
+    "apk": {
+      "android": {
+        "buildType": "apk"
+      },
+      "autoIncrement": true,
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://agromet-backend.vercel.app",
+        "EXPO_PUBLIC_MARKET_WHATSAPP": "233243999631",
+        "EXPO_PUBLIC_CONTACT_PHONE": "+233243999631",
+        "EXPO_PUBLIC_CONTACT_EMAIL": "0243999631a@gmail.com",
+        "EXPO_PUBLIC_SITE_URL": "https://agromet-ghana.vercel.app",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "AGROMET_ARM_ONLY": "1"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    }
   }
 }

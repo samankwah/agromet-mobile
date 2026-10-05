@@ -5,9 +5,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
 import { CommodityDetailScreen } from '../../features/market/CommodityDetailScreen';
+import { EXAMPLE_PRICES_MESSAGE } from '../../features/market/components/ExamplePricesNotice';
 import { MarketScreen } from '../../features/market/MarketScreen';
 import { queryClient } from '../../shared/api/queryClient';
 import { useCartStore } from '../../shared/state/cartStore';
+import { buildMarketOrderText } from '../../shared/utils/buildMarketOrderText';
 import { useMarketRegionStore } from '../../shared/state/marketRegionStore';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 
@@ -55,11 +57,33 @@ describe('MarketScreen', () => {
     expect(screen.getByText('18 commodities')).toBeTruthy();
   });
 
+  /* The figures are examples, not live quotes, and a farmer who took one for
+     today's price could sell under value. So it is said on the screen itself,
+     every time, and on each card beside the price. */
+  it("says the prices are examples, not today's market prices", async () => {
+    renderScreen(<MarketScreen />);
+    await screen.findByText('Yellow Maize');
+
+    expect(screen.getByText(EXAMPLE_PRICES_MESSAGE)).toBeTruthy();
+    expect(screen.getAllByText('Example price per bag').length).toBeGreaterThan(0);
+  });
+
+  it('says so in the quick view too', async () => {
+    renderScreen(<MarketScreen />);
+    await screen.findByText('Yellow Maize');
+
+    fireEvent.press(screen.getByLabelText('Quick view of Yellow Maize prices'));
+    await screen.findByText('6-month change');
+
+    // Once on the screen behind, once in the sheet.
+    expect(screen.getAllByText(EXAMPLE_PRICES_MESSAGE)).toHaveLength(2);
+  });
+
   it('opens a commodity page when a card is pressed', async () => {
     renderScreen(<MarketScreen />);
     await screen.findByText('Yellow Maize');
 
-    fireEvent.press(screen.getByLabelText('Yellow Maize, GH₵299.99'));
+    fireEvent.press(screen.getByLabelText('Yellow Maize, example price GH₵299.99'));
 
     expect(router.push).toHaveBeenCalledWith('/commodity/yellow-maize');
   });
@@ -92,7 +116,7 @@ describe('MarketScreen', () => {
     renderScreen(<MarketScreen />);
     await screen.findByText('Black Cobra Pepper');
 
-    fireEvent.press(screen.getByLabelText('Anaheim Pepper, GH₵59.99'));
+    fireEvent.press(screen.getByLabelText('Anaheim Pepper, example price GH₵59.99'));
 
     expect(router.push).toHaveBeenCalledWith('/commodity/anaheim-pepper');
   });
@@ -130,9 +154,30 @@ describe('CommodityDetailScreen', () => {
     expect(screen.queryByText('No price is published for this commodity yet.')).toBeNull();
   });
 
+  it('says the prices are examples', async () => {
+    renderScreen(<CommodityDetailScreen slug="yellow-maize" />);
+    await screen.findByText('Yellow Maize');
+
+    expect(screen.getByText(EXAMPLE_PRICES_MESSAGE)).toBeTruthy();
+    expect(screen.getByText(/^Example price per bag/)).toBeTruthy();
+  });
+
   it('says so plainly when the slug is not a commodity', () => {
     renderScreen(<CommodityDetailScreen slug="not-a-commodity" />);
 
     expect(screen.getByText('Unknown commodity')).toBeTruthy();
+  });
+});
+
+describe('buildMarketOrderText', () => {
+  /* The order goes to a person on WhatsApp. A total built from example prices
+     must not read as an agreed cost. */
+  it('labels the total an example and asks for the real price', () => {
+    const text = buildMarketOrderText([{ slug: 'yellow-maize', name: 'Yellow Maize', price: 300, unit: 'per bag', qty: 2 }], '');
+
+    expect(text).toContain('Example total: GH₵600.00');
+    expect(text).not.toMatch(/^Total:/m);
+    expect(text).toContain('These are example prices from the AgroMet app, not a quote.');
+    expect(text).toContain('Please confirm availability and the real price.');
   });
 });

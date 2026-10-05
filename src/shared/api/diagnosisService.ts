@@ -1,6 +1,7 @@
 import { File } from 'expo-file-system';
 
 import type { DiagnosisRequest, DiagnosisResult, DiagnosisUnavailable } from '../domain/diagnosis';
+import { useAuthStore } from '../state/authStore';
 import { confidenceBucket } from '../utils/confidenceBucket';
 import { postJson } from './http';
 
@@ -110,4 +111,73 @@ export function adaptDiagnosis(dto: DiagnosisDto, request: DiagnosisRequest): Di
     disclaimer: dto.disclaimer,
     diagnosedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * No image and a short prompt, so this is a fraction of the diagnosis budget.
+ * Above the backend's own OpenAI timeout (`OPENAI_TIMEOUT_SECONDS`, 20s) for
+ * the same reason `DIAGNOSIS_TIMEOUT_MS` sits above Kindwise's.
+ */
+const EXPLANATION_TIMEOUT_MS = 25_000;
+
+type DiagnosisExplanationDto =
+  | { degraded: true; reason?: string }
+  | { degraded: false; explanation: string; immediateActions: string[]; preventionGuidance: string[] };
+
+export type DiagnosisExplanation = Pick<DiagnosisResult, 'explanation' | 'immediateActions' | 'preventionGuidance' | 'adviceSource'>;
+
+/**
+ * Ask the backend to explain an on-device result in plain words.
+ *
+ * POST /api/diagnosis-explanation (backend/app/diagnosis_explain.py). The
+ * phone has already chosen the disease; what travels is that choice and the
+ * bundled advice for it, which the model is told to rephrase and not to add
+ * to. No photo is sent.
+ *
+ * Resolves `null` for every way this can fail, including a quota refusal.
+ * The farmer is already reading the knowledge-base answer, and an
+ * explanation that did not arrive is not something they need to be told about.
+ */
+export async function fetchDiagnosisExplanation(
+  result: DiagnosisResult,
+  request: DiagnosisRequest,
+): Promise<DiagnosisExplanation | null> {
+  if (!result.classId) return null;
+
+  try {
+    const dto = await postJson<DiagnosisExplanationDto>(
+      '/api/diagnosis-explanation',
+      {
+        crop: request.crop,
+        classId: result.classId,
+        likelyIssue: result.likelyIssue,
+        confidenceBand: result.confidenceBand,
+        symptoms: request.symptoms || undefined,
+        growthStage: request.growthStage || undefined,
+        region: request.region || undefined,
+        reference: {
+          summary: result.remedy,
+          immediateActions: result.immediateActions,
+          preventionGuidance: result.preventionGuidance,
+        },
+      },
+      {
+        timeoutMs: EXPLANATION_TIMEOUT_MS,
+        headers: { 'X-Device-Id': useAuthStore.getState().guestId },
+      },
+    );
+
+    if (!dto || dto.degraded || !dto.explanation?.trim()) return null;
+
+    return {
+      explanation: dto.explanation.trim(),
+      // An empty list from the model would blank a section the knowledge base
+      // had filled, so each list falls back independently.
+      immediateActions: dto.immediateActions?.length ? dto.immediateActions : result.immediateActions,
+      preventionGuidance: dto.preventionGuidance?.length ? dto.preventionGuidance : result.preventionGuidance,
+      adviceSource: 'ai',
+    };
+  } catch {
+    return null;
+  }
 }
