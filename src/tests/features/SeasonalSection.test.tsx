@@ -41,7 +41,7 @@ function makeSet(overrides: Record<string, unknown> = {}): SeasonalOutlookSet {
   } as unknown as SeasonalOutlookSet;
 }
 
-type Overrides = { set?: SeasonalOutlookSet; onRetry?: () => void; locationId?: string };
+type Overrides = { set?: SeasonalOutlookSet; onRetry?: () => void };
 
 function renderSection(overrides: Overrides = {}) {
   return render(
@@ -52,7 +52,6 @@ function renderSection(overrides: Overrides = {}) {
             set={overrides.set ?? makeSet()}
             status="success"
             onRetry={overrides.onRetry ?? (() => {})}
-            locationId={overrides.locationId ?? 'accra'}
           />
         </QueryClientProvider>
       </ThemeProvider>
@@ -135,11 +134,10 @@ describe('SeasonalSection controls', () => {
     expect(view.getByText('March to May 2027, all regions.')).toBeTruthy();
   });
 
-  it('has no district control, and points to the regions instead', () => {
-    const { queryByText, getByText } = renderWithControls();
+  it('has no district control', () => {
+    const { queryByText } = renderWithControls();
 
     expect(queryByText('GEOGRAPHY')).toBeNull();
-    expect(getByText(/Tap a region for its advice\./)).toBeTruthy();
   });
 
   it('opens on Probability when the data carries a split', () => {
@@ -151,7 +149,7 @@ describe('SeasonalSection controls', () => {
   it('names the model and the day the forecast was made, in one line', () => {
     const { getByText, queryByText } = renderWithControls();
 
-    expect(getByText(/^ECMWF SEAS5 · made 1 Oct 2026\./)).toBeTruthy();
+    expect(getByText('ECMWF SEAS5 · made 1 Oct 2026.')).toBeTruthy();
     // The method notes moved to the advisory page.
     expect(queryByText(/A guide to the season/)).toBeNull();
   });
@@ -166,117 +164,71 @@ describe('a season beyond the model reach', () => {
     chooseSeason(view, 'Southern Minor Season');
 
     expect(view.getByText(/The forecast for this season will be ready from May 2027\./)).toBeTruthy();
-    // The banner says when; the card says what usually happens, once.
-    expect(view.getByText(/^In most years the start of the rains in Greater Accra is/)).toBeTruthy();
-    expect(view.queryByText(/The forecast for the Southern Minor Season will be ready/)).toBeNull();
   });
 
-  it('says why Probability shows the normal instead of chances', () => {
+  it('greys out Probability and says when it will be ready', () => {
     const view = renderWithControls();
     chooseVariable(view, 'Onset Date');
     chooseSeason(view, 'Southern Minor Season');
-    fireEvent.press(view.getByLabelText('Forecast view').findByProps({ accessibilityLabel: 'Probability' }));
+    const probability = view.getByLabelText('Forecast view').findByProps({ accessibilityLabel: 'Probability' });
 
-    expect(view.getByText(/Chances are worked out once the season is in the forecast, from May 2027/)).toBeTruthy();
+    expect(probability.props.accessibilityState).toEqual({ selected: false, disabled: true });
+    expect(view.getByText('Probability will be ready from May 2027.')).toBeTruthy();
+    const deterministic = view.getByLabelText('Forecast view').findByProps({ accessibilityLabel: 'Deterministic' });
+    expect(deterministic.props.accessibilityState.selected).toBe(true);
+  });
+
+  it('turns Probability back on for a season in the forecast', () => {
+    const view = renderWithControls();
+    chooseVariable(view, 'Onset Date');
+    chooseSeason(view, 'Southern Minor Season');
+    chooseSeason(view, 'Southern Major Season');
+
+    expect(view.queryByText(/Probability will be ready/)).toBeNull();
+    const probability = view.getByLabelText('Forecast view').findByProps({ accessibilityLabel: 'Probability' });
+    expect(probability.props.accessibilityState.disabled).toBe(false);
   });
 });
 
 describe('All Variables', () => {
-  it("lists the season's figures for the reader's town, and the rain for the chosen months", () => {
+  it('shows the season, not the months', () => {
     const view = renderWithControls();
 
-    for (const label of ['Rains start', 'Early dry spell', 'Late dry spell', 'Rains end', 'Rainfall, Mar to May']) {
-      expect(view.getByText(label)).toBeTruthy();
-    }
-    expect(view.getByText('420 mm')).toBeTruthy();
-    // No month by month table and no starred footnote in the drawer any more.
-    expect(view.queryByText(/Normal \(1995 to 2024\), not a forecast/)).toBeNull();
-  });
-
-  it('opens the advice for a figure, and the full advisory', () => {
-    const view = renderWithControls();
-
-    fireEvent.press(view.getByText('Rains end'));
-    expect(mockPush).toHaveBeenLastCalledWith({
-      pathname: '/seasonal/[region]/[variable]',
-      params: { region: 'Greater Accra', season: 'southern-major', window: 'MAM', variable: 'cessation' },
-    });
-
-    fireEvent.press(view.getByText('Seasonal advisory'));
-    expect(mockPush).toHaveBeenLastCalledWith({
-      pathname: '/seasonal/[region]',
-      params: { region: 'Greater Accra', season: 'southern-major', window: 'MAM' },
-    });
+    expect(view.getByLabelText('SEASON: All Seasons')).toBeTruthy();
+    expect(view.queryByLabelText('Three-month window')).toBeNull();
   });
 });
 
-describe('a tap on the map', () => {
-  it("opens that region's full seasonal advisory, never a panel in the drawer", () => {
-    const view = renderSection();
-    view.UNSAFE_getByType(MapLibreChoropleth).props.onSelect({ region: 'Upper East' });
-    expect(mockPush).toHaveBeenCalledWith({ pathname: '/seasonal/[region]', params: { region: 'Upper East', season: 'northern' } });
-  });
-});
-
-describe("the reader's own town card", () => {
-  it('shows the town, the badge and the plain sentence', () => {
-    const view = renderWithControls();
-    chooseVariable(view, 'Onset Date');
-    const { getByText } = view;
-
-    expect(getByText('Accra, Greater Accra')).toBeTruthy();
-    expect(getByText('High confidence')).toBeTruthy();
-    expect(getByText(/72% chance the start of the rains in Greater Accra is earlier than usual, around Week 2 of March/)).toBeTruthy();
-  });
-
-  it('shows only the chosen condition, with its advice and the full advisory', () => {
+describe('the drawer', () => {
+  it("describes the country or a half of it, never the reader's town", () => {
     const view = renderWithControls();
     chooseVariable(view, 'Onset Date');
 
-    // Nothing about the other figures.
-    expect(view.queryByText('Early dry spell')).toBeNull();
-    expect(view.queryByText('Rains end')).toBeNull();
-
-    fireEvent.press(view.getByText('Rains start: what to do'));
-    expect(mockPush).toHaveBeenLastCalledWith({
-      pathname: '/seasonal/[region]/[variable]',
-      params: { region: 'Greater Accra', season: 'southern-major', window: 'MAM', variable: 'onset' },
-    });
-
-    fireEvent.press(view.getByText('Full seasonal advisory'));
-    expect(mockPush).toHaveBeenLastCalledWith({
-      pathname: '/seasonal/[region]',
-      params: { region: 'Greater Accra', season: 'southern-major', window: 'MAM' },
-    });
+    expect(view.queryByText('Accra, Greater Accra')).toBeNull();
+    expect(view.queryByText(/Greater Accra/)).toBeNull();
+    expect(view.getByText(/The Northern Single Season in the five northern regions/)).toBeTruthy();
   });
 
-  it('keeps the drawer months for a three month figure, even outside the season', () => {
+  it('links to no other page', () => {
     const view = renderWithControls();
     chooseVariable(view, 'Rainfall Total (mm)');
-    fireEvent.press(view.getByLabelText('Three-month window').findByProps({ accessibilityLabel: 'JAS' }));
 
-    fireEvent.press(view.getByText('Rainfall: what to do'));
-    expect(mockPush).toHaveBeenLastCalledWith({
-      pathname: '/seasonal/[region]/[variable]',
-      params: { region: 'Greater Accra', season: 'southern-major', window: 'JAS', variable: 'rainfallTotal' },
-    });
+    expect(view.queryByText(/what to do/)).toBeNull();
+    expect(view.queryByText(/seasonal advisory/i)).toBeNull();
+    expect(view.queryByText(/Tap a region/)).toBeNull();
   });
 
-  it('follows the variable control', () => {
+  it("leaves a tap on the map to the map's own popup", () => {
+    const view = renderSection();
+    expect(view.UNSAFE_getByType(MapLibreChoropleth).props.onSelect).toBeUndefined();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('notes the dry season when a region is in it', () => {
     const view = renderWithControls();
-    chooseVariable(view, 'Late-Season Dry Spell');
-
-    expect(
-      view.getByText(/65% chance the longest dry spell late in the season in Greater Accra is longer than usual, about 9 days/),
-    ).toBeTruthy();
-  });
-
-  it('notes the dry season in the legend when a region is in it', () => {
-    const view = renderWithControls({ locationId: 'tamale' });
     chooseVariable(view, 'Rainfall Total (mm)');
 
     expect(view.getByText(/Regions in their dry season show as No signal/)).toBeTruthy();
-    expect(view.getByText(/This is the dry season in Northern/)).toBeTruthy();
   });
 });
 

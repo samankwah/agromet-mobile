@@ -89,7 +89,7 @@ describe('ForecastsScreen', () => {
 
     /* The Seasonal segment draws the real outlook: the same map-and-drawer
        layout as Subseasonal, fed by /api/outlook/seasonal. */
-    it('draws the seasonal outlook, with its season control and the town card', async () => {
+    it('draws the seasonal outlook, with its season control and no town card', async () => {
       const previous = useLocationStore.getState();
       useLocationStore.setState({ selectedLocationId: 'accra', hasHydrated: true });
       globalThis.fetch = jest.fn((url: string) =>
@@ -103,9 +103,7 @@ describe('ForecastsScreen', () => {
 
         expect(selected()).toBe('Seasonal');
         expect(await screen.findByText('SEASON')).toBeTruthy();
-        expect(screen.getByText('Accra, Greater Accra')).toBeTruthy();
-        expect(screen.getByText('Rainfall, Mar to May')).toBeTruthy();
-        expect(screen.getByText('420 mm')).toBeTruthy();
+        expect(screen.queryByText('Accra, Greater Accra')).toBeNull();
         expect(screen.queryByText('Seasonal outlook coming soon')).toBeNull();
       } finally {
         useLocationStore.setState({ selectedLocationId: previous.selectedLocationId, hasHydrated: previous.hasHydrated });

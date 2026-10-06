@@ -1,13 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 
-import { buildSeasonalOutlook, pickBlock, readyFrom } from '../../../shared/api/seasonalService';
-import { SEASON_WINDOWS, seasonsOf } from '../../../shared/domain/seasonalAdvice';
+import { pickBlock, readyFrom } from '../../../shared/api/seasonalService';
 import type {
   SeasonChoice,
-  SeasonalOutlook,
   VariableChoice,
   SeasonalOutlookSet,
   SeasonalVariableId,
@@ -23,8 +20,6 @@ import {
   VARIABLE_INFO,
   WINDOW_KEYS,
   isSeasonVariable,
-  mainSeasonOf,
-  sectorOf,
 } from '../../../shared/domain/seasonalOutlook';
 import { useNetworkStatus } from '../../../shared/net/useNetworkStatus';
 import { tint } from '../../../shared/theme/blend';
@@ -37,29 +32,19 @@ import { Drawer } from '../../../shared/ui/Drawer';
 import { Dropdown } from '../../../shared/ui/Dropdown';
 import { EmptyState } from '../../../shared/ui/EmptyState';
 import { FieldLabel } from '../../../shared/ui/FieldLabel';
-import { MapLibreChoropleth, type MapSelection } from '../../../shared/ui/MapLibreChoropleth';
+import { MapLibreChoropleth } from '../../../shared/ui/MapLibreChoropleth';
 import { SegmentedControl } from '../../../shared/ui/SegmentedControl';
 import { Text } from '../../../shared/ui/Text';
 import { BAND_COUNT, TERCILE_BOUNDS } from '../../../shared/utils/tercilePalette';
 import { deterministicRange } from '../subseasonal/cells';
-import { SeasonalTownCard } from '../seasonal-advisory/components/SeasonalTownCard';
-import {
-  buildSeasonalCells,
-  hasDryWindow,
-  hasProbabilities,
-  paletteForVariable,
-  stopsFor,
-  valueFormatFor,
-} from '../seasonal/cells';
-import { SpatialOutlookSkeleton, SubseasonalOutlookSkeleton } from './ForecastSkeletons';
+import { buildSeasonalCells, hasDryWindow, hasProbabilities, paletteForVariable, stopsFor, valueFormatFor } from '../seasonal/cells';
+import { SpatialOutlookSkeleton } from './ForecastSkeletons';
 
 type Props = {
   set: SeasonalOutlookSet | undefined;
   status: 'pending' | 'error' | 'success';
   error?: unknown;
   onRetry: () => void;
-  /** The reader's own town, for the card in the drawer. */
-  locationId: string;
 };
 
 /** Matches the Subseasonal segment's map, so switching timescales does not
@@ -111,7 +96,7 @@ function formatRunDate(date: string): string | null {
  * - **A published forecast can be in force.** Then the map shows it, a notice
  *   says who issued it, and the town card adds what the model alone reads.
  */
-export function SeasonalSection({ set, status, error, onRetry, locationId }: Props) {
+export function SeasonalSection({ set, status, error, onRetry }: Props) {
   const theme = useTheme();
   const { isOnline } = useNetworkStatus();
   const [drawerExpanded, setDrawerExpanded] = useState(false);
@@ -140,9 +125,8 @@ export function SeasonalSection({ set, status, error, onRetry, locationId }: Pro
   // Null until the reader chooses, so the default follows the data.
   const view = VIEWS[viewIndex ?? (anyProbabilities ? 0 : 1)];
   // Chances need a forecast. Beyond the model's reach there is only the normal,
-  // so the map keeps showing it and the drawer says why (see probabilityNote).
+  // so Probability is greyed out, with the month it will be ready.
   const isProbability = view === 'probability' && !normalOnly;
-  const probabilityNote = view === 'probability' && normalOnly;
   const valueFormat = valueFormatFor(variable);
   const stops = stopsFor(variable);
   const palette = paletteForVariable(variable);
@@ -164,30 +148,8 @@ export function SeasonalSection({ set, status, error, onRetry, locationId }: Pro
   const fetchFailed = Boolean(set?.fetchFailed);
   const showsDryNote = !isEmpty && isProbability && hasDryWindow(blockCells, variable);
 
-  // The town card is a slice of the set already in hand, so it follows the
-  // controls without a second request. It still gets its own error state: a
-  // town whose region has no reading must not blank a healthy map.
-  const town = useMemo((): { outlook?: SeasonalOutlook; error?: unknown } => {
-    if (!set) return {};
-    try {
-      return { outlook: buildSeasonalOutlook(set, locationId, variableChoice, seasonKey, windowKey) };
-    } catch (caught) {
-      return { error: caught };
-    }
-  }, [set, locationId, variableChoice, seasonKey, windowKey]);
-
-  // A tap on a region opens that region's full seasonal advisory, for the
-  // season and months the map is showing when they apply there.
-  const handleSelect = useCallback(
-    (next: MapSelection) => {
-      if (!next.region) return;
-      const seasons = seasonsOf(sectorOf(next.region));
-      const season = seasonKey !== 'all' && seasons.includes(seasonKey) ? seasonKey : mainSeasonOf(next.region);
-      const window = SEASON_WINDOWS[season].includes(windowKey) ? windowKey : undefined;
-      router.push({ pathname: '/seasonal/[region]', params: { region: next.region, season, ...(window ? { window } : {}) } });
-    },
-    [seasonKey, windowKey],
-  );
+  // A tap on a region shows the map's own popup, nothing more: the drawer
+  // describes the whole country, a half of it, or a season, never one town.
   const handleDismiss = useCallback(() => setDrawerExpanded(false), []);
 
   const legend = isEmpty ? null : (
@@ -260,7 +222,6 @@ export function SeasonalSection({ set, status, error, onRetry, locationId }: Pro
               palette={isProbability ? palette : undefined}
               variableLabel={VARIABLE_INFO[variable].label}
               valueFormat={valueFormat}
-              onSelect={handleSelect}
               onDismiss={handleDismiss}
               stops={stops}
             />
@@ -280,42 +241,21 @@ export function SeasonalSection({ set, status, error, onRetry, locationId }: Pro
 
         <Drawer expanded={drawerExpanded} onExpandedChange={setDrawerExpanded} persistentContent={legend}>
           <View style={{ gap: theme.spacing.lg }}>
-            {/* The reader's own town first: it is why most people open this.
-                Hidden while the whole outlook is missing, where the map's own
-                empty state already says why. */}
-            {unavailable ? null : (
-              <AsyncStateView
-                status={status === 'pending' ? 'pending' : town.error ? 'error' : 'success'}
-                error={town.error}
-                onRetry={onRetry}
-                skeleton={<SubseasonalOutlookSkeleton />}
-              >
-                {town.outlook && set ? (
-                  <SeasonalTownCard
-                    set={set}
-                    outlook={town.outlook}
-                    variableChoice={variableChoice}
-                    seasonChoice={seasonKey}
-                    windowKey={windowKey}
-                  />
-                ) : null}
-              </AsyncStateView>
-            )}
-
             {/* The same selector style as the Subseasonal drawer: a caps label
                 over a full-width control, one row each. */}
             <View>
               <FieldLabel>VIEW</FieldLabel>
               <SegmentedControl
                 segments={VIEW_SEGMENTS}
-                selectedIndex={VIEWS.indexOf(view)}
+                selectedIndex={VIEWS.indexOf(isProbability ? 'probability' : 'deterministic')}
                 onChange={setViewIndex}
                 accessibilityLabel="Forecast view"
                 equalWidth
+                disabledIndexes={normalOnly ? [VIEWS.indexOf('probability')] : undefined}
               />
-              {probabilityNote ? (
+              {normalOnly ? (
                 <Text variant="caption" muted style={{ marginTop: theme.spacing.xs }}>
-                  Chances are worked out once the season is in the forecast, from {ready}. Until then the map shows the normal.
+                  Probability will be ready from {ready}.
                 </Text>
               ) : null}
             </View>
@@ -328,8 +268,9 @@ export function SeasonalSection({ set, status, error, onRetry, locationId }: Pro
               onSelect={(id) => setVariableChoice(id as VariableChoice)}
             />
 
-            {/* All Variables needs both: the season for the onset, dry spell and
-                cessation rows, and the three months the map's rainfall covers. */}
+            {/* One time control at a time. The three months belong only to the
+                three-month figures (rainfall total, rainy days, temperature);
+                All Variables and the season figures take the season. */}
             {isSeason || isAll ? (
               <Dropdown
                 label="SEASON"
@@ -338,9 +279,9 @@ export function SeasonalSection({ set, status, error, onRetry, locationId }: Pro
                 onSelect={(id) => setSeasonKey(id as SeasonChoice)}
               />
             ) : null}
-            {isSeason ? null : (
+            {isSeason || isAll ? null : (
               <View>
-                <FieldLabel>{isAll ? 'MONTHS' : 'SEASON'}</FieldLabel>
+                <FieldLabel>SEASON</FieldLabel>
                 <SegmentedControl
                   segments={WINDOW_KEYS}
                   selectedIndex={WINDOW_KEYS.indexOf(windowKey)}
@@ -380,7 +321,7 @@ export function SeasonalSection({ set, status, error, onRetry, locationId }: Pro
               {set ? (
                 <Text variant="caption" muted>
                   {set.source === 'gmet' && set.issuedBy ? `Issued by ${set.issuedBy}` : 'ECMWF SEAS5'}
-                  {runDate ? ` · made ${runDate}` : ''}. Tap a region for its advice.
+                  {runDate ? ` · made ${runDate}` : ''}.
                 </Text>
               ) : null}
             </View>
