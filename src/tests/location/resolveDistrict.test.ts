@@ -1,3 +1,4 @@
+import { getDistrictById } from '../../shared/data/districts';
 import { resolveDistrictFromCoords } from '../../shared/location/resolveDistrict';
 
 /**
@@ -15,17 +16,21 @@ describe('resolveDistrictFromCoords', () => {
     });
   });
 
-  it('resolves a fix between two towns to the nearer one', () => {
-    // Halfway up the coast road, closer to Cape Coast than to Takoradi.
-    const near = resolveDistrictFromCoords(5.05, -1.35);
-    expect(near).toEqual({ townId: 'cape-coast', districtId: 'cape-coast-metropolitan' });
-  });
-
-  it('covers Accra', () => {
+  /* The old resolver gave every fix the district of its nearest town, so all
+     of central Accra was "Accra Metropolitan". The district now comes from the
+     polygon the fix is in; the town is still the nearest, for the weather. */
+  it("takes the district the fix is in, not the nearest town's", () => {
     expect(resolveDistrictFromCoords(5.6, -0.19)).toEqual({
       townId: 'accra',
-      districtId: 'accra-metropolitan',
+      districtId: 'ayawaso-east-municipal',
     });
+  });
+
+  it('still places a fix just off the coast', () => {
+    // In the sea a few hundred metres off Cape Coast, outside every polygon.
+    const offshore = resolveDistrictFromCoords(5.05, -1.35);
+    expect(offshore?.townId).toBe('cape-coast');
+    expect(getDistrictById(offshore?.districtId ?? '')?.region).toBe('Central');
   });
 
   it('returns null for a fix well outside the served area', () => {

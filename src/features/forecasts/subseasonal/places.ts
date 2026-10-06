@@ -22,6 +22,9 @@ export type Place = {
  *
  * Built once at module load from the same pre-baked grid the map draws, so a
  * search result and a map tap on the same district resolve to the same cell.
+ * A district too small to own a grid cell (several in Accra and Kumasi) uses
+ * the label point the build script placed inside its polygon instead, so every
+ * district can still be found.
  */
 function buildIndex(): Place[] {
   const groups = new Map<string, { name: string; region: string | null; kind: Place['kind']; lat: number; lng: number; count: number }>();
@@ -33,6 +36,11 @@ function buildIndex(): Place[] {
     if (cell.districtName && cell.regionName) {
       add(groups, `district:${cell.regionName}:${cell.districtName}`, cell.districtName, cell.regionName, 'district', cell.lat, cell.lng);
     }
+  }
+
+  for (const { properties } of GHANA_BOUNDARIES.districts) {
+    const id = `district:${properties.region}:${properties.name}`;
+    if (!groups.has(id)) add(groups, id, properties.name, properties.region, 'district', properties.label[1], properties.label[0]);
   }
 
   return [...groups.entries()]
@@ -90,7 +98,12 @@ export function searchPlaces(query: string, limit = 8): Place[] {
   }
 
   return scored
-    .sort((a, b) => a.score - b.score || (a.place.kind === b.place.kind ? 0 : a.place.kind === 'district' ? -1 : 1) || a.place.name.localeCompare(b.place.name))
+    .sort(
+      (a, b) =>
+        a.score - b.score ||
+        (a.place.kind === b.place.kind ? 0 : a.place.kind === 'district' ? -1 : 1) ||
+        a.place.name.localeCompare(b.place.name),
+    )
     .slice(0, limit)
     .map((entry) => entry.place);
 }

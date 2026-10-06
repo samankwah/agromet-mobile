@@ -1,238 +1,258 @@
 #!/usr/bin/env node
 /**
- * Build-time only — generates mobile/src/shared/data/ghanaBoundaries.json
- * from the web app's existing boundary assets
- * (frontend/src/assets/ghana-district-boundaries.json,
- * frontend/src/assets/ghana-regions.json). Never run by the app itself;
- * run manually (`node scripts/build-ghana-boundaries.mjs`) whenever the
- * source boundary data changes. @turf/turf is a devDependency used only
- * here — nothing in this file is bundled into the shipped app.
+ * Build-time only: generates mobile/src/shared/data/ghanaBoundaries.json from
+ * the GADM 4.1 shapefiles in scripts/data/gadm41_GHA (see PROVENANCE.md
+ * there). Never run by the app; run `node scripts/build-ghana-boundaries.mjs`
+ * when the source shapefiles change. mapshaper and @turf/turf are
+ * devDependencies used only here.
  *
- * The source district file (260 ADM2 polygons) is ~3MB and has no region
- * attribute; ghana-regions.json only has district *centroid points* with a
- * region name. This script:
- *   1. Builds a district-name -> region-name map from the points file
- *      (normalized name matching + a small manual override list for the
- *      ~9% of names that don't match after normalization).
- *   2. Simplifies every district polygon (Douglas-Peucker) so the shipped
- *      asset is small enough for a low-bandwidth app.
- *   3. Dissolves districts sharing a region into region polygons, and
- *      unions everything into one national outline.
- *   4. Lays a coarse lat/lng grid over the country, keeps only cells whose
- *      center falls inside the national outline, and tags each cell with
- *      its region/district — this is the exact grid the gridded
- *      outlooks are painted onto (see the cells.ts helpers under features/forecasts).
+ *   1. Reads the 260 district polygons and fixes the one mislabelled record.
+ *   2. Simplifies them with mapshaper, which keeps the shared topology: a
+ *      border two districts share is simplified once, so neighbours still meet
+ *      exactly and no slivers or seams appear. The tolerance is absolute
+ *      (metres), not a percentage, so the small Accra and Kumasi districts keep
+ *      their shape instead of collapsing to triangles.
+ *   3. Dissolves those same simplified districts into the sixteen regions and
+ *      the national outline, so all three layers line up to the vertex.
+ *   4. Renames every district to the spelling the backend stores (from
+ *      src/shared/data/ghanaRegions.ts), so the map, search, alerts and the
+ *      calendar filters all say the same name.
+ *   5. Lays the 0.15° outlook grid over the country and tags each cell with
+ *      the district and region its centre falls in.
+ *
+ * It stops with an error, writing nothing, if any check below fails.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { Buffer } from 'node:buffer';
+import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import mapshaper from 'mapshaper';
 import * as turf from '@turf/turf';
 
+import { GHANA_REGIONS } from '../src/shared/data/ghanaRegions.ts';
+import { districtId } from '../src/shared/data/districtId.ts';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FRONTEND_ASSETS = resolve(__dirname, '../../frontend/src/assets');
+const SOURCE_DIR = resolve(__dirname, 'data/gadm41_GHA');
 const OUTPUT_PATH = resolve(__dirname, '../src/shared/data/ghanaBoundaries.json');
 
-const SIMPLIFY_TOLERANCE_DEG = 0.02; // ~2.2km at Ghana's latitude — coarse, but the shipped map renders at a few hundred px across; finer detail isn't perceptible there
-const COORDINATE_DECIMALS = 3; // ~111m precision — plenty for a small on-screen map, cuts JSON size substantially
-const GRID_RESOLUTION_DEG = 0.15; // matches the "pixelated" block size in the reference screenshots
+const SIMPLIFY_INTERVAL_M = 400; // at city zoom indistinguishable from 250 m, and 630 KB against 900 KB
+const COORDINATE_DECIMALS = 4; // ~11 m
+const GRID_RESOLUTION_DEG = 0.15;
 
-// Districts whose shapeName in the boundary file doesn't match any name in
-// ghana-regions.json even after normalization (checked by hand against
-// Ghana's known administrative regions).
-const REGION_OVERRIDES = {
-  'kasena nankana west': 'Upper East',
-  'kasena nankana east': 'Upper East',
-  'wassa amenfi west': 'Western',
-  'wassa amenfi central': 'Western',
-  'wassa amenfi east': 'Western',
-  'awutu senya': 'Central',
-  'adansi asokwa': 'Ashanti',
-  'adansi akrofuom': 'Ashanti',
-  kpando: 'Volta',
-  dormaa: 'Bono',
-  'sekyere afram plains north': 'Ashanti',
-  sagnerigu: 'Northern',
-  'bolga east': 'Upper East',
-  'assin fosu': 'Central',
-  'korle klottey': 'Greater Accra',
-  'accra metropolis': 'Greater Accra',
-  'sekondi takoradi metropolis': 'Western',
-  'asene akroso manso': 'Central',
-  'upper manya': 'Eastern',
-  'lower manya': 'Eastern',
-  'akwapem south': 'Eastern',
-  'akyem mansa': 'Eastern',
-  'akwapem north': 'Eastern',
+/* Pinned to the origin of the grid this file has always shipped, so every cell
+   centre stays exactly where it was. Forecast services, the backend's
+   precip_grid.json and saved map state all key on those centres; a new outline
+   with a slightly different bounding box must not shift them. */
+const GRID_ORIGIN = { minLng: -3.25491173484504, minLat: 4.74540425403578 };
+
+/* GADM spells these differently from the backend. Keyed by "Region|GADM name". */
+const NAME_ALIASES = {
+  'Ashanti|Sekyere Afram Plains North': 'Sekyere Afram Plains',
+  'Bono|Dormaa': 'Dormaa Central Municipal',
+  'Eastern|Akwapem North': 'Akwapim North Municipal',
+  'Eastern|Akwapem South': 'Akwapim South',
+  'Eastern|Upper Manya': 'Upper Manya Krobo',
+  'Northern|Sagnerigu': 'Sagnarigu Municipal',
+  'Northern|Zabzu-gu': 'Zabzugu',
+  'Upper East|Bolga East': 'Bolgatanga East',
+  'Upper East|Kasena Nankana East': 'Kassena Nankana East Municipal',
+  'Upper East|Kasena Nankana West': 'Kassena Nankana West',
+  'Western|Wassa Amenfi Central': 'Amenfi Central',
+  'Western|Wassa Amenfi East': 'Amenfi East Municipal',
+  'Western|Wassa Amenfi West': 'Amenfi West Municipal',
 };
 
-function roundCoordinates(node) {
-  if (typeof node[0] === 'number') {
-    return node.map((value) => Number(value.toFixed(COORDINATE_DECIMALS)));
-  }
-  return node.map(roundCoordinates);
-}
+/* Districts in the official list that the shapefile has no polygon for. */
+const KNOWN_WITHOUT_SHAPE = ['Guan'];
 
-/**
- * Drops the interior rings the dissolve leaves behind.
- *
- * Districts are simplified individually, above, and only then dissolved. That
- * ordering is not topology-preserving: simplifying a shared border moves its
- * vertices differently depending on which district is being simplified, so
- * neighbours stop matching exactly and the union leaves a hairline gap along
- * every internal boundary. Those gaps survive as holes and render as district
- * seams cut through what should be one solid region -- 467 of them across the
- * sixteen regions when this was first measured.
- *
- * Ghana has no region enclosing non-region territory, so an interior ring here
- * is always an artefact. The proper fix is topology-aware simplification
- * (mapshaper) or dissolving before simplifying; this is the cheap correct
- * result in the meantime, and it is safe precisely because of that
- * no-enclaves property.
- */
-function ringArea(ring) {
-  let area = 0;
-  for (let i = 0; i < ring.length - 1; i += 1) {
-    area += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
-  }
-  return Math.abs(area / 2);
-}
+/* Spot checks: a town, and the district it must land in. */
+const TOWN_CHECKS = [
+  ['Accra', 5.55, -0.205, 'Accra Metropolitan'],
+  ['Kumasi (Adum)', 6.693, -1.624, 'Kumasi Metropolitan'],
+  ['Tamale', 9.403, -0.842, 'Tamale Metropolitan'],
+  ['Ho', 6.601, 0.471, 'Ho Municipal'],
+  ['Bolgatanga', 10.7856, -0.8514, 'Bolgatanga Municipal'],
+  ['Wa', 10.0601, -2.5099, 'Wa Municipal'],
+  ['Sunyani', 7.3349, -2.3123, 'Sunyani Municipal'],
+  ['Fomena', 6.268, -1.498, 'Adansi North'],
+  ['Kibi', 6.165, -0.554, 'Abuakwa South Municipal'],
+  ['Cape Coast', 5.105, -1.247, 'Cape Coast Metropolitan'],
+];
 
-function withoutSliverHoles(geometry) {
-  if (geometry.type === 'Polygon') {
-    return { type: 'Polygon', coordinates: [geometry.coordinates[0]] };
-  }
-  if (geometry.type !== 'MultiPolygon') return geometry;
-
-  // Outer ring of every part, then drop the parts too small to be real
-  // coastline. Unioning 260 independently-simplified districts leaves detached
-  // specks along the borders as well as interior slivers -- the national
-  // outline came out of this with 724 rings, 723 of them slivers, every one of
-  // which was being stroked across the map.
-  const parts = geometry.coordinates.map((part) => [part[0]]);
-  const largest = Math.max(...parts.map((part) => ringArea(part[0])));
-  return { type: 'MultiPolygon', coordinates: parts.filter((part) => ringArea(part[0]) > largest * 0.0005) };
-}
-
-function roundGeometry(geometry) {
-  return { ...geometry, coordinates: roundCoordinates(geometry.coordinates) };
+function fail(message) {
+  console.error(`\nbuild-ghana-boundaries: ${message}`);
+  process.exit(1);
 }
 
 function normalizeName(raw) {
   return raw
-    .trim()
     .toLowerCase()
-    .replace(/\bmunicipal assembly\b/g, '')
-    .replace(/\bdistrict assembly\b/g, '')
-    .replace(/\bmetropolitan assembly\b/g, '')
-    .replace(/\bmunicipal\b/g, '')
-    .replace(/\bmetropolitan\b/g, '')
-    .replace(/\bdistrict\b/g, '')
-    .replace(/\bassembly\b/g, '')
+    .replace(/\b(municipal|metropolitan|metropolis|district)\b/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 }
 
-function loadRegionLookup() {
-  const regions = JSON.parse(readFileSync(resolve(FRONTEND_ASSETS, 'ghana-regions.json'), 'utf8'));
+function roundCoordinates(node) {
+  if (typeof node[0] === 'number') return node.map((value) => Number(value.toFixed(COORDINATE_DECIMALS)));
+  return node.map(roundCoordinates);
+}
+
+function roundGeometry(geometry) {
+  return { type: geometry.type, coordinates: roundCoordinates(geometry.coordinates) };
+}
+
+function vertexCount(geometry) {
+  return turf.coordAll(geometry).length;
+}
+
+async function runMapshaper() {
+  const input = resolve(SOURCE_DIR, 'gadm41_GHA_2.shp').replaceAll('\\', '/');
+  /* Two "Adansi Asokwa" records exist; the western one (it reaches -1.707°)
+     is Adansi North, which is otherwise missing. Checked below by Fomena, its
+     capital, landing inside it. */
+  const commands = [
+    `-i "${input}" snap name=districts`,
+    `-each "if (Level3Name === 'Adansi Asokwa' && this.bounds[0] < -1.65) Level3Name = 'Adansi North'"`,
+    `-simplify weighted interval=${SIMPLIFY_INTERVAL_M} keep-shapes`,
+    `-dissolve2 Level2Name target=districts + name=regions`,
+    `-dissolve2 target=districts + name=country`,
+    `-o target=* format=geojson`,
+  ].join(' ');
+  const out = await mapshaper.applyCommands(commands);
+  const layer = (name) => JSON.parse(out[`${name}.json`]);
+  return { districts: layer('districts'), regions: layer('regions'), country: layer('country') };
+}
+
+function canonicalNames() {
   const lookup = new Map();
-  for (const feature of regions.features) {
-    lookup.set(normalizeName(feature.properties.name), feature.properties.region);
+  for (const region of GHANA_REGIONS) {
+    const regionName = region.name.replace(/ Region$/, '');
+    for (const district of region.districts) {
+      lookup.set(`${regionName}|${normalizeName(district)}`, district);
+    }
   }
   return lookup;
 }
 
-function resolveRegion(shapeName, lookup) {
-  const normalized = normalizeName(shapeName);
-  return lookup.get(normalized) ?? REGION_OVERRIDES[normalized] ?? null;
+function regionAreas() {
+  return mapshaper
+    .applyCommands(`-i "${resolve(SOURCE_DIR, 'gadm41_GHA_1.shp').replaceAll('\\', '/')}" -o out.json format=geojson`)
+    .then((out) => new Map(JSON.parse(out['out.json']).features.map((feature) => [feature.properties.Level2Name, turf.area(feature)])));
 }
 
-function main() {
-  const regionLookup = loadRegionLookup();
-  const districtsRaw = JSON.parse(readFileSync(resolve(FRONTEND_ASSETS, 'ghana-district-boundaries.json'), 'utf8'));
+async function main() {
+  const raw = await runMapshaper();
+  const canonical = canonicalNames();
 
-  const districtFeatures = [];
-  const unresolved = [];
-
-  for (const feature of districtsRaw.features) {
-    const shapeName = feature.properties.shapeName;
-    const region = resolveRegion(shapeName, regionLookup);
-    if (!region) {
-      unresolved.push(shapeName);
-      continue;
-    }
-    const simplified = turf.simplify(feature, { tolerance: SIMPLIFY_TOLERANCE_DEG, highQuality: false });
-    districtFeatures.push(turf.feature(simplified.geometry, { name: shapeName, region }));
-  }
-
-  if (unresolved.length > 0) {
-    console.error(`Could not resolve a region for ${unresolved.length} district(s):`, unresolved);
-    process.exit(1);
-  }
-
-  console.log(`Resolved region for all ${districtFeatures.length} districts.`);
-
-  // turf.dissolve only accepts single Polygons — flatten any MultiPolygon
-  // district (islands/exclaves) into one Polygon feature per part, all
-  // tagged with the same region, purely for this dissolve step. The
-  // per-district output below keeps the original (possibly Multi) geometry.
-  const singlePolygonFeatures = districtFeatures.flatMap((feature) => {
-    if (feature.geometry.type === 'Polygon') return [feature];
-    return feature.geometry.coordinates.map((coords) => turf.polygon(coords, { region: feature.properties.region }));
+  // --- districts ---------------------------------------------------------
+  const districts = raw.districts.features.map((feature) => {
+    const region = feature.properties.Level2Name;
+    const gadmName = feature.properties.Level3Name;
+    const name = NAME_ALIASES[`${region}|${gadmName}`] ?? canonical.get(`${region}|${normalizeName(gadmName)}`);
+    if (!name) fail(`no app name for GADM district "${gadmName}" (${region}); add it to NAME_ALIASES`);
+    const geometry = roundGeometry(feature.geometry);
+    const label = turf.pointOnFeature({ type: 'Feature', geometry, properties: {} }).geometry.coordinates;
+    return {
+      type: 'Feature',
+      geometry,
+      properties: {
+        id: districtId(name),
+        name,
+        region,
+        label: [Number(label[0].toFixed(COORDINATE_DECIMALS)), Number(label[1].toFixed(COORDINATE_DECIMALS))],
+      },
+    };
   });
-  const dissolved = turf.dissolve(turf.featureCollection(singlePolygonFeatures), { propertyName: 'region' });
-  const regionFeatures = dissolved.features.map((feature) =>
-    turf.feature(withoutSliverHoles(feature.geometry), { name: feature.properties.region }),
-  );
 
-  // Union everything into one national outline.
-  let country = districtFeatures[0];
-  for (let i = 1; i < districtFeatures.length; i += 1) {
-    const unioned = turf.union(turf.featureCollection([country, districtFeatures[i]]));
-    if (unioned) country = unioned;
+  if (districts.length !== 260) fail(`expected 260 district polygons, got ${districts.length}`);
+  const ids = districts.map((feature) => feature.properties.id);
+  const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
+  if (duplicateIds.length) fail(`duplicate district ids: ${duplicateIds.join(', ')}`);
+
+  const shaped = new Set(districts.map((feature) => feature.properties.name));
+  const withoutShape = [...canonical.values()].filter((name) => !shaped.has(name));
+  if (withoutShape.sort().join() !== [...KNOWN_WITHOUT_SHAPE].sort().join()) {
+    fail(`districts in ghanaRegions.ts with no polygon: ${withoutShape.join(', ')} (expected only ${KNOWN_WITHOUT_SHAPE.join(', ')})`);
   }
-  const countryFeature = turf.feature(country.geometry, { name: 'Ghana' });
 
-  // Grid: coarse cells over the country's bounding box, kept only where the
-  // cell center falls inside the national outline, tagged with the
-  // region/district that contains that center point.
-  const [minLng, minLat, maxLng, maxLat] = turf.bbox(countryFeature);
+  /* A closed triangle is 4 coordinates. Ayawaso Central, the smallest district,
+     has only 15 in the source and keeps 6, a pentagon. */
+  const thin = districts.filter((feature) => vertexCount(feature.geometry) < 6);
+  if (thin.length) {
+    fail(`over-simplified districts: ${thin.map((f) => `${f.properties.name} (${vertexCount(f.geometry)})`).join(', ')}`);
+  }
+
+  // --- regions and country ------------------------------------------------
+  const regions = raw.regions.features.map((feature) => ({
+    type: 'Feature',
+    geometry: roundGeometry(feature.geometry),
+    properties: { name: feature.properties.Level2Name },
+  }));
+  if (regions.length !== 16) fail(`expected 16 region features, got ${regions.length}`);
+
+  const officialAreas = await regionAreas();
+  for (const region of regions) {
+    const official = officialAreas.get(region.properties.name);
+    if (!official) fail(`region "${region.properties.name}" is not in gadm41_GHA_1`);
+    const drift = Math.abs(turf.area(region) - official) / official;
+    if (drift > 0.01) fail(`region ${region.properties.name} differs from the GADM region outline by ${(drift * 100).toFixed(1)}%`);
+  }
+
+  // A layer with no attributes comes out of mapshaper as a GeometryCollection.
+  const countryParts = raw.country.geometries ?? raw.country.features.map((feature) => feature.geometry);
+  if (countryParts.length !== 1) fail(`expected one national outline, got ${countryParts.length}`);
+  const country = { type: 'Feature', geometry: roundGeometry(countryParts[0]), properties: { name: 'Ghana' } };
+
+  // --- spot checks ----------------------------------------------------------
+  const districtAtPoint = (lat, lng) => districts.find((feature) => turf.booleanPointInPolygon(turf.point([lng, lat]), feature));
+  for (const [town, lat, lng, expected] of TOWN_CHECKS) {
+    const found = districtAtPoint(lat, lng)?.properties.name;
+    if (found !== expected) fail(`${town} landed in ${found ?? 'no district'}, expected ${expected}`);
+  }
+
+  // --- grid ----------------------------------------------------------------
+  const [minLng, minLat, maxLng, maxLat] = turf.bbox(country);
   const cells = [];
-  let cellId = 0;
-  for (let lat = minLat; lat <= maxLat; lat += GRID_RESOLUTION_DEG) {
-    for (let lng = minLng; lng <= maxLng; lng += GRID_RESOLUTION_DEG) {
-      const center = turf.point([lng + GRID_RESOLUTION_DEG / 2, lat + GRID_RESOLUTION_DEG / 2]);
-      if (!turf.booleanPointInPolygon(center, countryFeature)) continue;
-
-      const regionMatch = regionFeatures.find((region) => turf.booleanPointInPolygon(center, region));
-      const districtMatch = districtFeatures.find((district) => turf.booleanPointInPolygon(center, district));
-
+  for (let lat = GRID_ORIGIN.minLat; lat <= maxLat; lat += GRID_RESOLUTION_DEG) {
+    for (let lng = GRID_ORIGIN.minLng; lng <= maxLng; lng += GRID_RESOLUTION_DEG) {
+      const centerLat = lat + GRID_RESOLUTION_DEG / 2;
+      const centerLng = lng + GRID_RESOLUTION_DEG / 2;
+      const center = turf.point([centerLng, centerLat]);
+      if (!turf.booleanPointInPolygon(center, country)) continue;
+      const district = districts.find((feature) => turf.booleanPointInPolygon(center, feature));
       cells.push({
-        id: cellId++,
-        lat: Number((lat + GRID_RESOLUTION_DEG / 2).toFixed(4)),
-        lng: Number((lng + GRID_RESOLUTION_DEG / 2).toFixed(4)),
-        regionName: regionMatch?.properties.name ?? null,
-        districtName: districtMatch?.properties.name ?? null,
+        id: cells.length,
+        lat: Number(centerLat.toFixed(4)),
+        lng: Number(centerLng.toFixed(4)),
+        regionName: district?.properties.region ?? null,
+        districtName: district?.properties.name ?? null,
       });
     }
   }
 
-  console.log(`Generated ${cells.length} grid cells at ${GRID_RESOLUTION_DEG}° resolution.`);
-
   const output = {
     generatedAt: new Date().toISOString(),
+    source: 'GADM 4.1 Ghana, 16-region edition (scripts/data/gadm41_GHA)',
     bounds: { minLng, minLat, maxLng, maxLat },
     gridResolutionDeg: GRID_RESOLUTION_DEG,
-    country: turf.feature(roundGeometry(withoutSliverHoles(countryFeature.geometry)), countryFeature.properties),
-    regions: regionFeatures.map((feature) => turf.feature(roundGeometry(feature.geometry), feature.properties)),
-    districts: districtFeatures.map((feature) =>
-      turf.feature(roundGeometry(feature.geometry), { name: feature.properties.name, region: feature.properties.region }),
-    ),
+    country,
+    regions,
+    districts,
     grid: cells,
   };
 
-  writeFileSync(OUTPUT_PATH, JSON.stringify(output));
-  const sizeKb = Buffer.byteLength(JSON.stringify(output)) / 1024;
-  console.log(`Wrote ${OUTPUT_PATH} (${sizeKb.toFixed(0)} KB)`);
+  const json = JSON.stringify(output);
+  writeFileSync(OUTPUT_PATH, json);
+
+  const counts = districts.map((feature) => vertexCount(feature.geometry)).sort((a, b) => a - b);
+  const gridDistricts = new Set(cells.map((cell) => cell.districtName).filter(Boolean));
+  console.log(
+    `districts: ${districts.length}, vertices min ${counts[0]} / median ${counts[counts.length >> 1]} / total ${counts.reduce((a, b) => a + b, 0)}`,
+  );
+  console.log(`regions: ${regions.length}, country vertices ${vertexCount(country.geometry)}`);
+  console.log(`grid: ${cells.length} cells, ${gridDistricts.size} districts own at least one`);
+  console.log(`wrote ${OUTPUT_PATH} (${(Buffer.byteLength(json) / 1024).toFixed(0)} KB)`);
 }
 
-main();
+main().catch((error) => fail(error.stack ?? String(error)));

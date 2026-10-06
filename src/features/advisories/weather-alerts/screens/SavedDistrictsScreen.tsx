@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -9,6 +9,7 @@ import { useTheme } from '../../../../shared/theme/ThemeProvider';
 import { Button } from '../../../../shared/ui/Button';
 import { Card } from '../../../../shared/ui/Card';
 import { Screen } from '../../../../shared/ui/Screen';
+import { SearchField } from '../../../../shared/ui/SearchField';
 import { Text } from '../../../../shared/ui/Text';
 import { detectAndStoreDistrict } from '../useDetectedDistrict';
 
@@ -31,6 +32,21 @@ export function SavedDistrictsScreen() {
   const clearLocationDetection = useLocationStore((state) => state.clearLocationDetection);
 
   const [locating, setLocating] = useState(false);
+  const [query, setQuery] = useState('');
+
+  /* All 261 districts is too long to scroll for one name, so the list filters
+     by district or region as the farmer types. Ticked districts stay on top,
+     so what is saved is visible without searching for it. */
+  const shownDistricts = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const matches = needle
+      ? DISTRICTS.filter((district) => district.name.toLowerCase().includes(needle) || district.region.toLowerCase().includes(needle))
+      : DISTRICTS;
+    return [
+      ...matches.filter((district) => savedDistrictIds.includes(district.id)),
+      ...matches.filter((district) => !savedDistrictIds.includes(district.id)),
+    ];
+  }, [query, savedDistrictIds]);
   const detectedName = detectedDistrictId ? getDistrictById(detectedDistrictId)?.name : undefined;
 
   const useMyLocation = async () => {
@@ -72,8 +88,21 @@ export function SavedDistrictsScreen() {
         </Card>
       ) : null}
 
+      <SearchField
+        value={query}
+        onChange={setQuery}
+        placeholder="Find a district or region"
+        accessibilityLabel="Find a district or region"
+      />
+
+      {shownDistricts.length === 0 ? (
+        <Text variant="body" muted>
+          No district or region by that name.
+        </Text>
+      ) : null}
+
       <Card style={{ padding: 0, overflow: 'hidden' }}>
-        {DISTRICTS.map((district, index) => {
+        {shownDistricts.map((district, index) => {
           const selected = savedDistrictIds.includes(district.id);
           return (
             <Pressable

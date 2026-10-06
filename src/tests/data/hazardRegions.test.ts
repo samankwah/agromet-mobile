@@ -40,13 +40,15 @@ describe('the map join', () => {
     expect([...names].sort()).toEqual(BACKEND_REGIONS);
   });
 
-  /* Several regions are multi-part geometry — Greater Accra alone is six
-     polygons. They must group down to sixteen fills, not render as sixteen
-     plus twenty orphans. */
-  it('groups its polygon features down to sixteen regions', () => {
-    expect(GHANA_BOUNDARIES.regions.length).toBeGreaterThan(BACKEND_REGIONS.length);
-    const grouped = new Set(GHANA_BOUNDARIES.regions.map((feature) => feature.properties.name));
-    expect(grouped.size).toBe(BACKEND_REGIONS.length);
+  /* The old asset dissolved regions from districts simplified one by one,
+     which left 26 fragments (Greater Accra alone was six) and slivers. The
+     topology-aware build gives one solid shape per region. */
+  it('draws each region as one solid shape', () => {
+    expect(GHANA_BOUNDARIES.regions).toHaveLength(BACKEND_REGIONS.length);
+    for (const region of GHANA_BOUNDARIES.regions) {
+      expect(region.geometry.type).toBe('Polygon');
+      expect(region.geometry.coordinates).toHaveLength(1); // no holes
+    }
   });
 });
 
