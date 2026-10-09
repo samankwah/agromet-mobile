@@ -18,6 +18,13 @@ describe('formatSpatialValue', () => {
   /* Ghana's spread is only a few degrees, so the range rule above would always
      keep a decimal -- but a tenth of a degree sits well inside the ensemble's
      own spread, so it claims precision the forecast does not have. */
+  describe('days', () => {
+    it('is always a whole count, however narrow the range', () => {
+      expect(formatSpatialValue(3.0, 'days', 4)).toBe('3');
+      expect(formatSpatialValue(2.7, 'days', 4)).toBe('3');
+    });
+  });
+
   describe('temperature', () => {
     it('is always whole, however narrow the range', () => {
       expect(formatSpatialValue(31.24, 'temperature', 4)).toBe('31');

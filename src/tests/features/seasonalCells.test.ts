@@ -6,6 +6,7 @@ import {
   paletteForVariable,
   stopsFor,
   valueFormatFor,
+  wholeDayRange,
 } from '../../features/forecasts/seasonal/cells';
 import { GHANA_BOUNDARIES } from '../../shared/data/ghanaBoundaries';
 import { DRY_SPELL_STOPS, RAINFALL_STOPS } from '../../shared/utils/colorScale';
@@ -67,9 +68,17 @@ describe('hasProbabilities', () => {
 describe('legends and keys', () => {
   it('writes dates as weeks and picks a ramp that fits each variable', () => {
     expect(valueFormatFor('onset')).toBe('day-of-year');
-    expect(valueFormatFor('rainyDays')).toBe('number');
+    expect(valueFormatFor('rainyDays')).toBe('days');
+    expect(valueFormatFor('earlyDrySpell')).toBe('days');
+    expect(valueFormatFor('rainfallTotal')).toBe('number');
     expect(stopsFor('lateDrySpell')).toBe(DRY_SPELL_STOPS);
     expect(stopsFor('rainfallTotal')).toBe(RAINFALL_STOPS);
+  });
+
+  it('widens a day count to whole-day legend edges, so no two labels read the same', () => {
+    // 2 to 6 days over six classes would put edges on 2.7 and 3.3, both "3".
+    expect(wholeDayRange({ min: 2, max: 6 })).toEqual({ min: 2, max: 8 });
+    expect(wholeDayRange({ min: 1.4, max: 20.2 })).toEqual({ min: 1, max: 25 });
   });
 
   it('names the bands in the words of each variable', () => {

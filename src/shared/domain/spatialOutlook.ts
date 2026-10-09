@@ -10,7 +10,7 @@ export type SpatialGeography = 'region' | 'district';
 
 /** How a variable's raw numeric value should be rendered to a reader, so the
  * legend and the map popups format it the same way. */
-export type SpatialValueFormat = 'number' | 'day-of-year' | 'temperature';
+export type SpatialValueFormat = 'number' | 'day-of-year' | 'temperature' | 'days';
 
 export type SpatialGridCell = {
   id: number;

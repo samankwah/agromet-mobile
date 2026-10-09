@@ -3,7 +3,7 @@ import type { SpatialGridCell, SpatialValueFormat } from '../../../shared/domain
 import type { SeasonalCell, SeasonalReading, SeasonalVariableId, SeasonalView } from '../../../shared/domain/seasonalOutlook';
 import { normaliseRegion } from '../../../shared/domain/seasonalOutlook';
 import type { ColorStops } from '../../../shared/utils/colorScale';
-import { DRY_SPELL_STOPS, RAINFALL_STOPS, TEMPERATURE_STOPS, VIRIDIS_STOPS } from '../../../shared/utils/colorScale';
+import { DEFAULT_CLASS_COUNT, DRY_SPELL_STOPS, RAINFALL_STOPS, TEMPERATURE_STOPS, VIRIDIS_STOPS } from '../../../shared/utils/colorScale';
 import { bandFor, RAINFALL_PALETTE, TEMPERATURE_PALETTE, type TercilePalette } from '../../../shared/utils/tercilePalette';
 
 /** The "No signal" band in every tercile palette. */
@@ -79,7 +79,22 @@ export function hasProbabilities(blockCells: SeasonalCell[], variable: SeasonalV
 export function valueFormatFor(variable: SeasonalVariableId): SpatialValueFormat {
   if (variable === 'onset' || variable === 'cessation') return 'day-of-year';
   if (variable === 'temperature') return 'temperature';
+  if (variable === 'earlyDrySpell' || variable === 'lateDrySpell' || variable === 'rainyDays') return 'days';
   return 'number';
+}
+
+/**
+ * A day-count range widened to whole-day class edges.
+ *
+ * The legend splits min to max into DEFAULT_CLASS_COUNT classes and labels
+ * each edge. Dry spells run over only a few days, so equal classes land on
+ * 2.7 and 3.3 and both print as "3" once rounded. Starting on a whole day
+ * and stepping by whole days keeps every label distinct and true.
+ */
+export function wholeDayRange(range: { min: number; max: number }): { min: number; max: number } {
+  const min = Math.floor(range.min);
+  const step = Math.max(1, Math.ceil((Math.ceil(range.max) - min) / DEFAULT_CLASS_COUNT));
+  return { min, max: min + step * DEFAULT_CLASS_COUNT };
 }
 
 /** The deterministic ramp: rain blues for amounts, warm for heat, brown for dry

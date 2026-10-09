@@ -37,7 +37,15 @@ import { SegmentedControl } from '../../../shared/ui/SegmentedControl';
 import { Text } from '../../../shared/ui/Text';
 import { BAND_COUNT, TERCILE_BOUNDS } from '../../../shared/utils/tercilePalette';
 import { deterministicRange } from '../subseasonal/cells';
-import { buildSeasonalCells, hasDryWindow, hasProbabilities, paletteForVariable, stopsFor, valueFormatFor } from '../seasonal/cells';
+import {
+  buildSeasonalCells,
+  hasDryWindow,
+  hasProbabilities,
+  paletteForVariable,
+  stopsFor,
+  valueFormatFor,
+  wholeDayRange,
+} from '../seasonal/cells';
 import { SpatialOutlookSkeleton } from './ForecastSkeletons';
 
 type Props = {
@@ -100,6 +108,7 @@ export function SeasonalSection({ set, status, error, onRetry }: Props) {
   const theme = useTheme();
   const { isOnline } = useNetworkStatus();
   const [drawerExpanded, setDrawerExpanded] = useState(false);
+  const [mapHeight, setMapHeight] = useState(0);
   const [viewIndex, setViewIndex] = useState<number | null>(null);
   const [variableChoice, setVariableChoice] = useState<VariableChoice>('all');
   const [seasonKey, setSeasonKey] = useState<SeasonChoice>('all');
@@ -136,7 +145,11 @@ export function SeasonalSection({ set, status, error, onRetry }: Props) {
     () => buildSeasonalCells(blockCells, variable, isProbability ? 'probability' : 'deterministic'),
     [blockCells, variable, isProbability],
   );
-  const range = useMemo(() => deterministicRange(cells), [cells]);
+  // Day counts snap to whole-day legend edges, so no two labels read the same.
+  const range = useMemo(() => {
+    const found = deterministicRange(cells);
+    return valueFormat === 'days' ? wholeDayRange(found) : found;
+  }, [cells, valueFormat]);
   const min = isProbability ? 0 : range.min;
   const max = isProbability ? BAND_COUNT - 1 : range.max;
 
@@ -176,7 +189,11 @@ export function SeasonalSection({ set, status, error, onRetry }: Props) {
       {/* The empty state replaces the map, never the drawer, so the controls
           that might get the reader out of it stay in reach. */}
       <View style={{ flex: 1 }}>
-        <View style={{ flex: 1 }}>
+        {/* The map fills the whole area, under the drawer too, the way a map
+            app's sheet floats over its map. A fixed height left a blank strip
+            between the map and a collapsed drawer whenever the legend, and so
+            the collapsed drawer, was shorter than the gap it was guessed for. */}
+        <View style={{ flex: 1 }} onLayout={(event) => setMapHeight(Math.round(event.nativeEvent.layout.height))}>
           {isEmpty ? (
             <EmptyState
               icon={computing ? 'time-outline' : fetchFailed ? 'cloud-offline-outline' : 'calendar-outline'}
@@ -217,7 +234,7 @@ export function SeasonalSection({ set, status, error, onRetry }: Props) {
               min={min}
               max={max}
               geography="region"
-              height={MAP_HEIGHT}
+              height={mapHeight || MAP_HEIGHT}
               isTercile={isProbability}
               palette={isProbability ? palette : undefined}
               variableLabel={VARIABLE_INFO[variable].label}
@@ -231,7 +248,7 @@ export function SeasonalSection({ set, status, error, onRetry }: Props) {
               min={min}
               max={max}
               geography="region"
-              height={MAP_HEIGHT}
+              height={mapHeight || MAP_HEIGHT}
               isTercile={isProbability}
               palette={isProbability ? palette : undefined}
               stops={stops}

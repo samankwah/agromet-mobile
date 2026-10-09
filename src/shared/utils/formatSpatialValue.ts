@@ -15,10 +15,13 @@ import { formatDayOfYearAsWeekOfMonth } from './formatDayOfYear';
  * a degree is well inside the ensemble's own spread, so the extra digit implies
  * a precision the forecast does not have, and reads as clutter to a farmer who
  * thinks in whole degrees.
+ *
+ * `days` (dry spells, rainy days) is a count, so it is always whole: "3.3
+ * days" of dry spell is not a thing a farmer can plan around.
  */
 export function formatSpatialValue(value: number, format: SpatialValueFormat, range: number): string {
   if (!Number.isFinite(value)) return '—';
   if (format === 'day-of-year') return formatDayOfYearAsWeekOfMonth(value);
-  if (format === 'temperature') return String(Math.round(value));
+  if (format === 'temperature' || format === 'days') return String(Math.round(value));
   return range >= 12 ? String(Math.round(value)) : value.toFixed(1);
 }
