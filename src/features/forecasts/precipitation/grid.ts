@@ -13,7 +13,7 @@ import { GHANA_BOUNDARIES } from '../../../shared/data/ghanaBoundaries';
 export const CELL_SIZE_DEG = 0.25;
 
 /**
- * Built by snapping the 865 pre-tagged display cells onto a quarter-degree
+ * Built by snapping the ~880 pre-tagged display cells onto a quarter-degree
  * lattice and deduplicating.
  *
  * That gives a land mask for free. Those cells already carry a region name,

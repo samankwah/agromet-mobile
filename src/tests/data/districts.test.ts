@@ -1,4 +1,5 @@
-import { DISTRICTS, getDistrictNameForLocation } from '../../shared/data/districts';
+import { DISTRICTS, LEGACY_DISTRICT_IDS, getDistrictById, getDistrictNameForLocation } from '../../shared/data/districts';
+import { GHANA_BOUNDARIES } from '../../shared/data/ghanaBoundaries';
 import { HOME_LOCATIONS } from '../../shared/data/mockWeather';
 
 /**
@@ -23,8 +24,8 @@ describe('getDistrictNameForLocation', () => {
     }
   });
 
-  it('maps damongo to West Gonja — the district the Savannah drought mock alert targets', () => {
-    expect(getDistrictNameForLocation('damongo')).toBe('West Gonja (Damongo)');
+  it('maps damongo to West Gonja, the district the Savannah drought mock alert targets', () => {
+    expect(getDistrictNameForLocation('damongo')).toBe('West Gonja Municipal');
   });
 
   it('returns undefined for an unknown location id', () => {
@@ -63,5 +64,33 @@ describe('HOME_LOCATIONS', () => {
     const region = (id: string) => HOME_LOCATIONS.find((location) => location.id === id)?.region;
     expect(region('yendi')).toBe('Northern');
     expect(region('nalerigu')).toBe('North East');
+  });
+});
+
+describe('DISTRICTS', () => {
+  it('lists every district in Ghana once', () => {
+    expect(DISTRICTS).toHaveLength(261);
+    expect(new Set(DISTRICTS.map((district) => district.id)).size).toBe(261);
+  });
+
+  /* The map polygon and the alert list must agree on ids, or a GPS fix
+     resolves to a district the alert pipeline cannot find. */
+  it('has an entry for every district polygon on the map, in the same region', () => {
+    for (const { properties } of GHANA_BOUNDARIES.districts) {
+      expect(getDistrictById(properties.id)).toEqual({ id: properties.id, name: properties.name, region: properties.region });
+    }
+  });
+
+  it('lists Guan, the one district the shapefile has no polygon for', () => {
+    const shaped = new Set(GHANA_BOUNDARIES.districts.map((feature) => feature.properties.id));
+    expect(DISTRICTS.filter((district) => !shaped.has(district.id)).map((district) => district.name)).toEqual(['Guan']);
+  });
+
+  /* Alert districts saved before the full list are stored under the old ids. */
+  it('still finds a district saved under an id from the old list', () => {
+    for (const [oldId, newId] of Object.entries(LEGACY_DISTRICT_IDS)) {
+      expect(getDistrictById(oldId)?.id).toBe(newId);
+    }
+    expect(getDistrictById('ketu-south')?.name).toBe('Ketu South Municipal');
   });
 });

@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { SeasonalSection } from '../../features/forecasts/components/SeasonalSection';
+import { MapLibreChoropleth } from '../../shared/ui/MapLibreChoropleth';
 import type { SeasonalOutlookSet } from '../../shared/domain/seasonalOutlook';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { seasonalPayload } from '../fixtures/seasonal';
@@ -15,9 +16,13 @@ const TEST_SAFE_AREA_METRICS = {
   insets: { top: 0, left: 0, right: 0, bottom: 0 },
 };
 
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({ router: { push: (...args: unknown[]) => mockPush(...args), back: jest.fn() } }));
+
 let client: QueryClient;
 
 beforeEach(() => {
+  mockPush.mockClear();
   client = createTestQueryClient();
   globalThis.fetch = jest.fn(() => Promise.reject(new TypeError('Network request failed'))) as unknown as typeof fetch;
 });
@@ -36,7 +41,7 @@ function makeSet(overrides: Record<string, unknown> = {}): SeasonalOutlookSet {
   } as unknown as SeasonalOutlookSet;
 }
 
-type Overrides = { set?: SeasonalOutlookSet; onRetry?: () => void; locationId?: string };
+type Overrides = { set?: SeasonalOutlookSet; onRetry?: () => void };
 
 function renderSection(overrides: Overrides = {}) {
   return render(
@@ -47,7 +52,6 @@ function renderSection(overrides: Overrides = {}) {
             set={overrides.set ?? makeSet()}
             status="success"
             onRetry={overrides.onRetry ?? (() => {})}
-            locationId={overrides.locationId ?? 'accra'}
           />
         </QueryClientProvider>
       </ThemeProvider>
@@ -130,11 +134,10 @@ describe('SeasonalSection controls', () => {
     expect(view.getByText('March to May 2027, all regions.')).toBeTruthy();
   });
 
-  it('has no district control, and says why', () => {
-    const { queryByText, getByText } = renderWithControls();
+  it('has no district control', () => {
+    const { queryByText } = renderWithControls();
 
     expect(queryByText('GEOGRAPHY')).toBeNull();
-    expect(getByText('Shown by region. The seasonal forecast is too coarse for district detail.')).toBeTruthy();
   });
 
   it('opens on Probability when the data carries a split', () => {
@@ -143,11 +146,12 @@ describe('SeasonalSection controls', () => {
     expect(getByLabelText('Forecast view').findByProps({ accessibilityLabel: 'Probability' }).props.accessibilityState.selected).toBe(true);
   });
 
-  it('names the model, the baseline and the day the forecast was made', () => {
-    const { getByText } = renderWithControls();
+  it('names the model and the day the forecast was made, in one line', () => {
+    const { getByText, queryByText } = renderWithControls();
 
-    expect(getByText(/ECMWF SEAS5 \(51 members\), adjusted to local climate · baseline ERA5 1995-2024/)).toBeTruthy();
-    expect(getByText(/Forecast made 1 Oct 2026/)).toBeTruthy();
+    expect(getByText('ECMWF SEAS5 · made 1 Oct 2026.')).toBeTruthy();
+    // The method notes moved to the advisory page.
+    expect(queryByText(/A guide to the season/)).toBeNull();
   });
 });
 
@@ -160,57 +164,71 @@ describe('a season beyond the model reach', () => {
     chooseSeason(view, 'Southern Minor Season');
 
     expect(view.getByText(/The forecast for this season will be ready from May 2027\./)).toBeTruthy();
-    expect(view.getByText(/The forecast for the Southern Minor Season will be ready from May 2027/)).toBeTruthy();
   });
 
-  it('says why Probability shows the normal instead of chances', () => {
+  it('greys out Probability and says when it will be ready', () => {
     const view = renderWithControls();
     chooseVariable(view, 'Onset Date');
     chooseSeason(view, 'Southern Minor Season');
-    fireEvent.press(view.getByLabelText('Forecast view').findByProps({ accessibilityLabel: 'Probability' }));
+    const probability = view.getByLabelText('Forecast view').findByProps({ accessibilityLabel: 'Probability' });
 
-    expect(view.getByText(/Chances are worked out once the season is in the forecast, from May 2027/)).toBeTruthy();
+    expect(probability.props.accessibilityState).toEqual({ selected: false, disabled: true });
+    expect(view.getByText('Probability will be ready from May 2027.')).toBeTruthy();
+    const deterministic = view.getByLabelText('Forecast view').findByProps({ accessibilityLabel: 'Deterministic' });
+    expect(deterministic.props.accessibilityState.selected).toBe(true);
+  });
+
+  it('turns Probability back on for a season in the forecast', () => {
+    const view = renderWithControls();
+    chooseVariable(view, 'Onset Date');
+    chooseSeason(view, 'Southern Minor Season');
+    chooseSeason(view, 'Southern Major Season');
+
+    expect(view.queryByText(/Probability will be ready/)).toBeNull();
+    const probability = view.getByLabelText('Forecast view').findByProps({ accessibilityLabel: 'Probability' });
+    expect(probability.props.accessibilityState.disabled).toBe(false);
   });
 });
 
 describe('All Variables', () => {
-  it("lists every variable for the reader's town, with the windows as columns", () => {
+  it('shows the season, not the months', () => {
     const view = renderWithControls();
 
-    expect(view.getAllByText('Early-Season Dry Spell').length).toBeGreaterThan(0);
-    expect(view.getAllByText('SON').length).toBeGreaterThan(1);
-    expect(view.getAllByText('420 mm').length).toBeGreaterThan(0);
-    // JAS and SON are only normals in the fixture: starred, with the key.
-    expect(view.getByText(/Normal \(1995 to 2024\), not a forecast/)).toBeTruthy();
+    expect(view.getByLabelText('SEASON: All Seasons')).toBeTruthy();
+    expect(view.queryByLabelText('Three-month window')).toBeNull();
   });
 });
 
-describe("the reader's own town card", () => {
-  it('shows the town, the badge and the plain sentence', () => {
+describe('the drawer', () => {
+  it("describes the country or a half of it, never the reader's town", () => {
     const view = renderWithControls();
     chooseVariable(view, 'Onset Date');
-    const { getByText } = view;
 
-    expect(getByText('Accra, Greater Accra')).toBeTruthy();
-    expect(getByText('High confidence')).toBeTruthy();
-    expect(getByText(/72% chance the start of the rains in Greater Accra is earlier than usual, around Week 2 of March/)).toBeTruthy();
+    expect(view.queryByText('Accra, Greater Accra')).toBeNull();
+    expect(view.queryByText(/Greater Accra/)).toBeNull();
+    expect(view.getByText(/The Northern Single Season in the five northern regions/)).toBeTruthy();
   });
 
-  it('follows the variable control', () => {
+  it('links to no other page', () => {
     const view = renderWithControls();
-    chooseVariable(view, 'Late-Season Dry Spell');
+    chooseVariable(view, 'Rainfall Total (mm)');
 
-    expect(
-      view.getByText(/65% chance the longest dry spell late in the season in Greater Accra is longer than usual, about 9 days/),
-    ).toBeTruthy();
+    expect(view.queryByText(/what to do/)).toBeNull();
+    expect(view.queryByText(/seasonal advisory/i)).toBeNull();
+    expect(view.queryByText(/Tap a region/)).toBeNull();
   });
 
-  it('notes the dry season in the legend when a region is in it', () => {
-    const view = renderWithControls({ locationId: 'tamale' });
+  it("leaves a tap on the map to the map's own popup", () => {
+    const view = renderSection();
+    expect(view.UNSAFE_getByType(MapLibreChoropleth).props.onSelect).toBeUndefined();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('notes the dry season when a region is in it', () => {
+    const view = renderWithControls();
     chooseVariable(view, 'Rainfall Total (mm)');
 
     expect(view.getByText(/Regions in their dry season show as No signal/)).toBeTruthy();
-    expect(view.getByText(/This is the dry season in Northern/)).toBeTruthy();
   });
 });
 
@@ -218,14 +236,14 @@ describe('a published forecast', () => {
   it('says who issued it', () => {
     const { getByText } = renderWithControls({ set: makeSet({ source: 'gmet', issuedBy: 'Ghana Meteorological Agency' }) });
 
-    expect(getByText('Published seasonal forecast')).toBeTruthy();
-    expect(getByText('Issued by Ghana Meteorological Agency')).toBeTruthy();
+    expect(getByText(/^Issued by Ghana Meteorological Agency · made/)).toBeTruthy();
   });
 
-  it('shows no notice when the map is the model', () => {
-    const { queryByText } = renderWithControls();
+  it('names the model when the map is the model', () => {
+    const { getByText, queryByText } = renderWithControls();
 
-    expect(queryByText('Published seasonal forecast')).toBeNull();
+    expect(getByText(/^ECMWF SEAS5/)).toBeTruthy();
+    expect(queryByText(/^Issued by/)).toBeNull();
   });
 });
 

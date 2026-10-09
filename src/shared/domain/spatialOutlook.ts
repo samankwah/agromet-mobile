@@ -10,7 +10,7 @@ export type SpatialGeography = 'region' | 'district';
 
 /** How a variable's raw numeric value should be rendered to a reader, so the
  * legend and the map popups format it the same way. */
-export type SpatialValueFormat = 'number' | 'day-of-year' | 'temperature';
+export type SpatialValueFormat = 'number' | 'day-of-year' | 'temperature' | 'days';
 
 export type SpatialGridCell = {
   id: number;
@@ -39,10 +39,13 @@ export type GeoFeature<Properties> = {
 
 export type GhanaBoundaries = {
   generatedAt: string;
+  source: string;
   bounds: { minLng: number; minLat: number; maxLng: number; maxLat: number };
   gridResolutionDeg: number;
   country: GeoFeature<{ name: string }>;
   regions: GeoFeature<{ name: string }>[];
-  districts: GeoFeature<{ name: string; region: string }>[];
+  /** `id` matches `DISTRICTS` in shared/data/districts.ts; `label` is a
+   * [lng, lat] point guaranteed to be inside the district. */
+  districts: GeoFeature<{ id: string; name: string; region: string; label: [number, number] }>[];
   grid: { id: number; lat: number; lng: number; regionName: string | null; districtName: string | null }[];
 };

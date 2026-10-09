@@ -8,14 +8,16 @@ import { PLACES, searchPlaces } from '../../features/forecasts/subseasonal/place
  * tap on the same district resolve to the same forecast cell.
  */
 describe('PLACES', () => {
-  it('covers every region and district the grid can place', () => {
+  it('covers every region the grid can place', () => {
     const regions = new Set(GHANA_BOUNDARIES.grid.map((cell) => cell.regionName).filter(Boolean));
-    const districts = new Set(
-      GHANA_BOUNDARIES.grid.filter((cell) => cell.regionName && cell.districtName).map((cell) => `${cell.regionName}:${cell.districtName}`),
-    );
-
     expect(PLACES.filter((place) => place.kind === 'region')).toHaveLength(regions.size);
-    expect(PLACES.filter((place) => place.kind === 'district')).toHaveLength(districts.size);
+  });
+
+  /* Districts smaller than a 0.15° grid cell (central Accra, Kumasi) own no
+     cell, and used to be missing from search altogether. */
+  it('finds every district on the map, including ones too small for a grid cell', () => {
+    expect(PLACES.filter((place) => place.kind === 'district')).toHaveLength(GHANA_BOUNDARIES.districts.length);
+    expect(searchPlaces('ayawaso central').map((place) => place.name)).toContain('Ayawaso Central Municipal');
   });
 
   it('keys districts by region, because the names repeat across Ghana', () => {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Pressable, View, type LayoutChangeEvent } from 'react-native';
 import BottomSheet, {
   BottomSheetFooter,
@@ -49,6 +49,45 @@ const EXPANDED_SNAP_POINT = '85%';
 // nothing visibly jumps once the real number replaces it.
 const COLLAPSED_FALLBACK_HEIGHT = 140;
 
+/**
+ * A one-value store the footer reads from.
+ *
+ * gorhom renders `footerComponent` inside its own memoised container and does
+ * not re-render it when the callback changes, only when the sheet moves or
+ * re-measures. So a footer that closed over `persistentContent` kept showing
+ * the old legend after the map had changed (Probability's tercile key still
+ * up after switching to Deterministic) until the reader next dragged the
+ * sheet. The footer now subscribes to this store and re-renders itself the
+ * moment the content changes, whatever gorhom does.
+ */
+type ContentStore = {
+  get: () => React.ReactNode;
+  set: (next: React.ReactNode) => void;
+  subscribe: (listener: () => void) => () => void;
+};
+
+function createContentStore(initial: React.ReactNode): ContentStore {
+  let current = initial;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => current,
+    set: (next) => {
+      if (next === current) return;
+      current = next;
+      listeners.forEach((listener) => listener());
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+}
+
+function FooterContent({ store }: { store: ContentStore }) {
+  const content = useSyncExternalStore(store.subscribe, store.get, store.get);
+  return <>{content}</>;
+}
+
 export function Drawer({ expanded, onExpandedChange, children, persistentContent }: Props) {
   const theme = useTheme();
   const sheetRef = useRef<BottomSheet>(null);
@@ -63,6 +102,13 @@ export function Drawer({ expanded, onExpandedChange, children, persistentContent
   const [footerHeight, setFooterHeight] = useState(0);
   const collapsedHeight = handleHeight && footerHeight ? Math.ceil(handleHeight + footerHeight) : COLLAPSED_FALLBACK_HEIGHT;
   const snapPoints = useMemo(() => [collapsedHeight, EXPANDED_SNAP_POINT], [collapsedHeight]);
+
+  // See ContentStore: the footer reads the legend from here, so a new legend
+  // reaches it on the same frame instead of on the next drag.
+  const [footerStore] = useState(() => createContentStore(persistentContent));
+  useLayoutEffect(() => {
+    footerStore.set(persistentContent);
+  }, [footerStore, persistentContent]);
 
   // The sheet is driven imperatively (gorhom's documented pattern for a
   // controlled index) rather than via a reactive `index` prop, so a
@@ -113,11 +159,16 @@ export function Drawer({ expanded, onExpandedChange, children, persistentContent
             borderTopColor: theme.colors.border,
           }}
         >
-          {persistentContent}
+          <FooterContent store={footerStore} />
         </View>
       </BottomSheetFooter>
     ),
-    [persistentContent, theme],
+    // `persistentContent` stays a dependency on purpose. The sheet measures
+    // and places its footer when it is handed a new one, and holding the
+    // callback steady left the sheet sitting below the screen. The store is
+    // what keeps the legend current between those hand-overs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [footerStore, theme, persistentContent],
   );
 
   return (

@@ -52,6 +52,26 @@ describe('Drawer', () => {
     expect(queryByLabelText('Collapse map controls')).toBeNull();
   });
 
+  it('shows new legend content at once, without the sheet having to move', () => {
+    // gorhom does not re-render a footer when only its content changes, which
+    // left Probability's key on screen after switching to Deterministic.
+    const tree = (legend: string) => (
+      <GestureHandlerRootView>
+        <ThemeProvider>
+          <Drawer expanded={false} onExpandedChange={() => {}} persistentContent={<Text>{legend}</Text>}>
+            <View />
+          </Drawer>
+        </ThemeProvider>
+      </GestureHandlerRootView>
+    );
+    const view = render(tree('probability key'));
+    expect(view.getByText('probability key')).toBeTruthy();
+
+    view.rerender(tree('deterministic key'));
+    expect(view.getByText('deterministic key')).toBeTruthy();
+    expect(view.queryByText('probability key')).toBeNull();
+  });
+
   it('reports the flipped state when the handle is pressed', () => {
     const onExpandedChange = jest.fn();
     const { getByLabelText } = renderDrawer(false, onExpandedChange);

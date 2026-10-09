@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import { currentDistrictId } from '../data/districts';
 import { DEFAULT_LOCATION_ID } from '../data/mockWeather';
 import type { LocationPermissionState } from '../location/locationClient';
 
@@ -97,12 +98,25 @@ export const useLocationStore = create<LocationState>()(
       setDetectedLocation: ({ districtId, townId }) => set({ detectedDistrictId: districtId, detectedTownId: townId }),
       setDetectedTown: (id) => set({ selectedLocationId: id }),
       markLocationResolved: () => set({ locationResolved: true }),
-      clearLocationDetection: () =>
-        set({ detectedDistrictId: null, detectedTownId: null, locationResolved: false }),
+      clearLocationDetection: () => set({ detectedDistrictId: null, detectedTownId: null, locationResolved: false }),
     }),
     {
       name: 'agromet:zustand:location',
       storage: createJSONStorage(() => AsyncStorage),
+      /* v1: district ids moved from a hand-picked list of 35 to every district,
+         named in full ("ketu-south" became "ketu-south-municipal"). */
+      version: 1,
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<LocationState>;
+        if (version < 1) {
+          return {
+            ...state,
+            savedDistrictIds: (state.savedDistrictIds ?? []).map(currentDistrictId),
+            detectedDistrictId: state.detectedDistrictId ? currentDistrictId(state.detectedDistrictId) : null,
+          } as LocationState;
+        }
+        return state as LocationState;
+      },
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       },

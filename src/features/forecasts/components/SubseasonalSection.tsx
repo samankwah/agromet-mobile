@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 
-import { cellAt, getSubseasonalSeries } from '../../../shared/api/subseasonalService';
+import { cellAt, getSubseasonalSeries, outlookAt } from '../../../shared/api/subseasonalService';
 import type { SpatialGeography, SpatialValueFormat } from '../../../shared/domain/spatialOutlook';
 import type {
   SubseasonalCell,
@@ -17,18 +17,14 @@ import { useNetworkStatus } from '../../../shared/net/useNetworkStatus';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { AsyncStateView } from '../../../shared/ui/AsyncStateView';
 import { BulletList } from '../../../shared/ui/BulletList';
-import { Card } from '../../../shared/ui/Card';
 import { ChoroplethMap } from '../../../shared/ui/ChoroplethMap';
 import { Button } from '../../../shared/ui/Button';
 import { ColorScaleLegend } from '../../../shared/ui/ColorScaleLegend';
 import { ConfidenceBadge } from '../../../shared/ui/ConfidenceBadge';
-import { DetailRow } from '../../../shared/ui/DetailRow';
-import { Divider } from '../../../shared/ui/Divider';
 import { Drawer } from '../../../shared/ui/Drawer';
 import { EmptyState } from '../../../shared/ui/EmptyState';
 import { FieldLabel } from '../../../shared/ui/FieldLabel';
 import { MapLibreChoropleth, type MapSelection } from '../../../shared/ui/MapLibreChoropleth';
-import { SectionHeading } from '../../../shared/ui/SectionHeading';
 import { SegmentedControl } from '../../../shared/ui/SegmentedControl';
 import { Text } from '../../../shared/ui/Text';
 import { RAINFALL_STOPS, TEMPERATURE_STOPS } from '../../../shared/utils/colorScale';
@@ -36,6 +32,7 @@ import { BAND_COUNT, TERCILE_BOUNDS, paletteFor } from '../../../shared/utils/te
 import { buildSubseasonalCells, deterministicRange, selectionPlaceName } from '../subseasonal/cells';
 import type { Place } from '../subseasonal/places';
 import { PlaceSearch } from './PlaceSearch';
+import { SubseasonalPlaceAnswer } from './SubseasonalPlaceAnswer';
 import { SubseasonalSpreadChart } from './SubseasonalSpreadChart';
 import { SpatialOutlookSkeleton, SubseasonalOutlookSkeleton } from './ForecastSkeletons';
 
@@ -87,19 +84,11 @@ const VARIABLES: SubseasonalVariableId[] = ['rainfall', 'temperature'];
  * honest version of a district view: the model's real detail under a familiar
  * boundary, rather than detail invented to fill one.
  */
-export function SubseasonalSection({
-  outlook,
-  set,
-  status,
-  error,
-  onRetry,
-  outlookStatus,
-  outlookError,
-  onRetryOutlook,
-}: Props) {
+export function SubseasonalSection({ outlook, set, status, error, onRetry, outlookStatus, outlookError, onRetryOutlook }: Props) {
   const theme = useTheme();
   const { isOnline } = useNetworkStatus();
   const [drawerExpanded, setDrawerExpanded] = useState(false);
+  const [mapHeight, setMapHeight] = useState(0);
   const hasProbabilities = useMemo(
     () => (set?.cells ?? []).some((cell) => cell.rainfall?.probabilities || cell.temperature?.probabilities),
     [set],
@@ -124,10 +113,7 @@ export function SubseasonalSection({
   // apart at a glance; the unit in the legend is not a strong enough cue.
   const stops = variable === 'temperature' ? TEMPERATURE_STOPS : RAINFALL_STOPS;
 
-  const cells = useMemo(
-    () => buildSubseasonalCells(set?.cells ?? [], variable, view, geography),
-    [set, variable, view, geography],
-  );
+  const cells = useMemo(() => buildSubseasonalCells(set?.cells ?? [], variable, view, geography), [set, variable, view, geography]);
 
   // Rainfall and temperature carry different published conventions, so the
   // palette follows the variable rather than being fixed to the view.
@@ -160,6 +146,11 @@ export function SubseasonalSection({
   // gesture for a bottom sheet, and the reader has already been given the
   // handle for the deliberate version.
   const handleDismiss = useCallback(() => setDrawerExpanded(false), []);
+  const showsDetail = !isEmpty && selection !== null;
+  const selectedGuidance = useMemo(
+    () => (showsDetail && set && selection ? outlookAt(set, selection.lat, selection.lng, selectionPlaceName(selection, geography)) : null),
+    [showsDetail, set, selection, geography],
+  );
 
   const handleSearch = useCallback(
     (place: Place) => {
@@ -199,7 +190,11 @@ export function SubseasonalSection({
           so the message told a reader to switch to Deterministic on a screen
           that no longer offered the control. A dead end dressed as advice. */}
       <View style={{ flex: 1 }}>
-        <View style={{ flex: 1 }}>
+        {/* The map fills the whole area, under the drawer too, the way a map
+            app's sheet floats over its map. A fixed height left a blank strip
+            between the map and a collapsed drawer whenever the legend, and so
+            the collapsed drawer, was shorter than the gap it was guessed for. */}
+        <View style={{ flex: 1 }} onLayout={(event) => setMapHeight(Math.round(event.nativeEvent.layout.height))}>
           {isEmpty ? (
             // Never a flat three-way split: "we could not compute this" and "the
             // ensemble sees no signal" look identical on a map and mean opposite
@@ -235,43 +230,39 @@ export function SubseasonalSection({
               {computing ? null : fetchFailed ? (
                 <Button label="Try again" variant="outline" onPress={onRetry} />
               ) : isProbability ? (
-                <Button
-                  label="Show the ensemble average"
-                  variant="outline"
-                  onPress={() => setViewIndex(VIEWS.indexOf('deterministic'))}
-                />
+                <Button label="Show the ensemble average" variant="outline" onPress={() => setViewIndex(VIEWS.indexOf('deterministic'))} />
               ) : null}
             </EmptyState>
           ) : (
             <>
-            {isOnline ? (
-              <MapLibreChoropleth
-                cells={cells}
-                min={min}
-                max={max}
-                geography={geography}
-                height={MAP_HEIGHT}
-                isTercile={isProbability}
-                palette={isProbability ? palette : undefined}
-                variableLabel={VARIABLE_SEGMENTS[variableIndex]}
-                valueFormat={valueFormat}
-                onSelect={handleSelect}
-                onDismiss={handleDismiss}
-                stops={stops}
-                selected={selection}
-              />
-            ) : (
-              <ChoroplethMap
-                cells={cells}
-                min={min}
-                max={max}
-                geography={geography}
-                height={MAP_HEIGHT}
-                isTercile={isProbability}
-                palette={isProbability ? palette : undefined}
-                stops={stops}
-              />
-            )}
+              {isOnline ? (
+                <MapLibreChoropleth
+                  cells={cells}
+                  min={min}
+                  max={max}
+                  geography={geography}
+                  height={mapHeight || MAP_HEIGHT}
+                  isTercile={isProbability}
+                  palette={isProbability ? palette : undefined}
+                  variableLabel={VARIABLE_SEGMENTS[variableIndex]}
+                  valueFormat={valueFormat}
+                  onSelect={handleSelect}
+                  onDismiss={handleDismiss}
+                  stops={stops}
+                  selected={selection}
+                />
+              ) : (
+                <ChoroplethMap
+                  cells={cells}
+                  min={min}
+                  max={max}
+                  geography={geography}
+                  height={mapHeight || MAP_HEIGHT}
+                  isTercile={isProbability}
+                  palette={isProbability ? palette : undefined}
+                  stops={stops}
+                />
+              )}
             </>
           )}
         </View>
@@ -280,66 +271,78 @@ export function SubseasonalSection({
             legend — a nested ScrollView here would fight it for the drag/
             scroll gesture that expands the sheet. */}
         <Drawer expanded={drawerExpanded} onExpandedChange={setDrawerExpanded} persistentContent={legend}>
-            <View style={{ gap: theme.spacing.lg }}>
-              <PlaceSearch onSelect={handleSearch} />
+          <View style={{ gap: theme.spacing.lg }}>
+            <PlaceSearch onSelect={handleSearch} />
 
-              {isEmpty || !selection ? null : (
-                <SelectionDetail
-                  selection={selection}
-                  cell={cellAt(set?.cells ?? [], selection.lat, selection.lng)}
-                  variable={variable}
-                  geography={geography}
-                  windowStart={set?.windowStart}
-                  baseline={set?.baseline}
-                  onClear={() => setSelection(null)}
-                />
-              )}
+            {showsDetail && selection ? (
+              <SelectionDetail
+                selection={selection}
+                cell={cellAt(set?.cells ?? [], selection.lat, selection.lng)}
+                variable={variable}
+                geography={geography}
+                windowStart={set?.windowStart}
+                baseline={set?.baseline}
+                guidance={selectedGuidance}
+                onClear={() => setSelection(null)}
+              />
+            ) : null}
 
-              {/* Matches the Seasonal segment's own selector style
-                  (SeasonalSection) — a caps FieldLabel over a pill, one
-                  full-width row each, no grid or card grouping them. Geography
-                  and Variable used to share a row, which left "Temperature"
-                  about 60px and shrank it below every other label in the
-                  drawer. A row each keeps all the labels at the same size. */}
-              <View>
-                <FieldLabel>FORECAST VIEW</FieldLabel>
-                <SegmentedControl
-                  segments={VIEW_SEGMENTS}
-                  selectedIndex={VIEWS.indexOf(view)}
-                  onChange={setViewIndex}
-                  accessibilityLabel="Forecast view"
-                  equalWidth
-                />
-              </View>
+            {/* A searched or tapped place takes the drawer: its detail is
+                  what the reader asked for, so the switches step aside until
+                  they close it (the panel's own close button brings them
+                  back). */}
+            {showsDetail ? null : (
+              <>
+                {/* Matches the Seasonal segment's own selector style
+                    (SeasonalSection) — a caps FieldLabel over a pill, one
+                    full-width row each, no grid or card grouping them. Geography
+                    and Variable used to share a row, which left "Temperature"
+                    about 60px and shrank it below every other label in the
+                    drawer. A row each keeps all the labels at the same size. */}
+                <View>
+                  <FieldLabel>FORECAST VIEW</FieldLabel>
+                  <SegmentedControl
+                    segments={VIEW_SEGMENTS}
+                    selectedIndex={VIEWS.indexOf(view)}
+                    onChange={setViewIndex}
+                    accessibilityLabel="Forecast view"
+                    equalWidth
+                  />
+                </View>
 
-              <View>
-                <FieldLabel>GEOGRAPHY</FieldLabel>
-                <SegmentedControl
-                  segments={GEOGRAPHY_SEGMENTS}
-                  selectedIndex={geographyIndex}
-                  onChange={setGeographyIndex}
-                  accessibilityLabel="Geography"
-                  equalWidth
-                />
-              </View>
+                <View>
+                  <FieldLabel>GEOGRAPHY</FieldLabel>
+                  <SegmentedControl
+                    segments={GEOGRAPHY_SEGMENTS}
+                    selectedIndex={geographyIndex}
+                    onChange={setGeographyIndex}
+                    accessibilityLabel="Geography"
+                    equalWidth
+                  />
+                </View>
 
-              <View>
-                <FieldLabel>VARIABLE</FieldLabel>
-                <SegmentedControl
-                  segments={VARIABLE_SEGMENTS}
-                  selectedIndex={variableIndex}
-                  onChange={setVariableIndex}
-                  accessibilityLabel="Outlook variable"
-                  equalWidth
-                />
-              </View>
+                <View>
+                  <FieldLabel>VARIABLE</FieldLabel>
+                  <SegmentedControl
+                    segments={VARIABLE_SEGMENTS}
+                    selectedIndex={variableIndex}
+                    onChange={setVariableIndex}
+                    accessibilityLabel="Outlook variable"
+                    equalWidth
+                  />
+                </View>
+              </>
+            )}
 
-              {/* The reader's own town is a separate query from the map above,
-                  so it can fail on its own — a rate-limited upstream, or a
-                  town whose grid cell has no baked baseline yet — while the
-                  map stays perfectly healthy. Wrapped in its own
-                  AsyncStateView rather than folded into the map's status so a
-                  personal-card failure never blanks the map underneath it. */}
+            {/* With a place open, its advice lives in the panel above, read
+                from the cell under it: a farmer who searched for Bongo is
+                planning for Bongo, not for their home town. */}
+            {showsDetail ? null : (
+              /* The reader's own town is a separate query from the map above,
+                 so it can fail on its own (a rate-limited upstream, or a town
+                 whose grid cell has no baked baseline yet) while the map stays
+                 healthy. Its own AsyncStateView, so a personal-card failure
+                 never blanks the map underneath it. */
               <AsyncStateView
                 status={outlookStatus}
                 error={outlookError}
@@ -348,43 +351,31 @@ export function SubseasonalSection({
               >
                 {outlook ? <ReaderGuidance outlook={outlook} /> : null}
               </AsyncStateView>
+            )}
 
-              {/* The caveats and the provenance, grouped once at the foot rather
-                  than interleaved with the controls. Each was true where it
-                  stood before; four separate muted paragraphs spread through the
-                  sheet meant none of them got read. */}
-              <View style={{ gap: theme.spacing.xs }}>
-                {/* Not optional. A district outline over a 55 km field looks
-                    more precise than it is. */}
-                {geography === 'district' ? (
-                  <Text variant="caption" muted>
-                    District outlines are drawn over a 55 km forecast grid, so neighbouring districts often share one reading. The boundary
-                    is precise; the forecast underneath it is not.
-                  </Text>
-                ) : null}
-
-                {/* The product rule: a probabilistic outlook is never shown
-                    without its uncertainty explanation, so this travels with
-                    the map rather than living on another screen. */}
-                <Text variant="caption" muted>
-                  A probability-based outlook for the next 2 to 4 weeks, not a day-to-day forecast. Use it to plan ahead, and follow the
-                  Today and 7-Day sections for immediate decisions.
-                </Text>
-
-                {set ? (
-                  <Text variant="caption" muted>
-                    {set.windowStart} to {set.windowEnd} · {set.model} · baseline {set.baseline ?? 'unknown'}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
+            {/* Not optional. A district outline over a 55 km field looks more
+                precise than it is. The general caveat and the model line were
+                dropped from the foot: the panel's figures already say how many
+                runs and against which record. */}
+            {geography === 'district' ? (
+              <Text variant="caption" muted>
+                District outlines are drawn over a 55 km forecast grid, so neighbouring districts often share one reading. The boundary is
+                precise; the forecast underneath it is not.
+              </Text>
+            ) : null}
+          </View>
         </Drawer>
       </View>
     </AsyncStateView>
   );
 }
 
-/** The tapped area's day-by-day ensemble, fetched on demand. */
+/**
+ * A searched or tapped place, answer first: the outcome and its chances, the
+ * day-by-day curve, then what to do. The order a farmer asks in ("will it be
+ * wetter?", "when?", "so what do I do?"), and the order the big weather apps
+ * lead a place with.
+ */
 function SelectionDetail({
   selection,
   cell,
@@ -392,6 +383,7 @@ function SelectionDetail({
   geography,
   windowStart,
   baseline,
+  guidance,
   onClear,
 }: {
   selection: MapSelection;
@@ -407,6 +399,8 @@ function SelectionDetail({
    * record is fixed at bake time, so counting back thirty years from today
    * would misname it by however long ago the bake ran. */
   baseline?: string | null;
+  /** This place's own advice, or null when its cell has no split to give it. */
+  guidance: SubseasonalOutlook | null;
   onClear: () => void;
 }) {
   const theme = useTheme();
@@ -421,53 +415,37 @@ function SelectionDetail({
   const series = variable === 'rainfall' ? query.data?.rainfall : query.data?.temperature;
   const reading = variable === 'rainfall' ? cell?.rainfall : cell?.temperature;
   const place = selectionPlaceName(selection, geography);
-  const unit = unitFor(variable);
-  const measure = variable === 'rainfall' ? 'Rainfall' : 'Temperature';
+  // A district is named with its region beneath it, so "Bongo" is placed.
+  const within = selection.district && selection.region && place !== selection.region ? selection.region : null;
 
   return (
-    <View style={{ gap: theme.spacing.lg }}>
-      <SelectionHeader place={place} onClear={onClear} />
+    <View style={{ gap: theme.spacing.xl }}>
+      <View style={{ gap: theme.spacing.lg }}>
+        <SelectionHeader place={place} within={within} onClear={onClear} />
+        {reading ? <SubseasonalPlaceAnswer reading={reading} variable={variable} baseline={baseline} /> : null}
+      </View>
 
-      <SectionHeading title="Day by day" subtitle={`${measure} across the whole window`} />
-      <AsyncStateView status={query.status} error={query.error} onRetry={query.refetch}>
-        {series ? (
-          <SubseasonalSpreadChart series={series} variable={variable} windowStart={windowStart} />
-        ) : (
-          <Text variant="caption" muted>
-            No day-by-day forecast covers this point.
-          </Text>
-        )}
-      </AsyncStateView>
+      <View>
+        <FieldLabel>DAY BY DAY</FieldLabel>
+        <AsyncStateView status={query.status} error={query.error} onRetry={query.refetch}>
+          {series ? (
+            <SubseasonalSpreadChart series={series} variable={variable} windowStart={windowStart} />
+          ) : (
+            <Text variant="caption" muted>
+              No day-by-day forecast covers this point.
+            </Text>
+          )}
+        </AsyncStateView>
+      </View>
 
-      {/* The figures the map's colour stands for. A reader who taps an area is
-          asking what the shade under their finger actually means, and until now
-          the panel answered with a curve and left the split unstated. */}
-      {reading ? (
-        <>
-          <SectionHeading title="Compared with normal" />
-          <Card style={{ gap: theme.spacing.sm }}>
-            <DetailRow
-              label={variable === 'rainfall' ? 'Forecast total' : 'Forecast average'}
-              value={`${Math.round(reading.value)}${unit}`}
-            />
-            {reading.normal === null ? null : (
-              <DetailRow label="Normal for this window" value={`${Math.round(reading.normal)}${unit}`} />
-            )}
-            {reading.probabilities ? (
-              <>
-                <Divider />
-                <DetailRow label={variable === 'rainfall' ? 'Drier than normal' : 'Cooler than normal'} value={pct(reading.probabilities.below)} />
-                <DetailRow label="Near normal" value={pct(reading.probabilities.normal)} />
-                <DetailRow label={variable === 'rainfall' ? 'Wetter than normal' : 'Warmer than normal'} value={pct(reading.probabilities.above)} />
-              </>
-            ) : null}
-          </Card>
-          <Text variant="caption" muted>
-            {reading.probabilities
-              ? `Out of ${reading.members} forecast runs, against the ${baseline ?? 'long-term'} average for these same weeks.`
-              : `The average of ${reading.members} forecast runs. This area has no baseline yet, so there is nothing to compare it against.`}
-          </Text>
-        </>
+      {guidance ? (
+        <View>
+          <FieldLabel>WHAT TO DO</FieldLabel>
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="bodyStrong">{guidance.farmerActionCard.headline}</Text>
+            <BulletList items={guidance.farmerActionCard.actions} accent />
+          </View>
+        </View>
       ) : null}
     </View>
   );
@@ -476,31 +454,46 @@ function SelectionDetail({
 /** The panel's own header, echoing the day-detail sheet: the place named on the
  * left, and a close control rather than a text link -- an X is what a reader
  * reaches for to dismiss a panel, and it does not compete with the title. */
-function SelectionHeader({ place, onClear }: { place: string; onClear: () => void }) {
+function SelectionHeader({ place, within, onClear }: { place: string; within: string | null; onClear: () => void }) {
   const theme = useTheme();
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-      <Ionicons name="location-outline" size={18} color={theme.colors.muted} />
-      <Text variant="h2" style={{ flex: 1 }} numberOfLines={2}>
-        {place}
-      </Text>
+      <Ionicons name="location-outline" size={20} color={theme.colors.accent} />
+      <View style={{ flex: 1 }}>
+        <Text variant="h2" numberOfLines={2}>
+          {place}
+        </Text>
+        {within ? (
+          <Text variant="caption" muted>
+            {within}
+          </Text>
+        ) : null}
+      </View>
+      {/* A 44 pt target, the platform minimum, drawn as a soft round button so
+          it reads as a control and not as a stray glyph. */}
       <Pressable
         onPress={onClear}
         accessibilityRole="button"
         accessibilityLabel={`Close ${place} details`}
-        hitSlop={12}
-        style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}
+        hitSlop={4}
+        style={{ width: theme.minTouchTarget, height: theme.minTouchTarget, alignItems: 'center', justifyContent: 'center' }}
       >
-        <Ionicons name="close" size={20} color={theme.colors.muted} />
+        <View
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.colors.text + '14',
+          }}
+        >
+          <Ionicons name="close" size={18} color={theme.colors.text} />
+        </View>
       </Pressable>
     </View>
   );
-}
-
-/** Shares are stored as fractions and read as whole percents. */
-function pct(share: number): string {
-  return `${Math.round(share * 100)}%`;
 }
 
 /** What this means where the reader actually is. */

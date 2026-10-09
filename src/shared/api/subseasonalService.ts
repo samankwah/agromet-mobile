@@ -133,15 +133,34 @@ export async function getSubseasonalOutlook(locationId: string): Promise<Subseas
     throw new ServiceError(`No subseasonal outlook available for "${locationId}".`);
   }
 
-  const cell = cellAt(set.cells, place.lat, place.lng);
-  const rainfall = cell?.rainfall;
-  if (!rainfall?.probabilities || !rainfall.category) {
+  const outlook = outlookAt(set, place.lat, place.lng, place.region, locationId);
+  if (!outlook) {
     throw new ServiceError(`No subseasonal outlook available for "${locationId}".`);
   }
+  return outlook;
+}
+
+/**
+ * The outlook, summary and advice for any point on the map: the reader's own
+ * town, or a district or region they searched for. Null when the cell there
+ * has no split to speak from, rather than a national average (see above).
+ *
+ * `placeName` is what the sentence names ("Bongo", "Upper East").
+ */
+export function outlookAt(
+  set: SubseasonalOutlookSet,
+  lat: number,
+  lng: number,
+  placeName: string,
+  locationId: string = placeName,
+): SubseasonalOutlook | null {
+  const cell = cellAt(set.cells, lat, lng);
+  const rainfall = cell?.rainfall;
+  if (!rainfall?.probabilities || !rainfall.category) return null;
 
   return {
     locationId,
-    region: place.region,
+    region: placeName,
     issuedAt: set.issuedAt ?? new Date().toISOString(),
     weekRangeStart: set.windowStart,
     weekRangeEnd: set.windowEnd,
@@ -157,7 +176,7 @@ export async function getSubseasonalOutlook(locationId: string): Promise<Subseas
           }
         : { category: 'normal', probabilityPct: 0 },
     confidenceLevel: rainfall.confidence ?? 'low',
-    plainLanguageSummary: summarise(rainfall, place.region),
+    plainLanguageSummary: summarise(rainfall, placeName),
     farmerActionCard: actionCard(rainfall),
   };
 }
@@ -226,9 +245,6 @@ function actionCard(rainfall: SubseasonalVariable): SubseasonalOutlook['farmerAc
 
   return {
     headline: 'Plan with flexibility',
-    actions: [
-      'Keep planting windows flexible over the next month.',
-      'Monitor weekly bulletins rather than acting on this outlook alone.',
-    ],
+    actions: ['Keep planting windows flexible over the next month.', 'Monitor weekly bulletins rather than acting on this outlook alone.'],
   };
 }

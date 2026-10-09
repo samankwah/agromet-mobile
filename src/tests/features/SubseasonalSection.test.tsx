@@ -25,9 +25,7 @@ let client: QueryClient;
 
 beforeEach(() => {
   client = createTestQueryClient();
-  globalThis.fetch = jest.fn(() =>
-    Promise.reject(new TypeError('Network request failed')),
-  ) as unknown as typeof fetch;
+  globalThis.fetch = jest.fn(() => Promise.reject(new TypeError('Network request failed'))) as unknown as typeof fetch;
 });
 
 afterEach(() => {
@@ -35,14 +33,14 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-function cell(withProbabilities: boolean): SubseasonalCell {
+function cell(withProbabilities: boolean, confidence: 'low' | 'moderate' | 'high' = 'high'): SubseasonalCell {
   const probabilities = { below: 0.1, normal: 0.2, above: 0.7 };
   return {
     id: '8.00,-1.00',
     lat: 8,
     lng: -1,
     rainfall: withProbabilities
-      ? { value: 68.9, members: 31, normal: 60, probabilities, category: 'above', confidence: 'high', noSignal: false }
+      ? { value: 68.9, members: 31, normal: 60, probabilities, category: 'above', confidence, noSignal: false }
       : { value: 68.9, members: 31, normal: null },
     temperature: null,
   };
@@ -273,6 +271,40 @@ describe('the selected place panel', () => {
     return view;
   }
 
+  it('ends without the general caveat or the model line', () => {
+    const view = selectPlace(true);
+
+    expect(view.queryByText(/probability-based outlook/)).toBeNull();
+    expect(view.queryByText(/NOAA GEFS 0\.5 degree/)).toBeNull();
+  });
+
+  it('hides the switches while a place is open, and brings them back on close', () => {
+    const view = selectPlace(true);
+
+    expect(view.queryByLabelText('Forecast view')).toBeNull();
+    expect(view.queryByLabelText('Geography')).toBeNull();
+    expect(view.queryByLabelText('Outlook variable')).toBeNull();
+
+    fireEvent.press(view.getByLabelText('Close Bongo details'));
+    expect(view.getByLabelText('Forecast view')).toBeTruthy();
+    expect(view.getByLabelText('Outlook variable')).toBeTruthy();
+  });
+
+  it("gives the searched place's own advice, not the reader's town's", () => {
+    const view = selectPlace(true);
+
+    // 70% wetter at high confidence in Bongo's cell.
+    expect(view.getByText('WHAT TO DO')).toBeTruthy();
+    expect(view.getByText('Prepare for a wetter spell')).toBeTruthy();
+  });
+
+  it('gives no advice for a place whose cell has no split', () => {
+    const view = selectPlace(false);
+
+    expect(view.queryByText(/(for|in) Bongo/)).toBeNull();
+    expect(view.queryByText(/^Prepare for|^Plan with flexibility$/)).toBeNull();
+  });
+
   it('names the place and offers a close control, not a text link', () => {
     const { getByText, getByLabelText } = selectPlace(true);
 
@@ -280,20 +312,45 @@ describe('the selected place panel', () => {
     expect(getByLabelText('Close Bongo details')).toBeTruthy();
   });
 
-  it('states the split and the normal, not just the curve', () => {
+  it('leads with the answer: the outcome, its chance and how sure', () => {
     const { getByText } = selectPlace(true);
 
-    expect(getByText('Compared with normal')).toBeTruthy();
-    // Both figures, rounded: 68.9 mm against a 60 mm normal. Queried by the
-    // values rather than by "70%", which the legend's own scale also prints.
-    expect(getByText('69mm')).toBeTruthy();
-    expect(getByText('Normal for this window')).toBeTruthy();
-    expect(getByText('60mm')).toBeTruthy();
-    // All three legs of the split are named, so the reader sees what the
-    // dominant one was chosen against.
-    expect(getByText('Drier than normal')).toBeTruthy();
-    expect(getByText('Near normal')).toBeTruthy();
     expect(getByText('Wetter than normal')).toBeTruthy();
+    expect(getByText('70% chance')).toBeTruthy();
+    expect(getByText('High confidence')).toBeTruthy();
+  });
+
+  it('shows the whole split as one bar, every leg named', () => {
+    const { getByLabelText, getByText } = selectPlace(true);
+
+    expect(getByLabelText('Drier 10%, Near normal 20%, Wetter 70%')).toBeTruthy();
+    expect(getByText('Drier 10%')).toBeTruthy();
+    expect(getByText('Near normal 20%')).toBeTruthy();
+    expect(getByText('Wetter 70%')).toBeTruthy();
+  });
+
+  it('states the amount against the usual, rounded', () => {
+    // 68.9 mm against a 60 mm normal.
+    const { getByText } = selectPlace(true);
+
+    expect(getByText(/69 mm expected/)).toBeTruthy();
+    expect(getByText(/usually 60 mm/)).toBeTruthy();
+  });
+
+  it('does not dress a split forecast up as a normal month', () => {
+    const view = renderWithControls(true, { set: { ...set(true), cells: [cell(true, 'low')] } });
+    fireEvent.changeText(view.getByLabelText('Search for a district or region'), 'bongo');
+    fireEvent.press(view.getByLabelText('Bongo, Upper East'));
+
+    expect(view.getByText('No clear signal')).toBeTruthy();
+    expect(view.getByText('The forecasts are split')).toBeTruthy();
+    expect(view.queryByText('Wetter than normal')).toBeNull();
+  });
+
+  it('places a district within its region', () => {
+    const { getByText } = selectPlace(true);
+
+    expect(getByText('Upper East')).toBeTruthy();
   });
 
   it('takes the baseline name from the response rather than from the clock', () => {
@@ -302,21 +359,23 @@ describe('the selected place panel', () => {
     // panel's own sentence: the footer prints the baseline too.
     const { getByText } = selectPlace(true);
 
-    expect(getByText(/Out of 31 forecast runs, against the ERA5 1995-2024 average/)).toBeTruthy();
+    expect(getByText(/From 31 forecast runs, against the ERA5 1995-2024 average/)).toBeTruthy();
   });
 
   it('says plainly when a cell has no baseline to compare against', () => {
     const { getByText, queryByText } = selectPlace(false);
 
-    expect(queryByText('Near normal')).toBeNull();
-    expect(getByText(/no baseline yet/i)).toBeTruthy();
+    expect(queryByText(/Near normal/)).toBeNull();
+    expect(getByText('69 mm expected')).toBeTruthy();
+    expect(getByText(/no long-term record yet/i)).toBeTruthy();
   });
 
   it('closes on the close control', () => {
     const { getByLabelText, queryByText } = selectPlace(true);
     fireEvent.press(getByLabelText('Close Bongo details'));
 
-    expect(queryByText('Compared with normal')).toBeNull();
+    expect(queryByText('Wetter than normal')).toBeNull();
+    expect(queryByText('DAY BY DAY')).toBeNull();
   });
 });
 
@@ -327,7 +386,7 @@ describe('the selected place panel', () => {
  * perfectly healthy map sat right above it, with no error and no way to
  * retry.
  */
-describe('the reader\'s own town card', () => {
+describe("the reader's own town card", () => {
   it('shows an error and a retry, not a silent gap, when only the personal card fails', () => {
     const onRetryOutlook = jest.fn();
     const { getByText } = renderWithControls(true, { outlookStatus: 'error', onRetryOutlook });

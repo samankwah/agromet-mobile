@@ -39,9 +39,21 @@ type Props = {
    * segments split whatever width it has.
    */
   equalWidth?: boolean;
+  /** Segments shown but not pressable, drawn faded: a choice that exists but
+   * has nothing behind it yet (the seasonal map's Probability, before the
+   * season is in the forecast). */
+  disabledIndexes?: number[];
 };
 
-export function SegmentedControl({ segments, selectedIndex, onChange, accessibilityLabel, variant = 'tab', equalWidth = false }: Props) {
+export function SegmentedControl({
+  segments,
+  selectedIndex,
+  onChange,
+  accessibilityLabel,
+  variant = 'tab',
+  equalWidth = false,
+  disabledIndexes,
+}: Props) {
   const theme = useTheme();
   const isPill = variant === 'pill';
 
@@ -74,12 +86,14 @@ export function SegmentedControl({ segments, selectedIndex, onChange, accessibil
     >
       {segments.map((segment, index) => {
         const isSelected = index === selectedIndex;
+        const isDisabled = disabledIndexes?.includes(index) ?? false;
         return (
           <Pressable
             key={segment}
             onPress={() => onChange(index)}
+            disabled={isDisabled}
             accessibilityRole="tab"
-            accessibilityState={{ selected: isSelected }}
+            accessibilityState={{ selected: isSelected, disabled: isDisabled }}
             accessibilityLabel={segment}
             style={{
               // Content-sized by default, then sharing leftover space
@@ -118,7 +132,7 @@ export function SegmentedControl({ segments, selectedIndex, onChange, accessibil
             >
               <Text
                 variant="bodyStrong"
-                color={theme.colors.text}
+                color={isDisabled ? theme.colors.muted : theme.colors.text}
                 numberOfLines={1}
                 // Safety net only — with content-based sizing the labels
                 // normally render at full size; this keeps a very long label

@@ -46,7 +46,22 @@ type Props = {
    * nothing: a single deterministic series has no band to draw.
    */
   band?: { upper: ChartPoint[]; lower: ChartPoint[] };
+  /**
+   * What the value axis measures, with its unit ("Rainfall (mm per day)").
+   * Drawn turned on its side beyond the tick labels, the way a right-hand
+   * axis is titled. Optional: a chart whose section heading already names
+   * the measure and unit needs none.
+   */
+  yTitle?: string;
 };
+
+/** Tick label size, and the rough width of one of its digits. */
+const TICK_FONT = 11;
+const TICK_CHAR_WIDTH = 6.5;
+/** Gap between the plot edge and its tick labels. */
+const TICK_GAP = 8;
+/** Gap between the widest tick label and a turned axis title. */
+const TITLE_GAP = 6;
 
 const PAD_BOTTOM = 30; // room for the time axis, clear of the plot floor
 const PAD_TOP_MARKED = 18; // room for the H/L labels above the line
@@ -63,11 +78,29 @@ const PAD_TOP_MARKED = 18; // room for the H/L labels above the line
  * what keeps 24 hourly readings from reading as a polygon while guaranteeing
  * the line never rises above the "H" marker labelling the day's high.
  */
-export function LineAreaChart({ points, width, height, color, yTicks, formatY, xLabels, markExtremes, extremeLabels, yDomain, band }: Props) {
+export function LineAreaChart({
+  points,
+  width,
+  height,
+  color,
+  yTicks,
+  formatY,
+  xLabels,
+  markExtremes,
+  extremeLabels,
+  yDomain,
+  band,
+  yTitle,
+}: Props) {
   const theme = useTheme();
 
   const padTop = markExtremes ? PAD_TOP_MARKED : 8;
-  const plotW = chartPlotWidth(width);
+  // With a title, the right margin is sized to what it holds (the widest tick
+  // label, then the title right beside it) rather than a fixed allowance, so
+  // the title sits against its numbers instead of out at the canvas edge.
+  const labelWidth = Math.max(...yTicks.map((tick) => formatY(tick).length), 1) * TICK_CHAR_WIDTH;
+  const titleX = TICK_GAP + labelWidth + TITLE_GAP;
+  const plotW = yTitle ? Math.max(width - titleX - TICK_FONT - 2, 10) : chartPlotWidth(width);
   const plotH = Math.max(height - PAD_BOTTOM - padTop, 10);
   const baselineY = padTop + plotH;
 
@@ -77,11 +110,7 @@ export function LineAreaChart({ points, width, height, color, yTicks, formatY, x
 
   // The band joins the domain, or a band wider than the line would be clipped
   // at the plot edge and read as though the ensemble agreed more than it does.
-  const ys = [
-    ...sorted.map((p) => p.y),
-    ...(band ? band.upper.map((p) => p.y) : []),
-    ...(band ? band.lower.map((p) => p.y) : []),
-  ];
+  const ys = [...sorted.map((p) => p.y), ...(band ? band.upper.map((p) => p.y) : []), ...(band ? band.lower.map((p) => p.y) : [])];
   const minY = yDomain?.min ?? Math.min(...ys);
   const maxY = yDomain?.max ?? Math.max(...ys);
   const span = maxY - minY || 1;
@@ -127,7 +156,7 @@ export function LineAreaChart({ points, width, height, color, yTicks, formatY, x
           return (
             <React.Fragment key={`grid-${tick}`}>
               <Line x1={0} y1={y} x2={plotW} y2={y} stroke={theme.colors.border} strokeWidth={0.5} opacity={0.5} />
-              <SvgText x={plotW + 8} y={y + 4} fill={theme.colors.muted} fontSize={11}>
+              <SvgText x={plotW + TICK_GAP} y={y + 4} fill={theme.colors.muted} fontSize={TICK_FONT}>
                 {formatY(tick)}
               </SvgText>
             </React.Fragment>
@@ -149,6 +178,21 @@ export function LineAreaChart({ points, width, height, color, yTicks, formatY, x
             opacity={0.7}
           />
         ))}
+
+        {yTitle ? (
+          <SvgText
+            // Turned clockwise, the glyphs grow to the right of the anchor, so
+            // the anchor goes just past the widest tick label.
+            x={plotW + titleX}
+            y={(padTop + baselineY) / 2}
+            fill={theme.colors.muted}
+            fontSize={TICK_FONT}
+            textAnchor="middle"
+            transform={`rotate(90, ${plotW + titleX}, ${(padTop + baselineY) / 2})`}
+          >
+            {yTitle}
+          </SvgText>
+        ) : null}
 
         {/* Separates the plot from its value labels. */}
         <Line x1={plotW} y1={padTop} x2={plotW} y2={baselineY} stroke={theme.colors.border} strokeWidth={1} opacity={0.8} />

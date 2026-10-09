@@ -80,3 +80,17 @@ describe('detection lifecycle', () => {
     expect(state.locationResolved).toBe(false);
   });
 });
+
+describe('stored district ids from the old list', () => {
+  /* Before every district was listed, alert districts were saved under short
+     ids like "ketu-south". The store rewrites them on load. */
+  it('rewrites them to the current ids when the store loads', () => {
+    const migrate = useLocationStore.persist.getOptions().migrate!;
+    const migrated = migrate({ savedDistrictIds: ['ketu-south', 'accra-metropolitan'], detectedDistrictId: 'bole-district' }, 0) as {
+      savedDistrictIds: string[];
+      detectedDistrictId: string | null;
+    };
+    expect(migrated.savedDistrictIds).toEqual(['ketu-south-municipal', 'accra-metropolitan']);
+    expect(migrated.detectedDistrictId).toBe('bole');
+  });
+});

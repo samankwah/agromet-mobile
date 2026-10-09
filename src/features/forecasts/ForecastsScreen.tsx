@@ -74,7 +74,7 @@ export function ForecastsScreen({ requestedSegment }: Props = {}) {
     if (requestedSegment) setSegmentIndex(forecastSegmentIndex(requestedSegment));
   }, [requestedSegment]);
 
-  const { locationId, locationName, conditions, hourly, weekly, subseasonal, subseasonalSet, seasonalSet } = useForecastsData();
+  const { locationName, conditions, hourly, weekly, subseasonal, subseasonalSet, seasonalSet } = useForecastsData();
 
   const todayStatus = combineStatus(conditions.status, hourly.status, weekly.status);
   const todayError = conditions.error ?? hourly.error ?? weekly.error;
@@ -203,13 +203,7 @@ export function ForecastsScreen({ requestedSegment }: Props = {}) {
     <Screen scroll={false} padded={false}>
       <View style={{ paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.lg, gap: theme.spacing.lg }}>{header}</View>
       <View style={{ flex: 1, marginTop: theme.spacing.lg, paddingBottom: tabBarClearance }}>
-        <SeasonalSection
-          set={seasonalSet.data}
-          status={seasonalSet.status}
-          error={seasonalSet.error}
-          onRetry={seasonalSet.refetch}
-          locationId={locationId}
-        />
+        <SeasonalSection set={seasonalSet.data} status={seasonalSet.status} error={seasonalSet.error} onRetry={seasonalSet.refetch} />
       </View>
     </Screen>
   );
