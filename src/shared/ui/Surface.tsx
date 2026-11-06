@@ -69,23 +69,21 @@ export function Surface({
 }: Props) {
   const theme = useTheme();
 
+  const shadow =
+    depth === 'raised'
+      ? theme.raised(level)
+      : depth === 'sunken'
+        ? theme.sunken(level)
+        : depth === 'lifted'
+          ? theme.lifted(level)
+          : undefined;
+
   const base: ViewStyle = {
     backgroundColor: background ?? theme.colors.surface,
     borderRadius: radius ?? theme.radii.md,
+    ...(bordered ? { borderWidth: 1, borderColor: borderColor ?? theme.colors.border } : null),
+    ...(shadow ? { boxShadow: shadow } : null),
   };
-
-  if (bordered) {
-    base.borderWidth = 1;
-    base.borderColor = borderColor ?? theme.colors.border;
-  }
-
-  if (depth === 'raised') {
-    base.boxShadow = theme.raised(level);
-  } else if (depth === 'sunken') {
-    base.boxShadow = theme.sunken(level);
-  } else if (depth === 'lifted') {
-    base.boxShadow = theme.lifted(level);
-  }
 
   return (
     <View style={[base, style]} {...rest}>

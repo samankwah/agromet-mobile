@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
@@ -435,7 +435,7 @@ export function MapLibrePrecipitation({
   radius = 0,
 }: Props) {
   const theme = useTheme();
-  const webViewRef = useRef<WebView>(null);
+  const webViewRef = useRef<ComponentRef<typeof WebView>>(null);
   /** Set when the document reports itself up. Nothing is pushed before that,
    * because an injection into a page that has not loaded yet simply vanishes. */
   const [documentReady, setDocumentReady] = useState(false);

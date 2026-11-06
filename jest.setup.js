@@ -5,6 +5,17 @@
 // itself and swaps to a synchronous JS mock automatically.
 require('react-native-gesture-handler/jestSetup');
 
+// Gesture Handler 3 (Expo SDK 58) installs its worklet bindings on a microtask
+// at import time, asking react-native-worklets for the UI runtime. Under Jest
+// worklets resolves to its web build, which throws "getUIRuntimeHolder is not
+// supported on web" after the suite has loaded, failing it with no test named.
+// Its own jestSetup does not cover this, so use the no-op the web build ships.
+// Jest loads the compiled lib/module build (stack traces source-map back to
+// src/, which is misleading), so that is the path to mock.
+jest.mock('react-native-gesture-handler/lib/module/handlers/gestures/installUIRuntimeBindings', () => ({
+  installUIRuntimeBindings: () => {},
+}));
+
 // AsyncStorage's native module doesn't exist under Jest's Node
 // environment — mock it with the library's own official in-memory mock so
 // anything that touches it (Zustand's persist middleware, shared/storage/

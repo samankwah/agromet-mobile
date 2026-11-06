@@ -13,7 +13,8 @@ import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 // mean "previous step", so it needs a navigation object as well as the router.
 jest.mock('expo-router', () => ({
   router: { back: jest.fn(), push: jest.fn() },
-  useNavigation: () => ({ setOptions: jest.fn(), addListener: jest.fn(() => jest.fn()) }),
+  useNavigation: () => ({ setOptions: jest.fn() }),
+  usePreventRemove: jest.fn(),
 }));
 
 // The camera and picker are native. These mocks GRANT and return a photo,

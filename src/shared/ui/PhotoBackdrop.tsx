@@ -1,5 +1,5 @@
 import React from 'react';
-import { ImageBackground, type ImageSourcePropType } from 'react-native';
+import { Image, StyleSheet, View, type ImageSourcePropType } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 type Props = {
@@ -31,7 +31,10 @@ export const ON_BACKDROP_MUTED = 'rgba(255,255,255,0.82)';
  */
 export function PhotoBackdrop({ source, children }: Props) {
   return (
-    <ImageBackground source={source} resizeMode="cover" style={{ flex: 1 }}>
+    // A View with the photo absolutely behind it is what ImageBackground did
+    // internally; RN 0.88 deprecates ImageBackground in favour of exactly this.
+    <View style={{ flex: 1 }}>
+      <Image source={source} resizeMode="cover" style={StyleSheet.absoluteFill} />
       {/* Denser at the top, where the hero text sits, easing downward so the
           photograph still reads through the middle, then firming up again at
           the foot where a caption or an action sits. */}
@@ -42,6 +45,6 @@ export function PhotoBackdrop({ source, children }: Props) {
       >
         {children}
       </LinearGradient>
-    </ImageBackground>
+    </View>
   );
 }
