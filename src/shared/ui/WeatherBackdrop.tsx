@@ -1,36 +1,37 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { View } from 'react-native';
 
-import { getWeatherBackdrop } from '../data/weatherBackdrops';
-import { ON_BACKDROP_COLOR, ON_BACKDROP_MUTED, PhotoBackdrop } from './PhotoBackdrop';
+import { skyScene } from '../domain/skyScene';
+import { ON_BACKDROP_COLOR, ON_BACKDROP_MUTED } from './PhotoBackdrop';
+import { AnimatedSky } from './sky/AnimatedSky';
 
 type Props = {
-  condition: string;
+  /** WMO code of the current reading, which picks the weather drawn. */
+  weatherCode: number;
+  /** Open-Meteo's day flag, which with the clock picks dawn, day, dusk or night. */
+  isDay: boolean;
   observedAt: string;
   children: React.ReactNode;
 };
 
 /**
- * The Daily view's backdrop — an actual Ghanaian sky matching the current
- * condition and time of day.
+ * The Daily and Weekly view's backdrop: a drawn sky that shows the weather
+ * now, moving, with the forecast on top.
  *
- * All this does now is choose the photograph; `PhotoBackdrop` paints it and
- * carries the scrim that makes white text legible over it.
+ * This used to be one of six still photographs of Ghanaian skies, chosen from
+ * the condition string. The sky now follows the WMO code, so fog, drizzle and
+ * a downpour each look like themselves, and it changes through dawn and dusk
+ * as well as day and night. See `sky/AnimatedSky.tsx`.
  */
-export function WeatherBackdrop({ condition, observedAt, children }: Props) {
-  return <PhotoBackdrop source={getWeatherBackdrop(condition, observedAt).source}>{children}</PhotoBackdrop>;
+export function WeatherBackdrop({ weatherCode, isDay, observedAt, children }: Props) {
+  const scene = useMemo(() => skyScene({ weatherCode, isDay, observedAt }), [weatherCode, isDay, observedAt]);
+  return (
+    <View style={{ flex: 1 }}>
+      <AnimatedSky scene={scene} />
+      {children}
+    </View>
+  );
 }
 
-/** The photo credit for the currently-shown backdrop. CC BY-SA obliges us
- * to display this, so it's exposed as a first-class helper rather than
- * left to each caller to remember. */
-export function getBackdropCredit(condition: string, observedAt: string): string {
-  const backdrop = getWeatherBackdrop(condition, observedAt);
-  return `${backdrop.place} · ${backdrop.credit} (${backdrop.licence})`;
-}
-
-/** Re-exported so callers don't need to reach into the data module. */
-export { getWeatherBackdrop };
-
-/** Re-exported from their new home, so the screens already drawing text on this
- * backdrop are untouched by the split. */
+/** Re-exported so the screens drawing text on the backdrop keep one import. */
 export { ON_BACKDROP_COLOR, ON_BACKDROP_MUTED };

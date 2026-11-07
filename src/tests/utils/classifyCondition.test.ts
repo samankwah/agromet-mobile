@@ -1,6 +1,5 @@
 import { classifyCondition, isDaytime, type ConditionKind } from '../../shared/utils/classifyCondition';
 import { glyphFromCondition, glyphFromWmo } from '../../shared/domain/weatherGlyph';
-import { ALL_BACKDROPS, getWeatherBackdrop } from '../../shared/data/weatherBackdrops';
 
 describe('classifyCondition', () => {
   it('classifies the conditions the mock data actually produces', () => {
@@ -47,41 +46,12 @@ describe('isDaytime', () => {
   });
 });
 
-describe('getWeatherBackdrop', () => {
-  const noon = new Date(2026, 0, 15, 12).toISOString();
-  const night = new Date(2026, 0, 15, 22).toISOString();
-
-  it('shows a visibly different photo for clear vs rainy weather', () => {
-    expect(getWeatherBackdrop('Sunny', noon)).not.toBe(getWeatherBackdrop('Heavy rain', noon));
-  });
-
-  it('uses one night photo regardless of condition', () => {
-    expect(getWeatherBackdrop('Sunny', night)).toBe(getWeatherBackdrop('Heavy rain', night));
-  });
-
-  it('covers every condition kind without falling through to undefined', () => {
-    for (const condition of ['Sunny', 'Partly cloudy', 'Overcast', 'Heavy rain', 'Thunderstorms likely', 'gibberish']) {
-      expect(getWeatherBackdrop(condition, noon)?.source).toBeDefined();
-    }
-  });
-
-  it('every backdrop carries the credit and licence its CC BY-SA terms require', () => {
-    // Attribution is a legal obligation, not a nicety - if an image is ever
-    // added without it, this fails rather than shipping uncredited.
-    for (const backdrop of ALL_BACKDROPS) {
-      expect(backdrop.credit).toMatch(/Wikimedia Commons/);
-      expect(backdrop.licence).toMatch(/^CC /);
-      expect(backdrop.place.length).toBeGreaterThan(0);
-    }
-  });
-});
-
 /**
- * The reason `classifyCondition` exists is that the icon and the photographic
- * backdrop must never disagree about what the weather is. The icon now reads a
- * WMO code where it has one, so this pins the two paths together: a code and
- * the string that code produces have to select the same picture, or the strip
- * can show a sun over a thunderstorm photograph.
+ * The icon reads a WMO code where it has one and falls back to the condition
+ * string where it does not. The sky behind the forecast reads the code too
+ * (`domain/skyScene.ts`). This pins the two icon paths together: a code and the
+ * string that code produces have to select the same picture, or a row could
+ * show a sun under a thunderstorm sky.
  */
 describe('the icon and the backdrop agree', () => {
   const cases: { code: number; condition: string; kind: ConditionKind }[] = [

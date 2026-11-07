@@ -127,8 +127,8 @@ export function ForecastsScreen({ requestedSegment }: Props = {}) {
     );
   }
 
-  // Daily and Weekly are rendered full-bleed over a photograph of the
-  // current sky, so the backdrop sits behind the header and segments too —
+  // Daily and Weekly are rendered full-bleed over a drawn, moving sky that
+  // shows the current weather, so the backdrop sits behind the header and segments too —
   // not just the content. The subtree is pinned to the dark palette because
   // that ground is always dark, whatever light/dark preference is set
   // elsewhere.
@@ -155,12 +155,12 @@ export function ForecastsScreen({ requestedSegment }: Props = {}) {
     if (ready && conditions.data) {
       return (
         <Screen scroll={false} padded={false} fullBleed>
-          <WeatherBackdrop condition={conditions.data.condition} observedAt={conditions.data.observedAt}>
+          <WeatherBackdrop weatherCode={conditions.data.weatherCode} isDay={conditions.data.isDay} observedAt={conditions.data.observedAt}>
             <ThemeProvider forceScheme="dark">
               <ScrollView
                 contentContainerStyle={{
                   padding: theme.spacing.lg,
-                  // fullBleed released the top inset so the photograph runs
+                  // fullBleed released the top inset so the sky runs
                   // behind the status bar; the hero text still has to clear it.
                   paddingTop: insets.top + theme.spacing.lg,
                   paddingBottom: theme.spacing.lg + tabBarClearance,

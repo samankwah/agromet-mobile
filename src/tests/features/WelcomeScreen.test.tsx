@@ -40,10 +40,9 @@ describe('WelcomeScreen', () => {
     expect(screen.getByRole('header')).toHaveTextContent('AgroMet Ghana');
   });
 
-  /* The backdrop is now the web app's register photograph, whose licence is
-     unrecorded — unlike the weather backdrops, which each carry a credit in
-     `assets/weather/CREDITS.md`. So no credit is shown, and specifically not one
-     belonging to a different photograph: attributing this image to the Wikimedia
+  /* The backdrop is the web app's register photograph, whose licence is
+     unrecorded. So no credit is shown, and specifically not one belonging to a
+     different photograph: attributing this image to the Wikimedia
      contributor who took the old one would be worse than showing nothing. */
   it('does not credit a photographer it cannot name', () => {
     renderWelcome();

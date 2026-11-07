@@ -17,9 +17,8 @@ import { Text } from '../../shared/ui/Text';
  * projects — the mobile bundle has to carry its own assets, and the app is
  * built for districts where a remote image would simply fail to load.
  *
- * **Its licence is unrecorded.** The weather backdrops each carry a credit and a
- * CC BY-SA reference (`assets/weather/CREDITS.md`); this one arrived with the
- * web app and has neither. No credit is shown because inventing one would be
+ * **Its licence is unrecorded.** It arrived with the web app with no credit or
+ * licence. No credit is shown because inventing one would be
  * worse than none — see the note raised with this change.
  */
 const BACKDROP = require('../../../assets/welcome.jpg');

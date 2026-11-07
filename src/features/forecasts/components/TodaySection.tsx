@@ -26,7 +26,7 @@ type Props = {
 /**
  * Purpose one of the two-purpose screen: "what should I do today."
  *
- * Rendered over the photographic weather backdrop, so every card here is
+ * Rendered over the moving sky backdrop, so every card here is
  * translucent and the surrounding subtree is pinned to the dark palette
  * (see ForecastsScreen) — that way text and icons come out light-on-dark
  * automatically rather than each component needing bespoke colours.
