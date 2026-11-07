@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react';
-import { Pressable, View } from 'react-native';
+import { LogBox, Pressable, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavigationThemeProvider, router, type ErrorBoundaryProps } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +23,14 @@ import { useReminderNotifications } from '../src/features/farm-tools/reminders/u
 
 // Before anything else renders, so an error during the first render is caught.
 initMonitoring();
+
+// @gorhom/bottom-sheet (the Seasonal and Subseasonal drawers) passes dependency
+// lists to Reanimated hooks, which Reanimated 4 ignores on phones and warns
+// about on every use. Harmless and not ours to fix, so the in-app yellow box is
+// silenced for that one message in development. Metro's terminal still prints it.
+if (__DEV__) {
+  LogBox.ignoreLogs(['[Reanimated] Dependencies should only be used on the web']);
+}
 bindQueryClientToDevice();
 
 SplashScreen.preventAutoHideAsync().catch(() => {
