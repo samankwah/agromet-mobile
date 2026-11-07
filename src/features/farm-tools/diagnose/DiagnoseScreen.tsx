@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useNavigation } from 'expo-router';
+import { router, useNavigation, usePreventRemove } from 'expo-router';
 
 import { HOME_LOCATIONS } from '../../../shared/data/mockWeather';
 import { useLocationStore } from '../../../shared/state/locationStore';
@@ -87,18 +87,12 @@ export function DiagnoseScreen() {
   /*
    * "Back" means the previous step, not "leave the screen".
    *
-   * One listener covers the iOS header chevron, the iOS edge-swipe and the
+   * One hook covers the iOS header chevron, the iOS edge-swipe and the
    * Android hardware back — the alternatives are a `BackHandler` (Android only)
    * plus a custom `headerLeft` (iOS only), which is two implementations of one
    * rule and leaves the swipe gesture doing a third thing.
    */
-  useEffect(() => {
-    if (!isMidFlow) return;
-    return navigation.addListener('beforeRemove', (event) => {
-      event.preventDefault();
-      setStep('photo');
-    });
-  }, [navigation, isMidFlow]);
+  usePreventRemove(isMidFlow, () => setStep('photo'));
 
   function handleSubmit() {
     submit({ crop, growthStage, symptoms: trimmedSymptoms, imageUri, region });

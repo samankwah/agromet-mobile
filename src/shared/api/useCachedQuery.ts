@@ -62,10 +62,25 @@ export function useCachedQuery<T>(params: {
   enabled?: boolean;
   staleTime?: number;
   gcTime?: number;
+  /**
+   * Show the saved copy while the first request is still out, not only after
+   * it has failed.
+   *
+   * Without this a slow connection keeps the skeleton up for the whole retry
+   * budget (the backend, then Open-Meteo direct, then once more: up to forty
+   * seconds) before the saved copy appears, and a farmer who opened the app
+   * for yesterday's forecast sees nothing. For data whose age is on screen,
+   * like the weather card's "Updated 3 hours ago", that wait buys nothing.
+   * Off by default: a list that a delete should remove from at once must not
+   * flash its old contents first.
+   */
+  showCachedWhilePending?: boolean;
 }): CachedQueryResult<T> {
-  const { queryKey, queryFn, cacheKey, enabled = true, staleTime, gcTime } = params;
+  const { queryKey, queryFn, cacheKey, enabled = true, staleTime, gcTime, showCachedWhilePending = false } = params;
   const queryClient = useQueryClient();
-  const [fallback, setFallback] = useState<{ value: T; cachedAt: string } | null>(null);
+  // Tagged with its key, so a town switch can never show the previous town's
+  // saved copy while the new one is read from disk.
+  const [fallback, setFallback] = useState<{ key: string; value: T; cachedAt: string } | null>(null);
 
   const query = useQuery({
     queryKey,
@@ -81,34 +96,46 @@ export function useCachedQuery<T>(params: {
     }
   }, [cacheKey, query.status, query.data]);
 
+  const unreachable = query.status === 'error' && query.error instanceof NetworkError;
+  // Only while `enabled`: before the location store hydrates, the key still
+  // names the default town, and its saved copy would flash up first.
+  const waiting = showCachedWhilePending && enabled && query.status === 'pending';
+
   useEffect(() => {
     // Deliberately never resets to null outside this branch — that would be
     // a synchronous setState in an effect body and can cascade renders. It
-    // doesn't need to: every read below is gated on status === 'error'.
-    if (query.status === 'error' && query.error instanceof NetworkError) {
+    // doesn't need to: every read below is gated on the key and the status.
+    if (unreachable || waiting) {
+      let current = true;
       getCached<T>(cacheKey).then((cached) => {
-        if (cached) setFallback({ value: cached.value, cachedAt: cached.cachedAt });
+        if (cached && current) setFallback({ key: cacheKey, value: cached.value, cachedAt: cached.cachedAt });
       });
+      return () => {
+        current = false;
+      };
     }
-  }, [cacheKey, query.status, query.error]);
+    return undefined;
+  }, [cacheKey, unreachable, waiting]);
 
   const refetch = useCallback(() => {
     setFallback(null);
     queryClient.invalidateQueries({ queryKey });
   }, [queryClient, queryKey]);
 
-  const usingCachedFallback = query.status === 'error' && fallback !== null;
+  // A 4xx or 5xx is never covered by the saved copy, even one that was showing
+  // while the request was out: the server answered, and its answer stands.
+  const usingCachedFallback = fallback !== null && fallback.key === cacheKey && (unreachable || waiting);
 
   return {
     status: usingCachedFallback ? 'success' : query.status,
     error: usingCachedFallback ? undefined : query.error,
-    data: query.status === 'success' ? query.data : fallback?.value,
+    data: query.status === 'success' ? query.data : usingCachedFallback ? fallback.value : undefined,
     usingCachedFallback,
-    cachedAt: fallback?.cachedAt,
+    cachedAt: usingCachedFallback ? fallback.cachedAt : undefined,
     // The disk snapshot's own age when that is what is showing; TanStack's
     // `dataUpdatedAt` describes the failed network attempt, not the value.
     dataUpdatedAt:
-      usingCachedFallback && fallback ? new Date(fallback.cachedAt).getTime() : query.dataUpdatedAt,
+      usingCachedFallback ? new Date(fallback.cachedAt).getTime() : query.dataUpdatedAt,
     isFetching: query.isFetching,
     refetch,
   };

@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type HostInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -265,7 +265,7 @@ function metricFor(id: MetricId) {
 function MetricPill({ metric, onSelect }: { metric: MetricId; onSelect: (id: MetricId) => void }) {
   const theme = useTheme();
   const { width } = useWindowDimensions();
-  const anchorRef = useRef<View>(null);
+  const anchorRef = useRef<HostInstance>(null);
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<{ top: number; right: number }>({ top: 0, right: theme.spacing.lg });
   const current = metricFor(metric);

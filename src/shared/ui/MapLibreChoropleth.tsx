@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
@@ -335,7 +335,7 @@ export function MapLibreChoropleth({
   selected,
 }: Props) {
   const theme = useTheme();
-  const webViewRef = useRef<WebView>(null);
+  const webViewRef = useRef<ComponentRef<typeof WebView>>(null);
 
   const [documentReady, setDocumentReady] = useState(false);
 

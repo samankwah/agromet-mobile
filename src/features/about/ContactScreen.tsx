@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View, findNodeHandle, type TextInput } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View, findNodeHandle, type ScrollViewInstance, type TextInputInstance } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -47,8 +47,8 @@ export function ContactScreen() {
   // scolding someone for a half-typed email they are still writing is the most
   // common way forms are made unpleasant.
   const submitted = useRef(false);
-  const inputs = useRef<Partial<Record<keyof ContactFields, TextInput | null>>>({});
-  const scroller = useRef<ScrollView>(null);
+  const inputs = useRef<Partial<Record<keyof ContactFields, TextInputInstance | null>>>({});
+  const scroller = useRef<ScrollViewInstance>(null);
 
   function update(key: keyof ContactFields, value: string) {
     const next = { ...fields, [key]: value };

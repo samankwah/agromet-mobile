@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, View } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, View, type ScrollViewInstance } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
 
@@ -67,7 +67,7 @@ import {
  */
 export function CityCarousel() {
   const theme = useTheme();
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const hasPositioned = useRef(false);
   const reduceMotion = useReduceMotion();
 

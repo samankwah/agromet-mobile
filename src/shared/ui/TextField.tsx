@@ -1,5 +1,5 @@
 import React, { forwardRef } from 'react';
-import { TextInput, View, type TextInputProps } from 'react-native';
+import { TextInput, View, type TextInputInstance, type TextInputProps } from 'react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
 import { FieldLabel } from './FieldLabel';
@@ -38,7 +38,7 @@ type Props = Omit<TextInputProps, 'style'> & {
  * Forwards its ref so a form can move focus from one field to the next on
  * "Next", and jump to the first field that failed on submit.
  */
-export const TextField = forwardRef<TextInput, Props>(function TextField(
+export const TextField = forwardRef<TextInputInstance, Props>(function TextField(
   { label, multiline, error, hint, accessibilityLabel, ...rest },
   ref,
 ) {

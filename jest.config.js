@@ -13,8 +13,14 @@ module.exports = {
    * its own files, so the plain implementations load instead. Note this is not
    * the self-mocking jest.setup.js describes: that was true of Reanimated 3,
    * which detected Jest itself, and stopped being true at 4.
+   *
+   * From Reanimated 4.7 (Expo SDK 58) the worklets resolver alone is not
+   * enough: Reanimated's own `.native` initializers then call into the web
+   * worklets build and die on "runOnUISync is not supported on web". Reanimated
+   * ships a resolver that also strips `.native` from those few files of its
+   * own, and delegates everything else to the worklets one.
    */
-  resolver: '<rootDir>/node_modules/react-native-worklets/jest/resolver.js',
+  resolver: '<rootDir>/node_modules/react-native-reanimated/jest/resolver.js',
   moduleNameMapper: {
     /**
      * `.tflite` is an asset extension metro was taught about in
