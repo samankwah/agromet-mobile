@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Canvas, Fill, Shader } from '@shopify/react-native-skia';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -39,7 +39,14 @@ const css = ([r, g, b]: Rgb) => `rgb(${Math.round(r * 255)},${Math.round(g * 255
  * Decorative: hidden from screen readers. The condition is written on screen.
  */
 export function AnimatedSky({ scene }: { scene: SkyScene }) {
-  const { width, height } = useWindowDimensions();
+  // Sized from its own box, not the window. On Android, drawing edge to edge,
+  // the window height leaves out the status and gesture bars, so a sky sized
+  // from it stopped about 70dp short and the page showed through behind the
+  // tab bar. The window is only the first guess, before layout reports.
+  const windowSize = useWindowDimensions();
+  const [box, setBox] = useState<{ width: number; height: number } | null>(null);
+  const width = box?.width ?? windowSize.width;
+  const height = box?.height ?? windowSize.height;
   const reduceMotion = useReduceMotion();
   const focused = useIsFocused();
   const moving = focused && !reduceMotion;
@@ -59,6 +66,10 @@ export function AnimatedSky({ scene }: { scene: SkyScene }) {
       importantForAccessibility="no-hide-descendants"
       accessibilityElementsHidden
       style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}
+      onLayout={(event) => {
+        const { width: w, height: h } = event.nativeEvent.layout;
+        if (w > 0 && h > 0 && (w !== box?.width || h !== box?.height)) setBox({ width: w, height: h });
+      }}
     >
       {/* The sky is always dark enough for the clock and battery to go light
           over it. Only while the tab is in view: the tabs stay mounted, and a
