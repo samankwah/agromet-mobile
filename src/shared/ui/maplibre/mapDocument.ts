@@ -25,6 +25,49 @@ export const CARTO_STYLES = {
   dark: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
 } as const;
 
+const ESRI_CANVAS = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas';
+
+/** Esri's own credit line for the Canvas basemaps, as its service reports it. */
+export const ESRI_ATTRIBUTION = 'Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community';
+
+/** The id of the Esri labels layer. Rain is drawn just below it, so towns and
+ * borders stay readable on top of the rain. */
+export const ESRI_LABELS_LAYER = 'esri-labels';
+
+/**
+ * Esri's Dark Gray Canvas, for the rain map: a quiet dark ground that the
+ * bright rain colours stand out on, the same reason the CARTO dark map was
+ * used before it.
+ *
+ * Two raster tile layers from Esri's public tile service, which needs no key
+ * (checked): the grey base, and a transparent layer of place names and borders
+ * drawn on top. Tiles have detail to zoom 16; MapLibre enlarges them past that.
+ * The credit travels on the base source, so MapLibre's attribution control
+ * shows it alongside the app's own credits.
+ */
+export const ESRI_DARK_GRAY_STYLE = JSON.stringify({
+  version: 8,
+  sources: {
+    'esri-base': {
+      type: 'raster',
+      tiles: [`${ESRI_CANVAS}/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`],
+      tileSize: 256,
+      maxzoom: 16,
+      attribution: ESRI_ATTRIBUTION,
+    },
+    'esri-reference': {
+      type: 'raster',
+      tiles: [`${ESRI_CANVAS}/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`],
+      tileSize: 256,
+      maxzoom: 16,
+    },
+  },
+  layers: [
+    { id: 'esri-base', type: 'raster', source: 'esri-base' },
+    { id: ESRI_LABELS_LAYER, type: 'raster', source: 'esri-reference' },
+  ],
+});
+
 /** The script and stylesheet tags, so both documents load one MapLibre build. */
 export function mapLibreHeadTags(): string {
   return (

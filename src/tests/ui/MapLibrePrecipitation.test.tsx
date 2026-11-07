@@ -175,7 +175,18 @@ describe('MapLibrePrecipitation', () => {
     expect(mockInject.mock.calls.some(([js]) => String(js).includes('setFrames'))).toBe(true);
   });
 
-  /* CARTO and OpenStreetMap require the credit and Open-Meteo is CC BY 4.0, so
+  /* Esri's Dark Gray Canvas, base and labels, with rain drawn between the two
+     so place names stay readable over the rain. Dark in both themes. */
+  it('draws on Esri Dark Gray Canvas with the rain under its labels', () => {
+    const html = htmlOf(renderMap(0).toJSON());
+
+    expect(html).toContain('Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}');
+    expect(html).toContain('Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}');
+    expect(html).toContain("map.getLayer('esri-labels') ? 'esri-labels'");
+    expect(html).not.toContain('cartocdn');
+  });
+
+  /* Esri and OpenStreetMap require the credit and Open-Meteo is CC BY 4.0, so
      the full map carries it as a licence condition. The preview card
      deliberately does not, which only holds if this one does; the two tests are
      a pair. */
@@ -185,5 +196,6 @@ describe('MapLibrePrecipitation', () => {
     expect(html).toContain('new maplibregl.AttributionControl');
     expect(html).toContain('NASA GIBS / GPM IMERG');
     expect(html).toContain('Open-Meteo (CC BY 4.0)');
+    expect(html).toContain('Esri, HERE, Garmin');
   });
 });

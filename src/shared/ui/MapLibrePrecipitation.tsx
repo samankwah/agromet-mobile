@@ -7,7 +7,8 @@ import { useTheme } from '../theme/ThemeProvider';
 import type { PrecipFrame } from '../domain/precipitationTimeline';
 import {
   buildBoundaryGeoJson,
-  CARTO_STYLES,
+  ESRI_DARK_GRAY_STYLE,
+  ESRI_LABELS_LAYER,
   FIRST_SYMBOL_LAYER_SNIPPET,
   mapLibreHeadTags,
 } from './maplibre/mapDocument';
@@ -63,8 +64,8 @@ type ViewOptions = {
 };
 
 /**
- * MapLibre GL JS over a CARTO basemap, rendered inside a WebView, showing an
- * animated precipitation timeline.
+ * MapLibre GL JS over Esri's Dark Gray Canvas, rendered inside a WebView,
+ * showing an animated precipitation timeline.
  *
  * Why not `MapLibreChoropleth`, which is the same engine over the same basemap:
  * that component's document is memoized over its `cells` prop, so changing what
@@ -75,15 +76,14 @@ type ViewOptions = {
  * raster has no use for, and it has no notion of a raster source at all.
  *
  * So this document's `html` deliberately depends on **nothing that changes per
- * frame** — only the height and the colour scheme. Frames arrive through
+ * frame**, only where the map is looking and how it is shown. Frames arrive through
  * `injectJavaScript`, using the same escape hatch `MapLibreChoropleth`
  * established for its selection filter.
  *
- * The basemap follows the device's colour scheme. The reference app is pinned
- * dark, but this one lives inside an app that has a light mode and is used
- * outdoors in daylight, so a map that stayed dark would read as a screenshot of
- * something else. The floating chrome is dark glass in both themes, which is
- * what keeps its white text legible over either basemap.
+ * The basemap is dark in both themes, Esri's Dark Gray Canvas. It used to
+ * follow the device's scheme (CARTO light or dark), but the rain colours run
+ * from pale green upward and the pale end vanished on a light map. The
+ * floating chrome is dark glass, which suits the dark ground either way.
  */
 
 /**
@@ -100,7 +100,7 @@ type ViewOptions = {
  * tile template with `setTiles` is the thing to avoid: it tears down the tile
  * pyramid and refetches, which *is* the flicker.
  */
-function buildHtml(scheme: 'light' | 'dark', view: ViewOptions): string {
+function buildHtml(view: ViewOptions): string {
   const country = GHANA_BOUNDARIES.bounds;
   const half = view.spanDeg / 2;
 
@@ -176,7 +176,7 @@ ${FIRST_SYMBOL_LAYER_SNIPPET}
     try {
       var map = new maplibregl.Map({
         container: 'map',
-        style: '${CARTO_STYLES[scheme]}',
+        style: ${ESRI_DARK_GRAY_STYLE},
         bounds: [[${minLng}, ${minLat}], [${maxLng}, ${maxLat}]],
         fitBoundsOptions: { padding: ${fitPadding} },
         // A thumbnail is a picture. Turning the handlers off here rather than
@@ -192,7 +192,7 @@ ${FIRST_SYMBOL_LAYER_SNIPPET}
       // app leaves the map itself uncluttered.
       //
       // Attribution is not optional in the same way. Open-Meteo is CC BY 4.0,
-      // and CARTO and OpenStreetMap have their own terms, so the credits are a
+      // and Esri and OpenStreetMap have their own terms, so the credits are a
       // licence condition rather than a courtesy. What they do not have to be is
       // a paragraph across the bottom of the map: collapsed, top-right, they are
       // one tap away and out of the way.
@@ -235,14 +235,16 @@ ${FIRST_SYMBOL_LAYER_SNIPPET}
       });
 
       map.on('load', function () {
-        var labelLayer = firstSymbolLayerId(map);
+        // Rain and borders go under Esri's labels layer, so place names stay
+        // on top. A raster layer, so the symbol search cannot find it.
+        var labelLayer = map.getLayer('${ESRI_LABELS_LAYER}') ? '${ESRI_LABELS_LAYER}' : firstSymbolLayerId(map);
 
         map.addSource('boundaries', { type: 'geojson', data: ${buildBoundaryGeoJson('region')} });
         map.addLayer({
           id: 'boundary-line',
           type: 'line',
           source: 'boundaries',
-          paint: { 'line-color': '${scheme === 'dark' ? '#8fa0ad' : '#37474f'}', 'line-width': 0.8, 'line-opacity': 0.5 }
+          paint: { 'line-color': '#8fa0ad', 'line-width': 0.8, 'line-opacity': 0.5 }
         }, labelLayer);
 
         /** Frame ids in paint order, so showFrame can turn the previous one off
@@ -440,7 +442,7 @@ export function MapLibrePrecipitation({
    * because an injection into a page that has not loaded yet simply vanishes. */
   const [documentReady, setDocumentReady] = useState(false);
 
-  // The scheme and where the map is looking. Anything that changes per frame
+  // Where the map is looking. Anything that changes per frame
   // must not be in here, or the map remounts mid-animation and the reader loses
   // their pan.
   //
@@ -450,9 +452,9 @@ export function MapLibrePrecipitation({
   // changes. Depending on the `center` object rather than its two numbers would
   // remount on every render that passed a fresh literal, so it is destructured.
   const html = useMemo(
-    () => buildHtml(theme.scheme, { center, spanDeg, interactive, radius }),
+    () => buildHtml({ center, spanDeg, interactive, radius }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [theme.scheme, center?.lat, center?.lng, spanDeg, interactive, radius],
+    [center?.lat, center?.lng, spanDeg, interactive, radius],
   );
 
   /** The one way anything reaches the running map, mirroring the
@@ -577,9 +579,7 @@ export function MapLibrePrecipitation({
     // from under them.
     <View
       style={
-        height === undefined
-          ? { flex: 1, backgroundColor: theme.colors.bg }
-          : { width: '100%', height, backgroundColor: 'transparent' }
+        height === undefined ? { flex: 1, backgroundColor: theme.colors.bg } : { width: '100%', height, backgroundColor: 'transparent' }
       }
     >
       <WebView
