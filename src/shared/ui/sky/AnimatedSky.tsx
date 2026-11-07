@@ -1,63 +1,67 @@
-import React, { useMemo, useState } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import { Canvas, Fill, Shader } from '@shopify/react-native-skia';
+import React, { useEffect, useState } from 'react';
+import { Image, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useIsFocused } from 'expo-router';
-import { useDerivedValue } from 'react-native-reanimated';
+import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
-import type { Rgb, SkyScene } from '../../domain/skyScene';
+import type { SkyScene } from '../../domain/skyScene';
 import { useReduceMotion } from '../../a11y/useReduceMotion';
-import { cloudEffect, cloudUniforms } from './cloudShader';
 import { SkyLightning } from './SkyLightning';
 import { SkyRain } from './SkyRain';
+import { SKY_IMAGES } from './skyImages';
 import { useSkyClock } from './useSkyClock';
 
-/**
- * The shader draws at a third of the screen's size and is scaled up. Cloud has
- * no hard edges to lose, so the difference does not show, and it is a ninth of
- * the pixels for the low-end Android phones this app targets.
- */
-const SCALE = 3;
+/** How much larger than the screen the painting is drawn, which is the room it
+ * has to drift in. */
+const OVERSCAN = 1.12;
 
-/** One pass of the drift clock. The clouds move continuously within it and
- * jump once at the wrap, so it is long: two hours. */
-const DRIFT_LOOP_MS = 2 * 60 * 60 * 1000;
+/** One slow sweep across and back: the clouds' drift, as on the phone's own
+ * weather app. Slow enough that it reads as weather, not as motion. */
+const DRIFT_MS = 90_000;
 const RAIN_LOOP_MS = 2_400;
 
-const css = ([r, g, b]: Rgb) => `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`;
-
 /**
- * The sky behind the Daily and Weekly forecast, in the manner of a phone's own
- * weather app: real cloud cover drawn as soft cloud, drifting slowly, with rain
- * and lightning over it when the weather has them. `domain/skyScene.ts` decides
- * what is in it; `cloudShader.ts` draws the sky and cloud.
+ * The sky behind the Daily and Weekly forecast: a painted sky for the weather
+ * now (`domain/skyScene.ts` picks it from the real cloud cover, the weather
+ * code and the sunrise and sunset), drifting slowly, with rain and lightning
+ * drawn live on top when the weather has them.
  *
- * Still, with everything else the same, when the phone asks for reduced motion
- * and while the tab is out of view, so a hidden screen costs nothing.
+ * The paintings are made offline by `scripts/render-skies.py` at a quality a
+ * live drawing cannot reach on a low-end phone, and shipped in the app, so the
+ * sky shows offline. The drift is one transform on the UI thread.
  *
- * Decorative: hidden from screen readers. The condition is written on screen.
+ * Still when the phone asks for reduced motion and while the tab is out of
+ * view. Decorative: hidden from screen readers. The condition is written on
+ * screen.
  */
 export function AnimatedSky({ scene }: { scene: SkyScene }) {
   // Sized from its own box, not the window. On Android, drawing edge to edge,
   // the window height leaves out the status and gesture bars, so a sky sized
-  // from it stopped about 70dp short and the page showed through behind the
-  // tab bar. The window is only the first guess, before layout reports.
+  // from it stopped short and the page showed through behind the tab bar.
   const windowSize = useWindowDimensions();
   const [box, setBox] = useState<{ width: number; height: number } | null>(null);
   const width = box?.width ?? windowSize.width;
   const height = box?.height ?? windowSize.height;
+
   const reduceMotion = useReduceMotion();
   const focused = useIsFocused();
   const moving = focused && !reduceMotion;
 
-  const effect = useMemo(() => cloudEffect(), []);
-  const small = { width: Math.ceil(width / SCALE), height: Math.ceil(height / SCALE) };
+  const drift = useSharedValue(0);
+  useEffect(() => {
+    if (!moving) return undefined;
+    drift.value = withRepeat(withTiming(1, { duration: DRIFT_MS, easing: Easing.inOut(Easing.sin) }), -1, true);
+    return () => cancelAnimation(drift);
+  }, [moving, drift]);
 
-  const drift = useSkyClock(DRIFT_LOOP_MS, moving && effect !== null);
   const rainClock = useSkyClock(RAIN_LOOP_MS, moving && scene.precip !== 'none');
 
-  const uniforms = useDerivedValue(() => cloudUniforms(scene, small.width, small.height, (drift.value * DRIFT_LOOP_MS) / 1000));
+  const spareX = (width * (OVERSCAN - 1)) / 2;
+  const spareY = (height * (OVERSCAN - 1)) / 2;
+  const driftStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: (drift.value * 2 - 1) * spareX }, { translateY: (drift.value * 2 - 1) * spareY * 0.25 }],
+  }));
 
   return (
     <View
@@ -76,27 +80,17 @@ export function AnimatedSky({ scene }: { scene: SkyScene }) {
           status bar left here would turn Home's icons white on a light page. */}
       {focused ? <StatusBar style="light" /> : null}
 
-      {effect ? (
-        <Canvas
-          testID="sky-clouds"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: small.width,
-            height: small.height,
-            // Scaling happens about the view's centre, so it is moved first by
-            // its own size to land the enlarged copy on the screen's top left.
-            transform: [{ translateX: small.width }, { translateY: small.height }, { scale: SCALE }],
-          }}
-        >
-          <Fill>
-            <Shader source={effect} uniforms={uniforms} />
-          </Fill>
-        </Canvas>
-      ) : (
-        <LinearGradient testID="sky-gradient" colors={[css(scene.skyTop), css(scene.skyBottom)]} style={StyleSheet.absoluteFill} />
-      )}
+      <Animated.View
+        style={[{ position: 'absolute', left: -spareX, top: -spareY, width: width * OVERSCAN, height: height * OVERSCAN }, driftStyle]}
+      >
+        <Image
+          testID={`sky-${scene.backdrop}`}
+          source={SKY_IMAGES[scene.backdrop]}
+          resizeMode="cover"
+          style={StyleSheet.absoluteFill}
+          fadeDuration={250}
+        />
+      </Animated.View>
 
       <SkyRain precip={scene.precip} width={width} height={height} clock={rainClock} />
       {scene.lightning ? <SkyLightning active={moving} /> : null}
@@ -104,7 +98,7 @@ export function AnimatedSky({ scene }: { scene: SkyScene }) {
       {/* A light shade where the temperature sits, so white type holds on the
           brightest sky. Apple does the same. */}
       <LinearGradient
-        colors={['rgba(4,10,20,0.22)', 'rgba(4,10,20,0)', 'rgba(4,10,20,0.12)']}
+        colors={['rgba(4,10,20,0.18)', 'rgba(4,10,20,0)', 'rgba(4,10,20,0.12)']}
         locations={[0, 0.4, 1]}
         style={StyleSheet.absoluteFill}
       />

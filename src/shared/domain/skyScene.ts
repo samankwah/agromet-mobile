@@ -1,3 +1,4 @@
+import { sunTimes } from '../utils/sun';
 import { glyphFromWmo, type WeatherGlyph } from './weatherGlyph';
 
 /**
@@ -8,7 +9,7 @@ import { glyphFromWmo, type WeatherGlyph } from './weatherGlyph';
  * three heights decides how much cloud is drawn and where, the visibility
  * decides the haze, and the time decides the light. Fifteen percent low cloud
  * is a few scattered puffs on blue; a hundred percent is the flat grey sheet of
- * a wet afternoon. The renderer (`ui/sky/cloudShader.ts`) only paints what this
+ * a wet afternoon. The renderer (`ui/sky/AnimatedSky.tsx`) only shows what this
  * decides, so every rule is a plain unit test here.
  *
  * Rain and lightning still come from the WMO code through `glyphFromWmo`, the
@@ -23,10 +24,20 @@ export type Rgb = [number, number, number];
 
 export type CloudCover = { total: number; low: number; mid: number; high: number };
 
+/** The kinds of sky there is a painted picture for (`scripts/render-skies.py`). */
+export type SkyKind = 'clear' | 'partly' | 'cloudy' | 'overcast' | 'rain' | 'storm' | 'fog';
+
+/** Which picture: a kind of sky at a time of day, e.g. "partly-dusk". */
+export type SkyBackdrop = `${SkyKind}-${SkyPhase}`;
+
 export type SkyReading = {
   weatherCode: number;
-  isDay: boolean;
-  observedAt: string;
+  /** The moment to draw the sky for: now, not when the reading was taken. A
+   * reading half an hour old must not hold the sky at that afternoon. */
+  at: Date;
+  /** Where, for the real sunrise and sunset. */
+  lat: number;
+  lng: number;
   /** Percent, from Open-Meteo. Absent on data saved before it was fetched. */
   cloudCover?: CloudCover;
   /** Metres. */
@@ -35,6 +46,9 @@ export type SkyReading = {
 
 export type SkyScene = {
   phase: SkyPhase;
+  /** The painted sky to show. */
+  kind: SkyKind;
+  backdrop: SkyBackdrop;
   glyph: WeatherGlyph;
   /** Fraction of the sky covered at each height, 0 to 1. */
   cover: { low: number; mid: number; high: number };
@@ -63,22 +77,38 @@ export type SkyScene = {
 // ---------------------------------------------------------------------------
 
 /**
- * Dawn and dusk by the clock, in minutes past midnight.
+ * Dawn and dusk around the real sunrise and sunset for the place
+ * (`utils/sun.ts`), in minutes either side.
  *
- * Ghana sits between 5°N and 11°N, so sunrise stays near 06:00 and sunset near
- * 18:00 all year. `utils/classifyCondition.ts` relies on the same fact. The
- * windows straddle those times, when the real sky has its warm colours.
+ * The warm light starts a little before the sun goes down and is gone within
+ * half an hour of it, which is when the sky should be night. Fixed clock
+ * windows (17:30 to 19:00) kept the sky in a glowing dusk for over an hour
+ * after the sun had set.
  */
-const DAWN = { from: 5 * 60 + 30, to: 7 * 60 };
-const DUSK = { from: 17 * 60 + 30, to: 19 * 60 };
+const DAWN_BEFORE_MIN = 30;
+const DAWN_AFTER_MIN = 45;
+const DUSK_BEFORE_MIN = 45;
+const DUSK_AFTER_MIN = 25;
 
-export function skyPhase(isDay: boolean, observedAt: string): SkyPhase {
-  const date = new Date(observedAt);
-  const minutes = Number.isNaN(date.getTime()) ? 12 * 60 : date.getHours() * 60 + date.getMinutes();
+export function skyPhase(at: Date, lat: number, lng: number): SkyPhase {
+  const times = sunTimes(at, lat, lng);
+  const now = at.getTime();
+  if (!times || Number.isNaN(now)) {
+    // No answer from the equations (never in Ghana): a plain six-to-six day.
+    const hour = at.getHours();
+    return hour >= 6 && hour < 18 ? 'day' : 'night';
+  }
+  const minute = 60_000;
+  if (now >= times.sunrise - DAWN_BEFORE_MIN * minute && now < times.sunrise + DAWN_AFTER_MIN * minute) return 'dawn';
+  if (now >= times.sunset - DUSK_BEFORE_MIN * minute && now < times.sunset + DUSK_AFTER_MIN * minute) return 'dusk';
+  return now > times.sunrise && now < times.sunset ? 'day' : 'night';
+}
 
-  if (minutes >= DAWN.from && minutes < DAWN.to) return 'dawn';
-  if (minutes >= DUSK.from && minutes < DUSK.to) return 'dusk';
-  return isDay ? 'day' : 'night';
+/** Whether the sun itself is above the horizon, for its glow. */
+function sunIsUp(at: Date, lat: number, lng: number): boolean {
+  const times = sunTimes(at, lat, lng);
+  if (!times) return at.getHours() >= 6 && at.getHours() < 18;
+  return at.getTime() > times.sunrise && at.getTime() < times.sunset;
 }
 
 // ---------------------------------------------------------------------------
@@ -172,7 +202,7 @@ function toCss([r, g, b]: Rgb, alpha: number): string {
 // ---------------------------------------------------------------------------
 
 export function skyScene(reading: SkyReading): SkyScene {
-  const phase = skyPhase(reading.isDay, reading.observedAt);
+  const phase = skyPhase(reading.at, reading.lat, reading.lng);
   const glyph = glyphFromWmo(reading.weatherCode);
   const precip = PRECIP[glyph];
   const lightning = glyph === 'thunderstorm';
@@ -205,8 +235,29 @@ export function skyScene(reading: SkyReading): SkyScene {
   }
   if (glyph === 'fog') haze = Math.max(haze, 0.9);
 
-  const sunGlow = phase === 'night' ? 0 : Math.pow(1 - total, 1.5);
-  const stars = phase === 'night' ? Math.pow(1 - total, 2) : 0;
+  // The glow only while the sun is actually up; after sunset the warm dusk
+  // colours carry the light, and the first stars come out.
+  const up = sunIsUp(reading.at, reading.lat, reading.lng);
+  const sunGlow = !up ? 0 : Math.pow(1 - total, 1.5) * (phase === 'day' ? 1 : 0.6);
+  const stars = phase === 'night' ? Math.pow(1 - total, 2) : !up && phase === 'dusk' ? 0.3 * Math.pow(1 - total, 2) : 0;
+
+  // Which painting. Weather that falls or blinds wins over the cover figures:
+  // a storm with a gap in the cloud is still a storm. Otherwise the measured
+  // cover decides, from a clear sky through a few clouds to a full deck.
+  const kind: SkyKind =
+    glyph === 'thunderstorm'
+      ? 'storm'
+      : precip !== 'none'
+        ? 'rain'
+        : glyph === 'fog' || haze >= 0.45
+          ? 'fog'
+          : total < 0.12
+            ? 'clear'
+            : total < 0.45
+              ? 'partly'
+              : total < 0.78
+                ? 'cloudy'
+                : 'overcast';
 
   // Cards over the sky are a darker, see-through version of its top colour, so
   // they take on the weather: grey glass on a grey day, blue on a clear one.
@@ -214,6 +265,8 @@ export function skyScene(reading: SkyReading): SkyScene {
 
   return {
     phase,
+    kind,
+    backdrop: `${kind}-${phase}`,
     glyph,
     cover,
     measured,

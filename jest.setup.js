@@ -261,24 +261,3 @@ const mockTflite = (() => {
 
 jest.mock('react-native-fast-tflite', () => mockTflite);
 
-// Skia draws on the GPU through a native module Jest does not have. Its own
-// Jest setup loads CanvasKit as WebAssembly, which is slow and pointless for
-// tests that only check what is mounted. Canvas and its children stand in as
-// plain Views, and the runtime effect compiles to a placeholder object, so the
-// forecast sky mounts and its fallback can be tested by making `Make` return
-// null.
-jest.mock('@shopify/react-native-skia', () => {
-  const React = require('react');
-  const { View } = require('react-native');
-  const passThrough = (name) => {
-    const Component = ({ children, testID, style }) => React.createElement(View, { testID, style }, children);
-    Component.displayName = name;
-    return Component;
-  };
-  return {
-    Canvas: passThrough('Canvas'),
-    Fill: passThrough('Fill'),
-    Shader: passThrough('Shader'),
-    Skia: { RuntimeEffect: { Make: jest.fn(() => ({ __mockEffect: true })) } },
-  };
-});

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { skyScene, type CloudCover } from '../domain/skyScene';
@@ -9,9 +9,10 @@ import { SkyTintContext } from './sky/SkyTint';
 type Props = {
   /** WMO code of the current reading: decides rain and lightning. */
   weatherCode: number;
-  /** With the clock, decides dawn, day, dusk or night. */
-  isDay: boolean;
-  observedAt: string;
+  /** Where the reading is for: the sunrise and sunset that decide dawn, day,
+   * dusk and night are worked out for this place and the time now. */
+  lat: number;
+  lng: number;
   /** Percent of sky covered, by height. Decides how much cloud is drawn. */
   cloudCover?: CloudCover;
   /** Metres. Decides the haze. */
@@ -24,7 +25,19 @@ type Props = {
  * real cloud cover and drifting slowly, with the forecast on top. The cards
  * inside take their glass colour from it. See `sky/AnimatedSky.tsx`.
  */
-export function WeatherBackdrop({ weatherCode, isDay, observedAt, cloudCover, visibilityM, children }: Props) {
+/** The current time, moved on once a minute so the sky turns over at dusk
+ * while the screen is open. */
+function useMinute(): Date {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
+
+export function WeatherBackdrop({ weatherCode, lat, lng, cloudCover, visibilityM, children }: Props) {
+  const now = useMinute();
   const total = cloudCover?.total;
   const low = cloudCover?.low;
   const mid = cloudCover?.mid;
@@ -35,13 +48,14 @@ export function WeatherBackdrop({ weatherCode, isDay, observedAt, cloudCover, vi
     () =>
       skyScene({
         weatherCode,
-        isDay,
-        observedAt,
+        at: now,
+        lat,
+        lng,
         cloudCover:
           total === undefined || low === undefined || mid === undefined || high === undefined ? undefined : { total, low, mid, high },
         visibilityM,
       }),
-    [weatherCode, isDay, observedAt, total, low, mid, high, visibilityM],
+    [weatherCode, now, lat, lng, total, low, mid, high, visibilityM],
   );
   return (
     <SkyTintContext.Provider value={scene.glass}>

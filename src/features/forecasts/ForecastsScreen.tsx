@@ -157,8 +157,8 @@ export function ForecastsScreen({ requestedSegment }: Props = {}) {
         <Screen scroll={false} padded={false} fullBleed>
           <WeatherBackdrop
             weatherCode={conditions.data.weatherCode}
-            isDay={conditions.data.isDay}
-            observedAt={conditions.data.observedAt}
+            lat={conditions.data.lat}
+            lng={conditions.data.lng}
             cloudCover={conditions.data.cloudCover}
             visibilityM={conditions.data.visibilityM}
           >
