@@ -84,8 +84,20 @@ export function PlaybackBar({
   const current = frames[index];
 
   return (
-    <Card translucent style={{ padding: 14, gap: 10, backgroundColor: chrome.card, borderColor: chrome.border }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+    // Compact, as the phone's own weather app sizes it: a small round play
+    // button, a short title over the time, the span switch, and the track.
+    <Card
+      translucent
+      style={{
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        gap: 8,
+        borderRadius: 22,
+        backgroundColor: chrome.card,
+        borderColor: chrome.border,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <Pressable
           onPress={onToggle}
           disabled={!canPlay}
@@ -93,23 +105,23 @@ export function PlaybackBar({
           accessibilityState={{ disabled: !canPlay }}
           accessibilityLabel={playing ? 'Pause rainfall animation' : 'Play rainfall animation'}
           style={{
-            width: 40,
-            height: 40,
-            borderRadius: 20,
+            width: 32,
+            height: 32,
+            borderRadius: 16,
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: ON_MAP.control,
             opacity: canPlay ? 1 : 0.45,
           }}
         >
-          <Ionicons name={playing ? 'pause' : 'play'} size={18} color={ON_MAP.text} />
+          <Ionicons name={playing ? 'pause' : 'play'} size={15} color={ON_MAP.text} />
         </Pressable>
 
         <View style={{ flex: 1 }}>
-          <Text variant="bodyStrong" color={ON_MAP.text}>
+          <Text variant="bodyStrong" color={ON_MAP.text} style={{ fontSize: 15, lineHeight: 19 }}>
             {current ? KIND_LABEL[current.kind] : 'Rainfall'}
           </Text>
-          <Text variant="caption" color={ON_MAP.muted} numberOfLines={1}>
+          <Text variant="caption" color={ON_MAP.muted} numberOfLines={1} style={{ fontSize: 12, lineHeight: 16 }}>
             {current ? formatFrameTime(current.validAt) : ''}
           </Text>
         </View>
@@ -117,7 +129,7 @@ export function PlaybackBar({
         <View
           accessibilityRole="tablist"
           accessibilityLabel="How far ahead to show"
-          style={{ flexDirection: 'row', backgroundColor: ON_MAP.control, borderRadius: 999, padding: 3 }}
+          style={{ flexDirection: 'row', backgroundColor: ON_MAP.control, borderRadius: 999, padding: 2 }}
         >
           {SPANS.map((option) => {
             const selected = option.id === span;
@@ -129,13 +141,19 @@ export function PlaybackBar({
                 accessibilityState={{ selected }}
                 accessibilityLabel={option.id === '1h' ? 'Show 1 hour ahead' : 'Show 12 hours ahead'}
                 style={{
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
+                  paddingHorizontal: 13,
+                  paddingVertical: 5,
                   borderRadius: 999,
                   backgroundColor: selected ? ON_MAP.controlSelected : 'transparent',
+                  // A lift on the chosen option, as on the reference.
+                  elevation: selected ? 1 : 0,
                 }}
               >
-                <Text variant="caption" color={selected ? ON_MAP.controlSelectedText : ON_MAP.muted}>
+                <Text
+                  variant="body"
+                  color={selected ? ON_MAP.controlSelectedText : ON_MAP.text}
+                  style={{ fontSize: 14, lineHeight: 18, fontWeight: selected ? '700' : '500' }}
+                >
                   {option.label}
                 </Text>
               </Pressable>

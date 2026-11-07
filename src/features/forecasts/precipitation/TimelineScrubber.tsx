@@ -19,8 +19,8 @@ type Props = {
   chrome?: MapChrome;
 };
 
-const TRACK_HEIGHT = 36;
-const LINE_HEIGHT = 4;
+const TRACK_HEIGHT = 24;
+const LINE_HEIGHT = 6;
 /** At most this many times printed under the track. More than five and they
  * collide at phone width; fewer and the axis stops being readable. */
 const MAX_LABELS = 5;
@@ -63,13 +63,6 @@ export function TimelineScrubber({ frames, index, playing, reduceMotion, span, n
   /** Ticks and times on a regular clock grid (see `timelineAxis`), so they sit
    * evenly along the strip whatever the frames' own spacing. */
   const axis = useMemo(() => timelineAxis(frames, MAX_TICKS, MAX_LABELS), [frames]);
-
-  /** The last measured moment. Ticks up to it are drawn as measured. */
-  const lastObservedMs = useMemo(() => {
-    let last = -Infinity;
-    for (const frame of frames) if (frame.kind === 'observed') last = Math.max(last, Date.parse(frame.validAt));
-    return last;
-  }, [frames]);
 
   // The fill glides on the frame's own dwell so it arrives exactly as the next
   // frame paints. Under reduced motion, and when paused, it simply jumps.
@@ -154,6 +147,25 @@ export function TimelineScrubber({ frames, index, playing, reduceMotion, span, n
           }}
         />
 
+        {/* Ticks inside the grey track, one per clock interval, so the scale
+            reads without crowding the labels. Drawn before the fill, which
+            covers the ones already played, as the phone's own weather app
+            does. */}
+        {axis.ticks.map((tick) => (
+          <View
+            key={tick.atMs}
+            testID="timeline-tick"
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: tick.fraction * Math.max(0, trackWidth - 1.5),
+              width: 1.5,
+              height: LINE_HEIGHT,
+              backgroundColor: chrome.tickForecast,
+            }}
+          />
+        ))}
+
         {/* The fill is the thumb: the reference app has no separate handle, and
             a growing bar says "elapsed" more directly than a dot does. */}
         <Animated.View
@@ -171,27 +183,6 @@ export function TimelineScrubber({ frames, index, playing, reduceMotion, span, n
           }}
         />
 
-        {axis.ticks.map((tick) => {
-          // Measured time gets a taller, brighter tick than modelled time. The
-          // difference between a measurement and a forecast is the most
-          // important thing this strip has to say.
-          const measured = tick.atMs <= lastObservedMs;
-          return (
-            <View
-              key={tick.atMs}
-              testID="timeline-tick"
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                left: tick.fraction * Math.max(0, trackWidth - 1),
-                width: 1,
-                height: measured ? 12 : 8,
-                backgroundColor: measured ? chrome.tickMeasured : chrome.tickForecast,
-              }}
-            />
-          );
-        })}
-
         {/* Now, drawn rather than implied. On an axis that runs from measured
             through modelled to forecast, this is the reference point every
             other tick is read against. */}
@@ -202,7 +193,7 @@ export function TimelineScrubber({ frames, index, playing, reduceMotion, span, n
               position: 'absolute',
               left: now * Math.max(0, trackWidth - 2),
               width: 2,
-              height: 18,
+              height: 14,
               borderRadius: 1,
               backgroundColor: chrome.now,
             }}
@@ -210,24 +201,32 @@ export function TimelineScrubber({ frames, index, playing, reduceMotion, span, n
         ) : null}
       </View>
 
-      <View style={{ height: 14 }}>
-        {labels.map((label) => (
-          <Text
-            key={label.key}
-            variant="caption"
-            color={label.isNow ? chrome.text : chrome.muted}
-            style={{
-              position: 'absolute',
-              // Centred on its tick, but kept inside the bar at either end.
-              left: Math.min(Math.max(0, label.fraction * trackWidth - LABEL_WIDTH / 2), Math.max(0, trackWidth - LABEL_WIDTH)),
-              width: LABEL_WIDTH,
-              textAlign: 'center',
-              fontWeight: label.isNow ? '700' : undefined,
-            }}
-          >
-            {label.text}
-          </Text>
-        ))}
+      <View style={{ height: 16 }}>
+        {labels.map((label) => {
+          // "4 PM" with the AM/PM set smaller, as the reference app prints it.
+          const suffix = / (AM|PM)$/.exec(label.text);
+          return (
+            <Text
+              key={label.key}
+              variant="caption"
+              color={label.isNow ? chrome.text : chrome.muted}
+              style={{
+                position: 'absolute',
+                // Centred on its tick, but kept inside the bar at either end.
+                left: Math.min(Math.max(0, label.fraction * trackWidth - LABEL_WIDTH / 2), Math.max(0, trackWidth - LABEL_WIDTH)),
+                width: LABEL_WIDTH,
+                textAlign: 'center',
+                fontSize: 12,
+                fontWeight: label.isNow ? '700' : '600',
+              }}
+            >
+              {suffix ? label.text.slice(0, suffix.index) : label.text}
+              {suffix ? (
+                <Text style={{ fontSize: 9, fontWeight: '600' }} color={label.isNow ? chrome.text : chrome.muted}>{` ${suffix[1]}`}</Text>
+              ) : null}
+            </Text>
+          );
+        })}
       </View>
     </View>
   );
