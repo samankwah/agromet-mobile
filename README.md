@@ -1,405 +1,92 @@
-# AgroMet Ghana — Mobile
+# AgroMet Ghana: Mobile App
 
-A native React Native + Expo app delivering agrometeorological alerts,
-advisories, forecasts, farm tools, and reference material to Ghanaian
-farmers. Part of the AgroMet monorepo, alongside `frontend/` (the web app /
-admin surface) and `backend/` (FastAPI). This is a native app, not a
-WebView wrapper.
+The Android and iOS app for AgroMet Ghana. It gives farmers forecasts, flood and
+drought warnings, seasonal outlooks, advisories, crop diagnosis, market prices
+and an AI assistant.
 
-Built on Expo SDK 57 (React Native 0.86, React 19.2), New Architecture,
-expo-router. Styling is inline style objects over a design-token module
-(`src/shared/theme`); there is no NativeWind or Tailwind.
+**Download (Android):** [agromet-ghana-1.0.0.apk](https://github.com/samankwah/agromet-mobile/releases/download/v1.0.0/agromet-ghana-1.0.0.apk)
 
-## Navigation
+The backend, website and model training code are in
+[samankwah/agromet](https://github.com/samankwah/agromet).
 
-Five bottom tabs, each covering a distinct area of the product:
+Built with React Native, Expo SDK 57 and TypeScript.
 
-| Tab            | Status this increment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Home**       | Real — alert banner, city carousel, current conditions, quick actions, featured forecast, latest advisory, latest news                                                                                                                                                                                                                                                                                                                                                                                   |
-| **Forecasts**  | Real — Today (hourly strip + stats + a farm-actionable card), 7-Day (expandable list with a min–max range bar), and Outlook (subseasonal + seasonal, marked as probabilistic), plus a lightweight, honest map preview card                                                                                                                                                                                                                                                                               |
-| **Advisories** | Real — weather alerts derived from the hazard index, crop and poultry advisories, flood/drought monitoring, and a searchable advisory archive                                                                                                                                                                                                                                                                                                                                                            |
-| **Farm Tools** | Crop Diagnose, crop/poultry calendars, market prices and farm reminders — every tool on this tab is built and routes out from here                                                                                                                                                                                                                                                                                                                                                                       |
-| **Consult**    | Real — a conversational assistant over the backend's `/api/chat`, in a messaging layout: multi-turn context, day-grouped tailed bubbles, starter questions, inline retry, voice input, photo questions, read-aloud. Answers are grounded server-side in the farmer's own forecast, hazard bands and prices. The transcript survives a restart for 24 hours (`storage/chatHistory`) and clears itself after. The tab is named for the action; the assistant itself is still AgroMet AI wherever it speaks |
+## Features
 
-Settings live at `app/settings.tsx`, reached from the app menu — the button at
-the right of every tab's header, which opens `shared/ui/MenuDrawer`. Settings is
-deliberately not a sixth tab: the five tabs run with `headerShown: false`, and
-app-level utilities (About, Settings, Share, Contact, Terms, Privacy) belong
-together behind one menu rather than competing with the five things a farmer
-actually opens the app to do.
+| Tab | What it does |
+|---|---|
+| Home | Weather for the farmer's town or GPS location, severe weather banner, latest advisory |
+| Forecasts | Hourly, 7 days, live rain map, weeks 2 to 4 outlook and seasonal outlook on maps of Ghana |
+| Advisories | Weather alerts for the farmer's district, crop and poultry advisories, flood and drought risk |
+| Farm Tools | Crop diagnosis, crop and poultry calendars, market prices, reminders |
+| Consult | AgroMet AI chat, with voice and photo questions and read-aloud answers |
 
-The fifth tab used to be **Library**, a single card of four FAQ answers. The
-assistant replaced it: the backend had been serving `/api/chat` all along with
-nothing in this app calling it, and a conversation is a better use of the slot
-than a static list. The FAQ _data layer_ is deliberately retained, currently
-unplaced — see `src/features/library/useFaqs.ts`, which explains which five
-files that covers and why none of them is dead code.
+- **Diagnosis without internet:** a cassava model runs on the phone
+  (`assets/models/cassava.tflite`, 71.5% accuracy). Other crops are sent to the
+  backend.
+- **District from GPS:** the app finds which of Ghana's 260 districts the farmer
+  is in and shows alerts for it.
+- **Works offline:** screens show the last saved data when there is no signal.
+- **Example content:** market prices are example figures, and a labelled sample
+  advisory shows when none is published. The app has no sign-in.
 
-Several areas still run on mock data, clearly tagged in development (see
-"Mock data" below). See "Mock services" for which are real and which are
-not, and how to swap the rest in.
-
-## Farm reminders and notifications
-
-Reminders are **device-local**. There is no reminders table, scheduler or push
-infrastructure on the AgroMet backend, and a farmer with no signal is the case
-this app is built for — so `shared/state/reminderStore.ts` (zustand + persist,
-`agromet:zustand:reminders`) is the source of truth. The OS notification is a
-projection of it, not the record.
-
-A reminder can be created three ways: typed in on the reminders screen, from a
-crop or poultry calendar activity (which needs a started cycle, because a week
-number only becomes a date once one is running), or from a weather alert.
-
-### Notifications need a development build
-
-`expo-notifications` cannot deliver Android local notifications from **Expo Go**
-— support was removed in SDK 53. In Expo Go the reminders list works fully and
-the screen says plainly that alerts will not fire; it does not pretend the
-schedule was accepted. To get real alerts:
+## Run it
 
 ```bash
-npx eas-cli@latest login
-npx eas-cli@latest init      # writes extra.eas.projectId into app.json
+npm install
+cp .env.example .env
+npx expo start
+```
+
+Scan the QR code with Expo Go. The phone and computer must be on the same Wi-Fi.
+
+Two features need a development build instead of Expo Go: on-device diagnosis
+and reminder notifications.
+
+```bash
 npx eas-cli@latest build --profile development --platform android
 npx expo start --dev-client
 ```
 
-`eas.json`'s `development` profile already sets `developmentClient: true`, so no
-build configuration changes are needed.
-
-### What Expo Go can and cannot run
-
-This project tracks the current Expo SDK (57), so Expo Go on a physical
-iPhone or Android device opens it directly — Apple only ships the newest
-Expo Go, and "Project is incompatible with this version of Expo Go" means
-the project has fallen behind that, not the other way round.
-
-Two features still need a development build, on either platform:
-
-- **Crop diagnosis.** `react-native-fast-tflite` is a native module Expo Go
-  does not contain. The Diagnose screen loads but the on-device model does
-  not run.
-- **Real notification delivery.** `expo-notifications` dropped local
-  notification support from Expo Go in SDK 53. The reminders list works
-  fully in Expo Go and says plainly that alerts will not fire; it is loaded
-  lazily so its absence never white-screens the app.
-
-Everything else — forecasts, advisories, the hazard maps, market, the
-Consult assistant, reminders as a list — runs in Expo Go.
-
-For the two native features, build a development client. `eas.json`'s
-`development` profile is configured for both platforms (the `ios` block
-does an ad-hoc device build, which needs an Apple Developer Program
-membership to register the device):
-
-```bash
-npx eas-cli@latest login
-npx eas-cli@latest build --profile development --platform android   # or ios
-npx expo start --dev-client
-```
-
-### Known limitation, stated rather than papered over
-
-On Android 12+ an exact alarm can still be deferred by OEM battery
-optimisation, which is common on exactly the low-end devices this app targets.
-`SCHEDULE_EXACT_ALARM` and `USE_EXACT_ALARM` are declared and the reminders
-channel is created at `HIGH` importance, which is as far as an app can go.
-**Reminders are best-effort at the OS level; the in-app list is the reliable
-record.** A row whose notification is not registered says "No alert" rather than
-looking identical to one that is.
-
-`reconcile()` re-registers notifications on launch, because the OS drops
-scheduled ones on reinstall and a reminder created while permission was denied
-never had one.
-
-## Prerequisites
-
-- Node.js (matching the repo root — v24.x; Expo SDK 57 wants `^20.19.4`,
-  `^22.13.0`, `^24.3.0`, or `^25`)
-- npm
-- The [Expo Go](https://expo.dev/go) app on a physical device (iOS or
-  Android — Android is the primary release target, but the app runs on
-  both), or a simulator/emulator. See "What Expo Go can and cannot run"
-  above for the two features that need a development build.
-
-## Install
-
-```bash
-cd mobile
-npm install
-```
-
 ## Environment variables
 
-```bash
-cp .env.example .env
-```
+| Variable | Purpose |
+|---|---|
+| `EXPO_PUBLIC_API_URL` | Backend address (production: `https://agromet-backend.vercel.app`). Unset uses port 8000 on your computer |
+| `EXPO_PUBLIC_SITE_URL` | Website for Terms and Privacy |
+| `EXPO_PUBLIC_MARKET_WHATSAPP` | WhatsApp number for market orders |
+| `EXPO_PUBLIC_CONTACT_EMAIL`, `EXPO_PUBLIC_CONTACT_PHONE` | Contact details in the menu |
+| `EXPO_PUBLIC_SENTRY_DSN` | Crash reporting (optional) |
 
-Expo only exposes client-side env vars prefixed `EXPO_PUBLIC_` (unlike the
-web app's Vite-based `VITE_` prefix). `EXPO_PUBLIC_API_BASE_URL` is defined
-but unused this increment — every service function currently reads local
-mock data; it's reserved for the increment that points the app at a real
-backend.
+Release builds already set these in `eas.json`. After changing `.env`, restart
+with `npx expo start -c`.
 
-## Run
-
-```bash
-npx expo start
-```
-
-Or from the repo root: `npm run mobile:start`.
-
-Scan the QR code with Expo Go — on Android, use Expo Go's own scanner; on
-iOS, point your Camera app at it. Device and computer must be on the same
-Wi-Fi network. Press `a` in the terminal to launch an Android emulator
-instead, if you have one configured.
-
-Other scripts:
+## Scripts
 
 ```bash
-npm run android       # expo start --android
-npm test              # jest — utilities, domain logic, and a Home smoke render test
-npm run lint           # expo lint (ESLint, flat config)
-npm run format         # prettier --write .
-npm run format:check   # prettier --check . (what CI runs)
-npx tsc --noEmit       # type-check
+npm test              # 1,185 tests
+npm run lint
+npx tsc --noEmit      # type check
 ```
 
-## Project structure
-
-```
-app/                          Expo Router routes — thin, just render a screen
-  (tabs)/                      Home, Forecasts, Advisories, Farm Tools, Consult tabs
-  alert/[id].tsx                Alert details
-  saved-districts.tsx           Manage which districts you get alerts for
-  diagnose.tsx                  Crop Diagnose (reached from a Farm Tools card, not a tab itself)
-  settings.tsx                  App settings (reached from the app menu, not a tab)
-  about.tsx                     What the app is, its sources and its version
-  contact.tsx                   Write to the AgroMet team (POSTs to /api/contact)
-  legal/[slug].tsx              Terms and Privacy, fetched from /api/legal/{slug}
-  spatial-outlook.tsx           Seasonal Outlook's gridded map (reached from SeasonalOutlookCard, not a tab)
-src/
-  features/
-    home/                       Home screen + its cards (CityCarousel, FeaturedForecastCard, NewsTeaserCard, …)
-    advisories/
-      weather-alerts/            Alert banner, details/saved-districts screens, useAlerts
-      AdvisoriesScreen.tsx        Composed screen: live alerts + stub sections
-    farm-tools/
-      diagnose/                   Diagnose form, photo capture, result card, WhatsApp share
-      FarmToolsScreen.tsx          Composed screen: live diagnose entry + stub sections
-    forecasts/                   Today / 7-Day / Outlook segmented screen, useForecastsData, components/
-    chat/                        AgroMet AI: transcript reducer (useChat), tailed bubbles, contact header,
-                                 pill composer + attachment grid, starter prompts
-    library/                     Retained FAQ layer (useFaqs, FaqItem, LibrarySkeleton) — no screen
-                                 renders it today; retained deliberately, not dead code
-    settings/                    App settings: appearance, text size, data saver, reminder alerts
-  shared/
-    domain/                      TypeScript types for every feature area (see "Domain models" below)
-    data/                        Mock data — one file per domain, clearly the swap target for real content
-    api/                         Service functions — the sole swap point for real APIs (see below)
-    state/                       Zustand stores — client-only preference/selection state (see below)
-    storage/                     Generic AsyncStorage cache + the diagnosis offline queue
-    net/                         Connectivity hook (NetInfo)
-    theme/                       Design tokens (ported from the web app's palette) + ThemeProvider
-    ui/                          Shared primitives — Screen, Card, Button, Text, AsyncStateView, EmptyState,
-                                  DoodleWallpaper (the page pattern behind Home, Advisories, Farm Tools and
-                                  the chat — opt-in via Screen's `wallpaper` prop; Forecasts skips it because
-                                  it paints its own photographic ground),
-                                  Skeleton, OfflineBanner, SeverityBadge, MockDataTag, StatTile, BulletList,
-                                  DetailRow, Divider, FieldLabel, TextField, DateTimeField, OptionSheet,
-                                  SegmentedControl, TemperatureRangeBar, ConfidenceBadge, ChoroplethMap,
-                                  MapLibreChoropleth, ColorScaleLegend, LineAreaChart, WeatherBackdrop,
-                                  Dropdown, Drawer
-    utils/                       Formatting helpers
-  tests/                        Jest tests, mirroring the src/ structure
-```
-
-## State: TanStack Query vs. Zustand
-
-Two different jobs, two different tools:
-
-- **TanStack Query** owns every fetch with a server-shaped answer — current
-  conditions, forecasts, advisories, alerts, news. It already handles
-  loading/error/retry/caching.
-- **Zustand** (`shared/state/`) owns client-only preference/selection state
-  that has no server source of truth:
-  - `locationStore.ts` — which town is selected on Home, which districts
-    the farmer saved for alerts. Persisted via `zustand/middleware`'s
-    `persist` + AsyncStorage.
-  - `settingsStore.ts` — theme override, text size, data-saver mode,
-    language, favourite districts/crops, livestock type, notification
-    preferences. Backs `ThemeProvider`'s dark-mode/text-size resolution.
-    Only four of these are wired to a consumer — theme, text size, data
-    saver and `notificationPrefs.remindersEnabled` — and `app/settings.tsx`
-    deliberately exposes only those four. See that screen's header comment
-    before adding a control for any of the others.
-  - `authStore.ts` — a guest-only placeholder (`{ mode: 'guest', guestId }`)
-    so later milestones don't have to retrofit an auth concept into
-    stores/components that assumed a single implicit user.
-
-Both persist through AsyncStorage directly (Zustand's own idiomatic
-pattern), namespaced `agromet:zustand:*` — distinct from
-`shared/storage/cache.ts`'s `agromet:cache:*`, which remains a separate,
-timestamped "last successful fetch" cache for query results (e.g. the
-alerts offline fallback), not preferences.
-
-## Mock services and swapping in a real backend later
-
-Every screen gets its data through a function in `src/shared/api/`. No UI
-component ever imports mock data directly — only the matching service
-function, each wrapped in `mockDelay()` to simulate latency. That means
-pointing the app at a real backend is a change to one file per domain, not
-a rewrite.
-
-**Fully backed by real mock data and consumed by real UI**: `weatherService`,
-`advisoryService`, `alertsService` (+ `getAlertById`), `diagnosisService`,
-`newsService`, and `forecastService`'s `getDailyForecast`/
-`getWeeklyForecast`/`getFeaturedWeeklyForecast`/`getHourlyForecast`
-(the Forecasts tab's Today and 7-Day sections).
-
-`forecastService.getSubseasonalOutlook`/`getSeasonalOutlook`/
-`getForecastMapLayers` are now also consumed by real UI (the Outlook
-section and the map preview card) — the mock _data_ stays intentionally
-static/placeholder-quality (one hardcoded outlook regardless of location,
-no real map imagery), but the screens built against them are real, not
-stubs.
-
-**Signature + placeholder mock only, no UI yet** (types exist now so the
-milestone that builds their UI is pure UI work):
-`calendarService`, `poultryCalendarService`, `marketService`,
-`mapService`, `settingsService` (a no-op sync
-placeholder — settings are store-owned), `authService` (guest-only).
-
-`bulletinService` and its mock used to sit in that list. They were deleted
-rather than carried: there is no bulletins endpoint, and real bulletins
-already reach farmers as the weekly advisory and its archive under
-Advisories, so the placeholder only implied a feature that was not coming.
-
-Real-integration notes:
-
-- `weatherService.getCurrentConditions()` — field names mirror the web
-  app's Open-Meteo-normalized shape, so it can call a backend proxy or
-  Open-Meteo directly (`frontend/src/services/openMeteoService.js`).
-- `advisoryService.getLatestAdvisoryTeaser()` — points at the backend's
-  `GET /api/weekly-advisories` (`backend/app/main.py`).
-- `alertsService` — no backend or CAP feed exists yet; see
-  `shared/domain/alertSeverity.ts` for the CAP severity mapping this was
-  designed against.
-- `diagnosisService.submitDiagnosis()` — the `DiagnosisRequest`
-  in/`DiagnosisResult` out contract a real Azure ML endpoint, or the
-  backend's Kindwise-based `POST /api/crop-diagnosis`
-  (`backend/app/diagnosis.py`), needs to satisfy.
-- `calendarService` — field names mirror the backend's
-  `serialize_calendar`/`serialize_calendar_activity`
-  (`backend/app/domain.py`) 1:1.
-- `marketService` — mirrors the backend's `GET /api/market/*` shape 1:1.
-
-## Domain models
-
-Every feature area from the product's full scope has a TypeScript type in
-`shared/domain/`, even where no screen consumes it yet: `CurrentWeather`,
-`WeatherAlert`/`AlertSeverity`, `AgroAdvisory` (general or crop-specific,
-via a `kind` discriminant), `DiagnosisRequest`/`DiagnosisResult`/
-`QueuedDiagnosisSubmission`, `DailyForecast`/`WeeklyForecast`/
-`HourlyForecast`, `SubseasonalOutlook`/`SeasonalOutlook` (both carry a
-**mandatory** `plainLanguageSummary` — a probabilistic climate outlook
-can't be rendered without also carrying its own uncertainty explanation),
-`ForecastMapLayer`/`MapLayer`, `CropCalendar`/`CropCalendarActivity`,
-`PoultryCalendar`/`PoultryGuidanceItem`, `MarketCommodity`/`MarketTrend`,
-`FarmReminder`, `NewsUpdate`, `UserSettings`, `Account`.
-
-`SpatialOutlookDataset`/`SpatialGridCell` (`shared/domain/spatialOutlook.ts`)
-back the Seasonal Outlook's gridded map — see "Seasonal Outlook spatial
-map" below.
-
-## Seasonal Outlook spatial map
-
-`SeasonalOutlookCard` has a "View spatial map" action (`app/spatial-outlook.tsx`)
-that opens a gridded choropleth of Ghana with a bottom drawer of filters
-(Forecast View: Probability/Deterministic, Geography: Region/District,
-Variable, Sub-season) over an always-visible color-scale legend — expand
-the drawer for every control, collapse it to leave the map fully visible.
-
-**The map geometry is real, the grid values are mock:**
-
-- `shared/data/ghanaBoundaries.json` — real, simplified Ghana country/
-  region/district boundaries plus a pre-baked ~0.15°-resolution grid
-  (~865 cells, each already tagged with its region/district), generated
-  once by **`scripts/build-ghana-boundaries.mjs`** from the web app's
-  boundary assets (`frontend/src/assets/ghana-district-boundaries.json`,
-  `ghana-regions.json`). That script uses `@turf/turf` (a devDependency,
-  never shipped in the app) to simplify/dissolve/union the source
-  polygons and bake the grid — re-run it (`node
-scripts/build-ghana-boundaries.mjs`) if the source boundary data
-  changes. The output stays minified (see `.prettierignore`) since
-  pretty-printing roughly doubles its size.
-- `shared/api/spatialOutlookService.ts` fills each pre-baked cell's
-  `value` with a plausible mock pattern (`shared/data/mockSpatialOutlook.ts`)
-  — the real gridded dataset will be supplied later and slots into the
-  same per-cell shape (`regionName`/`districtName`/`value`), so swapping
-  it in doesn't touch the map rendering at all.
-- Rendered via `react-native-svg` (`shared/ui/ChoroplethMap.tsx`,
-  `shared/utils/geoProjection.ts` for the lat/lng→screen projection,
-  `shared/utils/colorScale.ts` for the viridis-style legend) — not a map-
-  tile library. This is a static country-scale illustration, not a
-  pannable/zoomable slippy map, so a full map library would be
-  unjustified weight.
-
-## Mock data
-
-The user-facing rule this app follows: **never present fake real-time
-claims — label mock data clearly in development.** Every Home card backed
-by mock data renders a small `MockDataTag` (`shared/ui/MockDataTag.tsx`) —
-`__DEV__`-gated, zero cost in production builds.
-
-The 10 towns Home supports: Accra, Kumasi, Tamale, Bolgatanga, Damongo,
-Cape Coast, Koforidua, Tema, Ho, Yendi (`shared/data/mockWeather.ts`,
-coordinates cross-referenced from the web app's `ghanaCities`).
-
-## Testing
+## Build
 
 ```bash
-npm test
+npx eas-cli@latest build -p android --profile apk          # APK to share
+npx eas-cli@latest build -p android --profile production   # Google Play
 ```
 
-Covers `shared/utils/*`, `shared/theme/tokens.ts`'s `scaleTypeScale`,
-`shared/domain/alertSeverity.ts` (severity → label/color/icon mapping,
-including an exhaustive-switch guard), `shared/data/districts.ts`'s
-town-to-district mapping, `shared/api/forecastService.ts` (including that
-`SeasonalOutlook.rainfallProbability`'s three categories sum to 100), and
-a Home screen smoke render test.
+Store release steps are in [`store/RELEASE.md`](store/RELEASE.md).
 
-## Releasing to Google Play and the App Store
+## Folders
 
-The full runbook, from creating the store accounts to the Play closed test
-and App Review, is in [`store/RELEASE.md`](store/RELEASE.md). The listing
-text, data safety and privacy answers are in
-[`store/listing.md`](store/listing.md).
-
-In short:
-
-- `eas build -p android --profile preview` makes an APK to install directly
-  on test phones.
-- `eas build -p all --profile production` makes the store builds (an app
-  bundle for Play, an IPA for the App Store), and `eas submit` uploads them.
-  The very first Play upload is done by hand in Play Console.
-- Build numbers live on EAS (`appVersionSource: remote`) and go up by
-  themselves. The runtime version follows the app `version` (`appVersion`
-  policy), so an `eas update` only reaches builds of the same version.
-  **Bump `version` in app.json whenever a native module, permission or plugin
-  changes**, or an update could reach a build that cannot run it. (The
-  `fingerprint` policy would catch this automatically, but it makes
-  `expo start` hash the project on every manifest request, 30 to 130 seconds
-  on the dev PC, which times out Expo Go.)
-- The icons in `assets/` are the AgroMet mark on brand green, made from
-  `assets/agromet-mark.png`. The 512 px store icon is `store/store-icon-512.png`.
-
-## CI
-
-`.github/workflows/ci.yml` in this repo runs on pushes to `main` and on pull
-requests: installs, then `lint`, `tsc --noEmit`, `test`, and an
-`expo export --platform android` smoke bundle. It lives here rather than in
-the parent repo, whose `mobile-ci.yml` never ran because the parent ignores
-`mobile/`.
+```
+app/                 Screens (Expo Router)
+src/features/        Code for each area: home, forecasts, advisories, chat, ...
+src/shared/api/      All calls to the backend
+src/shared/data/     Ghana boundaries, regions, districts
+src/tests/           Tests
+assets/models/       The on-device diagnosis model
+scripts/             Builds the map boundaries from GADM data
+store/               Store listing and release steps
+```
