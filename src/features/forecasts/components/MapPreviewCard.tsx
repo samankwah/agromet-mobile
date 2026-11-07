@@ -9,13 +9,10 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Card } from '../../../shared/ui/Card';
 import { MapLibrePrecipitation } from '../../../shared/ui/MapLibrePrecipitation';
 import { Text } from '../../../shared/ui/Text';
+import { useWhenIdle } from '../../../shared/ui/useWhenIdle';
 import { formatDegrees } from '../../../shared/utils/formatTemperature';
 import { openingIndex } from '../precipitation/frames';
-import {
-  CELL_SIZE_DEG,
-  PRECIP_CLASSES,
-  usePrecipitationTimeline,
-} from '../precipitation/usePrecipitationTimeline';
+import { CELL_SIZE_DEG, PRECIP_CLASSES, usePrecipitationTimeline } from '../precipitation/usePrecipitationTimeline';
 
 type Props = {
   /** Where to look. The selected town, straight off the conditions the Daily
@@ -51,6 +48,12 @@ const MAP_HEIGHT = 200;
  *    on, so the two share one react-query entry: the preview warms the cache
  *    the map then opens from, rather than costing a second fetch.
  *
+ * The WebView mounts only once the screen is idle. It is the heaviest thing on
+ * the Forecasts tab (a browser engine, MapLibre from a CDN, then tiles) and it
+ * sits below the fold, so building it in the first frame held up the
+ * temperature and the hourly strip above it for a map nobody had scrolled to
+ * yet. Until then the card keeps the map's exact height, so nothing moves.
+ *
  * The whole card is one tap target. The map is behind `pointerEvents="none"`
  * because a WebView otherwise eats the touch and the Pressable never fires. It
  * carries no attribution control for the same reason and one more: there is no
@@ -67,6 +70,7 @@ export function MapPreviewCard({ center, locationName, temperatureC }: Props) {
   // what stops a blank rectangle sitting in the card while MapLibre works out
   // it cannot reach its basemap.
   const canRenderMap = isOnline && !dataSaverEnabled;
+  const idle = useWhenIdle();
 
   const { data } = usePrecipitationTimeline('12h');
 
@@ -112,26 +116,26 @@ export function MapPreviewCard({ center, locationName, temperatureC }: Props) {
               {/* Hidden from assistive technology as well as from touch: a
                   WebView the reader cannot operate should not be offered to
                   them as though they could. */}
-              <View
-                pointerEvents="none"
-                importantForAccessibility="no-hide-descendants"
-                accessibilityElementsHidden
-              >
-                <MapLibrePrecipitation
-                  frames={frames}
-                  index={0}
-                  grid={data?.grid}
-                  values={data?.values}
-                  classes={PRECIP_CLASSES}
-                  cellSizeDeg={data?.cellSizeDeg ?? CELL_SIZE_DEG}
-                  attributions={data?.attributions ?? []}
-                  height={MAP_HEIGHT}
-                  center={center}
-                  spanDeg={SPAN_DEG}
-                  interactive={false}
-                  radius={theme.radii.md}
-                />
-              </View>
+              {idle ? (
+                <View pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+                  <MapLibrePrecipitation
+                    frames={frames}
+                    index={0}
+                    grid={data?.grid}
+                    values={data?.values}
+                    classes={PRECIP_CLASSES}
+                    cellSizeDeg={data?.cellSizeDeg ?? CELL_SIZE_DEG}
+                    attributions={data?.attributions ?? []}
+                    height={MAP_HEIGHT}
+                    center={center}
+                    spanDeg={SPAN_DEG}
+                    interactive={false}
+                    radius={theme.radii.md}
+                  />
+                </View>
+              ) : (
+                <View style={{ height: MAP_HEIGHT, borderRadius: theme.radii.md, backgroundColor: theme.colors.chrome }} />
+              )}
 
               <View
                 pointerEvents="none"

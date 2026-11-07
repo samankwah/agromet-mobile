@@ -74,7 +74,15 @@ function add(
   groups.set(id, { name, region, kind, lat, lng, count: 1 });
 }
 
-export const PLACES: Place[] = buildIndex();
+let places: Place[] | null = null;
+
+/** Every searchable place, built on first use. Not a module-level constant:
+ * building it reads the boundary file, which must not happen at app start
+ * (see `shared/data/ghanaBoundaries.ts`). */
+export function getPlaces(): Place[] {
+  if (!places) places = buildIndex();
+  return places;
+}
 
 /**
  * Places matching what the reader has typed so far.
@@ -90,7 +98,7 @@ export function searchPlaces(query: string, limit = 8): Place[] {
   if (needle.length < 2) return [];
 
   const scored: { place: Place; score: number }[] = [];
-  for (const place of PLACES) {
+  for (const place of getPlaces()) {
     const haystack = place.name.toLowerCase();
     const at = haystack.indexOf(needle);
     if (at === -1) continue;

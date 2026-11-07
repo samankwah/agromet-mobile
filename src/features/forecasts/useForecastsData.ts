@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getHourlyForecast, getWeeklyForecast } from '../../shared/api/forecastService';
 import { getSeasonalOutlookSet } from '../../shared/api/seasonalService';
 import { getSubseasonalOutlook, getSubseasonalOutlookSet } from '../../shared/api/subseasonalService';
+import { useCachedQuery } from '../../shared/api/useCachedQuery';
 import { getCurrentConditions } from '../../shared/api/weatherService';
 import { HOME_LOCATIONS } from '../../shared/data/mockWeather';
 import { useLocationStore } from '../../shared/state/locationStore';
@@ -23,22 +24,32 @@ export function useForecastsData() {
   const hasHydrated = useLocationStore((state) => state.hasHydrated);
   const location = HOME_LOCATIONS.find((entry) => entry.id === locationId);
 
-  const conditions = useQuery({
+  // The Daily and Weekly sections keep their last answer on the phone, with
+  // the same keys as Home, so a launch with no signal still opens on a dated
+  // forecast. The outlooks below are left alone: their polling needs the plain
+  // query, and the server already holds them as a stored snapshot.
+  const conditions = useCachedQuery({
     queryKey: ['currentConditions', locationId],
     queryFn: () => getCurrentConditions(locationId),
+    cacheKey: `weather:current:${locationId}`,
     enabled: hasHydrated,
+    showCachedWhilePending: true,
   });
 
-  const hourly = useQuery({
+  const hourly = useCachedQuery({
     queryKey: ['hourlyForecast', locationId],
     queryFn: () => getHourlyForecast(locationId),
+    cacheKey: `forecast:hourly:${locationId}`,
     enabled: hasHydrated,
+    showCachedWhilePending: true,
   });
 
-  const weekly = useQuery({
+  const weekly = useCachedQuery({
     queryKey: ['weeklyForecast', locationId],
     queryFn: () => getWeeklyForecast(locationId),
+    cacheKey: `forecast:weekly:${locationId}`,
     enabled: hasHydrated,
+    showCachedWhilePending: true,
   });
 
   const subseasonal = useQuery({

@@ -44,12 +44,15 @@ const LABEL_FONT_SIZE = 9;
  * The height is derived from that rather than fixed, because `createProjector`
  * fits by the smaller of the two scales — hand a portrait country a landscape
  * box and it fills the height and leaves a third of the width as dead space.
+ *
+ * A function, not a module constant: reading the bounds at import would load
+ * the whole boundary file at app start (see `shared/data/ghanaBoundaries.ts`).
  */
-const GHANA_ASPECT = (() => {
+function ghanaAspect(): number {
   const b = GHANA_BOUNDARIES.bounds;
   const cos = Math.cos((((b.minLat + b.maxLat) / 2) * Math.PI) / 180);
   return (b.maxLat - b.minLat) / ((b.maxLng - b.minLng) * cos);
-})();
+}
 
 /** Tall enough for the country to fill its box, capped so the map cannot push
  * the ranked lists — which are the primary view — off the screen. */
@@ -91,7 +94,7 @@ export function HazardChoropleth({
   const theme = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const width = widthProp ?? windowWidth - theme.spacing.lg * 2;
-  const height = Math.min(Math.round(width * GHANA_ASPECT), MAX_MAP_HEIGHT);
+  const height = Math.min(Math.round(width * ghanaAspect()), MAX_MAP_HEIGHT);
 
   const project = useMemo(
     () => createProjector(GHANA_BOUNDARIES.bounds, { width, height, padding: 8 }),

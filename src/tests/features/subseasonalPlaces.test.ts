@@ -1,5 +1,5 @@
 import { GHANA_BOUNDARIES } from '../../shared/data/ghanaBoundaries';
-import { PLACES, searchPlaces } from '../../features/forecasts/subseasonal/places';
+import { getPlaces, searchPlaces } from '../../features/forecasts/subseasonal/places';
 
 /**
  * The searchable index behind the map's place search.
@@ -7,6 +7,8 @@ import { PLACES, searchPlaces } from '../../features/forecasts/subseasonal/place
  * Built from the same pre-baked grid the map draws, so a search result and a
  * tap on the same district resolve to the same forecast cell.
  */
+const PLACES = getPlaces();
+
 describe('PLACES', () => {
   it('covers every region the grid can place', () => {
     const regions = new Set(GHANA_BOUNDARIES.grid.map((cell) => cell.regionName).filter(Boolean));

@@ -1,6 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-
 import { getWeeklyForecast } from '../../shared/api/forecastService';
+import { useCachedQuery } from '../../shared/api/useCachedQuery';
 import { getCurrentConditions } from '../../shared/api/weatherService';
 import { HOME_LOCATIONS } from '../../shared/data/mockWeather';
 import { useLocationStore } from '../../shared/state/locationStore';
@@ -24,18 +23,25 @@ export function useHomeData() {
   // "your area" scope — see shared/location.
   useDetectedDistrict();
 
-  const weather = useQuery({
+  // Both cards keep their last answer on the phone, so a launch with no signal
+  // shows yesterday's weather, dated, instead of two error cards. The keys are
+  // the ones the Forecasts tab uses, so either screen fills the other's copy.
+  const weather = useCachedQuery({
     queryKey: ['currentConditions', locationId],
     queryFn: () => getCurrentConditions(locationId),
+    cacheKey: `weather:current:${locationId}`,
     enabled: hasHydrated,
+    showCachedWhilePending: true,
   });
 
   // Same key as the Forecasts tab and `useWeatherAlerts` below, so Home makes
   // one forecast request that feeds the card and the alert banner both.
-  const forecast = useQuery({
+  const forecast = useCachedQuery({
     queryKey: ['weeklyForecast', locationId],
     queryFn: () => getWeeklyForecast(locationId),
+    cacheKey: `forecast:weekly:${locationId}`,
     enabled: hasHydrated,
+    showCachedWhilePending: true,
   });
 
   const alerts = useWeatherAlerts(locationId, hasHydrated);

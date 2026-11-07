@@ -95,13 +95,27 @@ const TIMELINE: PrecipitationTimeline = {
 /** Accra, matching what `conditions` carries for the default town. */
 const CENTER = { lat: 5.6037, lng: -0.187 };
 
+/** Renders, then lets the idle wait pass: the map mounts only once the screen
+ * is idle, and every check below is about the mounted map. */
 function renderCard() {
-  return render(
+  const view = render(
     <ThemeProvider>
       <MapPreviewCard center={CENTER} locationName="Accra" temperatureC={25.4} />
     </ThemeProvider>,
   );
+  act(() => {
+    jest.runOnlyPendingTimers();
+  });
+  return view;
 }
+
+beforeEach(() => {
+  jest.useFakeTimers();
+});
+
+afterEach(() => {
+  jest.useRealTimers();
+});
 
 type JsonNode = { props?: Record<string, unknown>; children?: JsonNode[] } | null;
 
@@ -202,6 +216,22 @@ describe('MapPreviewCard', () => {
 
   /* Said before the WebView mounts rather than after, so the card never shows a
      blank rectangle while MapLibre works out it cannot reach its basemap. */
+  /* The WebView is the heaviest thing on the Forecasts tab and sits below the
+     fold, so it waits until the screen above it has drawn. */
+  it('leaves the map out of the first frame and mounts it once idle', () => {
+    const view = render(
+      <ThemeProvider>
+        <MapPreviewCard center={CENTER} locationName="Accra" temperatureC={25.4} />
+      </ThemeProvider>,
+    );
+    expect(findWebViewProps(view.toJSON())).toBeNull();
+
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+    expect(findWebViewProps(view.toJSON())).not.toBeNull();
+  });
+
   it('says why instead of mounting a map when there is no connection', () => {
     mockIsOnline.mockReturnValue(false);
 
