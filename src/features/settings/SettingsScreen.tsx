@@ -14,6 +14,7 @@ import { Text } from '../../shared/ui/Text';
 import { NotificationNotice } from '../farm-tools/reminders/components/NotificationNotice';
 import { ChoiceSetting } from './components/ChoiceSetting';
 import { ToggleSetting } from './components/ToggleSetting';
+import { WeatherWarningSettings } from './components/WeatherWarningSettings';
 
 /**
  * The app's settings.
@@ -31,11 +32,10 @@ import { ToggleSetting } from './components/ToggleSetting';
  *   - `livestockType`, `favouriteDistrictIds`, `favouriteCrops` — nothing reads
  *     them. A control that persists a value no code consults looks like a
  *     working preference and is not one.
- *   - `notificationPrefs.alertsEnabled` / `advisoriesEnabled` /
- *     `bulletinsEnabled` — same: only `remindersEnabled` is wired to delivery
- *     (see `useReminderNotifications`), so it is the only notification switch
- *     offered. Showing the other three would promise notification control the
- *     app cannot honour.
+ *   - `notificationPrefs.advisoriesEnabled` / `bulletinsEnabled` — same: nothing
+ *     delivers them yet. `remindersEnabled` (see `useReminderNotifications`)
+ *     and `alertsEnabled` with `warningHazards` (weather warnings, see
+ *     `WeatherWarningSettings`) are the notification switches that are wired.
  *
  * No screen-level `h1`: the stack header already reads "Settings", and this is
  * a utility reached from an icon, not a destination that needs re-announcing.
@@ -142,11 +142,11 @@ export function SettingsScreen() {
             onChange={(value) => setNotificationPrefs({ remindersEnabled: value })}
           />
 
-          {blocker ? (
-            <NotificationNotice blocker={blocker} onRequestPermission={requestPermission} />
-          ) : null}
+          {blocker ? <NotificationNotice blocker={blocker} onRequestPermission={requestPermission} /> : null}
         </Card>
       </View>
+
+      <WeatherWarningSettings />
 
       {/* An action, not a preference — hence a button rather than a toggle, and
           its own section rather than a row among the settings above. It exists

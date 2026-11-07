@@ -31,15 +31,9 @@ export function useWeatherAlerts(locationId: string, enabled: boolean) {
   // a storm alert with an `onset` also has a lead edge.
   const [now, setNow] = useState(() => Date.now());
 
-  const candidates = useMemo<WeatherAlert[]>(
-    () => (enabled ? (query.data?.weatherAlerts ?? []) : []),
-    [query.data, enabled],
-  );
+  const candidates = useMemo<WeatherAlert[]>(() => (enabled ? (query.data?.weatherAlerts ?? []) : []), [query.data, enabled]);
 
-  const alerts = useMemo<WeatherAlert[]>(
-    () => candidates.filter((alert) => isCurrent(alert, now)),
-    [candidates, now],
-  );
+  const alerts = useMemo<WeatherAlert[]>(() => candidates.filter((alert) => isCurrent(alert, now)), [candidates, now]);
 
   useEffect(() => {
     const soonest = candidates
@@ -66,13 +60,12 @@ export function useWeatherAlerts(locationId: string, enabled: boolean) {
     status: enabled ? query.status : ('pending' as const),
     error: query.error,
     alerts,
+    /** Every warning in the forecast, including tomorrow's and any not yet
+     * showing, for scheduling notifications ahead of time. */
+    candidates,
     refetch: query.refetch,
     locationPermission,
     locationPrompt:
-      hasHydrated &&
-      locationResolved &&
-      locationPermission === 'denied' &&
-      !townChoiceIsManual &&
-      locationId === DEFAULT_LOCATION_ID,
+      hasHydrated && locationResolved && locationPermission === 'denied' && !townChoiceIsManual && locationId === DEFAULT_LOCATION_ID,
   };
 }

@@ -30,7 +30,13 @@ const DEFAULT_SETTINGS: UserSettings = {
   favouriteCrops: [],
   livestockType: 'none',
   preferOfflineDiagnosis: false,
-  notificationPrefs: { alertsEnabled: true, advisoriesEnabled: true, bulletinsEnabled: true, remindersEnabled: true },
+  notificationPrefs: {
+    alertsEnabled: true,
+    warningHazards: { thunderstorm: true, 'heavy-rain': true, 'extreme-heat': true, 'strong-wind': true },
+    advisoriesEnabled: true,
+    bulletinsEnabled: true,
+    remindersEnabled: true,
+  },
 };
 
 function toggleInArray(list: string[], value: string): string[] {
@@ -54,6 +60,16 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'agromet:zustand:settings',
       storage: createJSONStorage(() => AsyncStorage),
+      // Settings saved by an older version lack fields added since, such as
+      // the warning types. The default merge is shallow and would replace the
+      // whole `notificationPrefs` object with the old one, leaving the new
+      // fields undefined, so the nested defaults are filled in here.
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<UserSettings>;
+        const prefs = { ...current.notificationPrefs, ...(saved.notificationPrefs ?? {}) };
+        prefs.warningHazards = { ...current.notificationPrefs.warningHazards, ...(saved.notificationPrefs?.warningHazards ?? {}) };
+        return { ...current, ...saved, notificationPrefs: prefs };
+      },
     },
   ),
 );

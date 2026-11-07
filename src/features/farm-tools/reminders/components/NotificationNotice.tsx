@@ -15,6 +15,9 @@ type Props = {
   onEnable?: () => void;
   /** Prompts the OS for notification permission. */
   onRequestPermission?: () => void;
+  /** What the notifications are for, which changes the wording. Reminders by
+   * default; Settings' weather warnings section passes 'warnings'. */
+  subject?: 'reminders' | 'warnings';
 };
 
 /**
@@ -25,12 +28,39 @@ type Props = {
  * the task themselves *because* they set a reminder, and then nothing arrives.
  * Each case gets its own words and, where one exists, its own way out.
  */
-export function NotificationNotice({ blocker, onEnable, onRequestPermission }: Props) {
+export function NotificationNotice({ blocker, onEnable, onRequestPermission, subject = 'reminders' }: Props) {
   const theme = useTheme();
 
   if (!blocker) return null;
 
-  const copy = {
+  const warningsCopy = {
+    'expo-go': {
+      icon: 'flask-outline' as const,
+      title: 'Warnings are off in Expo Go',
+      body: 'Expo Go cannot show notifications on Android. Install the development build to get weather warnings when the app is closed.',
+      action: null,
+    },
+    'permission-undetermined': {
+      icon: 'notifications-outline' as const,
+      title: 'Turn on weather warnings',
+      body: 'Your phone has not been asked yet. Allow notifications to be warned about storms, heavy rain, strong wind and extreme heat, even with the app closed.',
+      action: 'Allow notifications',
+    },
+    'permission-denied': {
+      icon: 'notifications-off-outline' as const,
+      title: 'Weather warnings are blocked',
+      body: 'Your phone will not show AgroMet warnings. Allow notifications for AgroMet to change that.',
+      action: 'Open settings',
+    },
+    disabled: {
+      icon: 'toggle-outline' as const,
+      title: 'Weather warnings are switched off',
+      body: 'Turn them on to be warned about severe weather in your town.',
+      action: 'Turn warnings on',
+    },
+  };
+
+  const reminderCopy = {
     'expo-go': {
       icon: 'flask-outline' as const,
       title: 'Alerts are off in Expo Go',
@@ -55,7 +85,9 @@ export function NotificationNotice({ blocker, onEnable, onRequestPermission }: P
       body: 'Reminders are still saved and listed here. Turn alerts back on to be notified when one is due.',
       action: 'Turn alerts on',
     },
-  }[blocker];
+  };
+
+  const copy = (subject === 'warnings' ? warningsCopy : reminderCopy)[blocker];
 
   return (
     <View

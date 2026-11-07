@@ -124,7 +124,8 @@
       "expo-status-bar",
       "expo-asset",
       "@sentry/react-native",
-      "./plugins/withArmOnlyAbis"
+      "./plugins/withArmOnlyAbis",
+      "expo-background-task"
     ],
     "extra": {
       "router": {},

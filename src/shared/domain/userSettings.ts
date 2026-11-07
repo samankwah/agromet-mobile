@@ -10,8 +10,21 @@ export type TextSize = 'standard' | 'large' | 'extra-large';
  * 'dag' slot in later as an extension, not a reshape. */
 export type Language = 'en';
 
+/** The weather warning types a farmer can be notified about. Same keys as the
+ * hazard part of a warning's id (`weatherHazards.ts`) and the server's list. */
+export type WarningHazard = 'thunderstorm' | 'heavy-rain' | 'extreme-heat' | 'strong-wind';
+
+export const WARNING_HAZARDS: WarningHazard[] = ['thunderstorm', 'heavy-rain', 'extreme-heat', 'strong-wind'];
+
 export type NotificationPrefs = {
+  /**
+   * Weather warnings as notifications, even with the app closed: the main
+   * switch. Sent from the server when the phone is registered, scheduled on
+   * the phone as a backup (`shared/notifications/weatherWarnings.ts`).
+   */
   alertsEnabled: boolean;
+  /** Which warning types notify, each on by default. */
+  warningHazards: Record<WarningHazard, boolean>;
   advisoriesEnabled: boolean;
   bulletinsEnabled: boolean;
   /**

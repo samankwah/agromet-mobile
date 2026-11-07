@@ -20,6 +20,15 @@ import { repeatSuffix, scheduleTargetFor } from '../utils/reminderSchedule';
 /** The Android channel reminders are delivered on. Mirrors app.json's `defaultChannel`. */
 const CHANNEL_ID = 'reminders';
 
+/** The Android channel weather warnings arrive on, from the server or the phone.
+ * Its own channel so a farmer can silence reminders and keep the warnings, or
+ * the other way round, from the phone's settings. The server sends to it by
+ * name (`backend/app/routers/push.py`). */
+export const WEATHER_CHANNEL_ID = 'weather-alerts';
+
+/** Marks a notification as a weather warning, in its data. */
+export const WEATHER_ALERT_TYPE = 'weather-alert';
+
 /**
  * `undetermined` and `denied` are deliberately separate.
  *
@@ -123,6 +132,106 @@ async function ensureChannel(): Promise<void> {
   });
 }
 
+/** The weather warnings channel: high importance, so a warning shows as a
+ * heads-up banner with sound, not a silent line in the shade. */
+async function ensureWeatherChannel(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  const Notifications = getNotifications();
+  if (!Notifications) return;
+
+  await Notifications.setNotificationChannelAsync(WEATHER_CHANNEL_ID, {
+    name: 'Weather warnings',
+    description: 'Heavy rain, storms, strong wind and extreme heat where you farm.',
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 400, 200, 400],
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+  });
+}
+
+/**
+ * This phone's Expo push token, which the server sends warnings to, or null
+ * when it cannot have one: Expo Go, no permission, no project id, or no
+ * connection to Expo. Never throws.
+ */
+export async function getExpoPushToken(): Promise<string | null> {
+  const Notifications = getNotifications();
+  if (!Notifications) return null;
+  const extra = Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined;
+  const projectId = extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+  if (!projectId) return null;
+  try {
+    await ensureWeatherChannel();
+    const token = await Notifications.getExpoPushTokenAsync({ projectId });
+    return token.data || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Schedule a weather warning on the phone: the backup for when the server
+ * cannot reach it. `at` in the past or now shows it straight away. Returns the
+ * notification id, or null when it could not be scheduled.
+ */
+export async function scheduleWeatherWarning(
+  warning: { title: string; body: string; alertId: string; hazard: string },
+  at: Date,
+  now: Date = new Date(),
+): Promise<string | null> {
+  const Notifications = getNotifications();
+  if (!Notifications) return null;
+  try {
+    await ensureWeatherChannel();
+    return await Notifications.scheduleNotificationAsync({
+      content: {
+        title: warning.title,
+        body: warning.body,
+        data: { type: WEATHER_ALERT_TYPE, alertId: warning.alertId, hazard: warning.hazard },
+        ...(Platform.OS === 'android' ? { channelId: WEATHER_CHANNEL_ID } : null),
+      },
+      trigger:
+        at.getTime() <= now.getTime() + 1000
+          ? null
+          : {
+              type: Notifications.SchedulableTriggerInputTypes.DATE,
+              date: at,
+              ...(Platform.OS === 'android' ? { channelId: WEATHER_CHANNEL_ID } : null),
+            },
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** Cancel scheduled notifications by id. Stale ids are fine. */
+export async function cancelNotifications(ids: string[]): Promise<void> {
+  const Notifications = getNotifications();
+  if (!Notifications) return;
+  await Promise.all(ids.map((id) => Notifications.cancelScheduledNotificationAsync(id).catch(() => {})));
+}
+
+/**
+ * Run `onOpen` with the warning's id when the farmer taps a weather warning,
+ * whether it launched the app or arrived while it was open (see
+ * `attachResponseListener` for why both paths matter).
+ */
+export function attachWeatherAlertListener(onOpen: (alertId: string | null) => void): () => void {
+  const Notifications = getNotifications();
+  if (!Notifications) return () => {};
+
+  const handle = (response: import('expo-notifications').NotificationResponse | null) => {
+    const data = response?.notification.request.content.data as { type?: string; alertId?: string } | undefined;
+    if (data?.type === WEATHER_ALERT_TYPE) onOpen(typeof data.alertId === 'string' ? data.alertId : null);
+  };
+
+  Notifications.getLastNotificationResponseAsync()
+    .then(handle)
+    .catch(() => {});
+  const subscription = Notifications.addNotificationResponseReceivedListener(handle);
+  return () => subscription.remove();
+}
+
 /**
  * Ask for permission, if it has not already been settled.
  *
@@ -190,10 +299,7 @@ export function schedulingBlocker(permission: PermissionState): SchedulingBlocke
  * or a runtime that cannot schedule. The caller persists whatever comes back;
  * it must never assume a notification exists.
  */
-export async function scheduleReminder(
-  reminder: FarmReminder,
-  now: Date = new Date(),
-): Promise<string | null> {
+export async function scheduleReminder(reminder: FarmReminder, now: Date = new Date()): Promise<string | null> {
   const Notifications = getNotifications();
   if (!Notifications) return null;
 
@@ -238,13 +344,20 @@ export async function cancelReminder(notificationId: string | null | undefined):
   }
 }
 
-/** Cancel everything this app has scheduled. Used when reminders are switched off. */
+/**
+ * Cancel every scheduled reminder. Used when reminders are switched off.
+ *
+ * Reminders only: the backup weather warnings scheduled on the phone are left
+ * alone, since switching reminders off says nothing about storms.
+ */
 export async function cancelAllReminders(): Promise<void> {
   const Notifications = getNotifications();
   if (!Notifications) return;
 
   try {
-    await Notifications.cancelAllScheduledNotificationsAsync();
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    const reminders = scheduled.filter((item) => (item.content.data as { type?: string } | undefined)?.type !== WEATHER_ALERT_TYPE);
+    await Promise.all(reminders.map((item) => Notifications.cancelScheduledNotificationAsync(item.identifier).catch(() => {})));
   } catch {
     // Nothing to clean up.
   }
@@ -268,7 +381,9 @@ export function attachResponseListener(onOpenReminder: (reminderId: string) => v
     if (typeof reminderId === 'string') onOpenReminder(reminderId);
   };
 
-  Notifications.getLastNotificationResponseAsync().then(handle).catch(() => {});
+  Notifications.getLastNotificationResponseAsync()
+    .then(handle)
+    .catch(() => {});
   const subscription = Notifications.addNotificationResponseReceivedListener(handle);
   return () => subscription.remove();
 }

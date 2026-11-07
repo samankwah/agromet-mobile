@@ -222,10 +222,19 @@ describe('cancelAll', () => {
   it('drops every handle when reminders are switched off', async () => {
     await useReminderStore.getState().add(draft({ title: 'One' }));
     await useReminderStore.getState().add(draft({ title: 'Two' }));
+    (Notifications.getAllScheduledNotificationsAsync as jest.Mock).mockResolvedValueOnce([
+      { identifier: 'reminder-1', content: { data: { reminderId: 'a' } } },
+      { identifier: 'reminder-2', content: { data: { reminderId: 'b' } } },
+      { identifier: 'storm', content: { data: { type: 'weather-alert', alertId: 'weather:x:thunderstorm:2026-11-07' } } },
+    ]);
+    (Notifications.cancelScheduledNotificationAsync as jest.Mock).mockClear();
 
     await useReminderStore.getState().cancelAll();
 
-    expect(Notifications.cancelAllScheduledNotificationsAsync).toHaveBeenCalled();
+    // Reminders only: a weather warning scheduled as a backup is left alone.
+    const cancelled = (Notifications.cancelScheduledNotificationAsync as jest.Mock).mock.calls.map(([id]) => id);
+    expect(cancelled).toEqual(expect.arrayContaining(['reminder-1', 'reminder-2']));
+    expect(cancelled).not.toContain('storm');
     expect(useReminderStore.getState().reminders.every((r) => r.notificationId === null)).toBe(true);
   });
 });

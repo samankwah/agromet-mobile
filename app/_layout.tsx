@@ -20,6 +20,11 @@ import { WelcomeScreen } from '../src/features/onboarding/WelcomeScreen';
 import { ThemeProvider, useTheme } from '../src/shared/theme/ThemeProvider';
 import { OfflineBanner } from '../src/shared/ui/OfflineBanner';
 import { useReminderNotifications } from '../src/features/farm-tools/reminders/useReminderNotifications';
+// Imported for its side effect as well: it defines the background warning
+// check, which must exist whenever the app's code loads, including a launch the
+// system makes only to run that check.
+import '../src/shared/notifications/weatherWarningTask';
+import { useWeatherWarningNotifications } from '../src/shared/notifications/useWeatherWarningNotifications';
 
 // Before anything else renders, so an error during the first render is caught.
 initMonitoring();
@@ -190,6 +195,9 @@ function RootNavigator() {
   // Mounted here rather than on the reminders screen: a notification tapped
   // from a cold start has to route somewhere before that screen exists.
   useReminderNotifications();
+  // Weather warnings as notifications: server registration, the phone-side
+  // backup and the tap handler. Here for the same cold-start reason.
+  useWeatherWarningNotifications();
 
   // The welcome screen stands in for the whole navigator rather than sitting on
   // top of it as a route. Leaving it is then a state change, not a navigation —

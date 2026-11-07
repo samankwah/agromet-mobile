@@ -43,6 +43,7 @@ beforeEach(() => {
     dataSaverEnabled: false,
     notificationPrefs: {
       alertsEnabled: true,
+      warningHazards: { thunderstorm: true, 'heavy-rain': true, 'extreme-heat': true, 'strong-wind': true },
       advisoriesEnabled: true,
       bulletinsEnabled: true,
       remindersEnabled: true,
@@ -147,6 +148,7 @@ describe('SettingsScreen', () => {
     useSettingsStore.setState({
       notificationPrefs: {
         alertsEnabled: true,
+        warningHazards: { thunderstorm: true, 'heavy-rain': true, 'extreme-heat': true, 'strong-wind': true },
         advisoriesEnabled: true,
         bulletinsEnabled: true,
         remindersEnabled: false,

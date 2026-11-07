@@ -43,7 +43,13 @@ function seeded(overrides: Partial<FarmReminder> = {}): FarmReminder {
 beforeEach(() => {
   useReminderStore.setState({ reminders: [], permission: 'granted', hasHydrated: true });
   useSettingsStore.setState({
-    notificationPrefs: { alertsEnabled: true, advisoriesEnabled: true, bulletinsEnabled: true, remindersEnabled: true },
+    notificationPrefs: {
+      alertsEnabled: true,
+      warningHazards: { thunderstorm: true, 'heavy-rain': true, 'extreme-heat': true, 'strong-wind': true },
+      advisoriesEnabled: true,
+      bulletinsEnabled: true,
+      remindersEnabled: true,
+    },
   });
   jest.clearAllMocks();
 });
@@ -154,16 +160,20 @@ describe('RemindersScreen', () => {
 
   it('explains when the farmer has switched reminder alerts off, and offers to turn them back on', async () => {
     useSettingsStore.setState({
-      notificationPrefs: { alertsEnabled: true, advisoriesEnabled: true, bulletinsEnabled: true, remindersEnabled: false },
+      notificationPrefs: {
+        alertsEnabled: true,
+        warningHazards: { thunderstorm: true, 'heavy-rain': true, 'extreme-heat': true, 'strong-wind': true },
+        advisoriesEnabled: true,
+        bulletinsEnabled: true,
+        remindersEnabled: false,
+      },
     });
     renderScreen(<RemindersScreen />);
 
     expect(screen.getByText('Reminder alerts are switched off')).toBeTruthy();
 
     fireEvent.press(screen.getByText('Turn alerts on'));
-    await waitFor(() =>
-      expect(useSettingsStore.getState().notificationPrefs.remindersEnabled).toBe(true),
-    );
+    await waitFor(() => expect(useSettingsStore.getState().notificationPrefs.remindersEnabled).toBe(true));
   });
 
   /* The summary answers "am I on top of things?" before the list answers
