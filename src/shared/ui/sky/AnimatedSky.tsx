@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { useIsFocused } from 'expo-router';
 
 import type { SkyScene } from '../../domain/skyScene';
@@ -56,6 +57,10 @@ export function AnimatedSky({ scene }: { scene: SkyScene }) {
       accessibilityElementsHidden
       style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}
     >
+      {/* The sky is always dark, so the clock and battery go light over it.
+          Only while the tab is in view: the tabs stay mounted, and a status
+          bar left here would turn Home's icons white on a light page. */}
+      {focused ? <StatusBar style="light" /> : null}
       <LinearGradient colors={scene.gradient} style={StyleSheet.absoluteFill} />
       {scene.sun ? <SkySun phase={scene.phase} width={width} clock={glowClock} /> : null}
       {scene.stars ? <SkyStars width={width} height={height} clock={glowClock} /> : null}

@@ -9,7 +9,7 @@ import type { CloudTone, SkyPhase } from '../../domain/skyScene';
 const LAYOUT = [
   { top: 0.06, scale: 1.0, speed: 1, offset: 0.15, depth: 0.55 },
   { top: 0.2, scale: 0.75, speed: 2, offset: 0.6, depth: 0.75 },
-  { top: 0.34, scale: 1.15, speed: 1, offset: 0.85, depth: 0.45 },
+  { top: 0.26, scale: 1.15, speed: 1, offset: 0.85, depth: 0.45 },
   { top: 0.12, scale: 0.6, speed: 3, offset: 0.35, depth: 0.9 },
 ];
 
@@ -47,9 +47,11 @@ function CloudShape({ width, fill, opacity }: { width: number; fill: string; opa
 function Cloud({ index, tone, phase, width, height, clock }: Omit<Props, 'count'> & { index: number }) {
   const layout = LAYOUT[index];
   const cloudWidth = width * 0.75 * layout.scale;
-  // Clouds after dark are lit by nothing. Dimmed, they read as night cloud
-  // instead of white shapes pasted on a black sky.
-  const opacity = (phase === 'night' ? 0.28 : 0.6) * layout.depth + 0.1;
+  // Kept faint: a cloud drifting behind the temperature must not pale the
+  // white text over it. Seen on a device, 0.4 and above already did. After
+  // dark they are dimmer still, read as night cloud rather than white shapes
+  // pasted on a black sky.
+  const opacity = phase === 'night' ? 0.08 + 0.14 * layout.depth : 0.14 + 0.24 * layout.depth;
 
   const style = useAnimatedStyle(() => {
     const progress = (clock.value * layout.speed + layout.offset) % 1;
