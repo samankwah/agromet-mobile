@@ -1,16 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { GIBS_ATTRIBUTION, observedFrames, resolveHorizon } from '../../../shared/api/precipitation/gibsSource';
-import {
-  fetchPrecipField,
-  OPEN_METEO_ATTRIBUTION,
-} from '../../../shared/api/precipitation/openMeteoPrecipSource';
-import type {
-  PrecipFrame,
-  PrecipitationTimeline,
-  TimelineSpan,
-} from '../../../shared/domain/precipitationTimeline';
-import { buildFixedClasses, IMERG_STOPS, PRECIP_RATE_BREAKS } from '../../../shared/utils/colorScale';
+import { fetchPrecipField, OPEN_METEO_ATTRIBUTION } from '../../../shared/api/precipitation/openMeteoPrecipSource';
+import type { PrecipFrame, PrecipitationTimeline, TimelineSpan } from '../../../shared/domain/precipitationTimeline';
+import { buildFixedClasses, PRECIP_RATE_BREAKS, RAIN_STOPS } from '../../../shared/utils/colorScale';
 import { LOOK_AHEAD_HOURS, OBSERVED_FRAME_COUNT } from './frames';
 import { CELL_SIZE_DEG, modelGrid } from './grid';
 
@@ -105,6 +98,6 @@ export function usePrecipitationTimeline(span: TimelineSpan) {
 
 /** The classes the map fill and the legend both key off, so a colour cannot
  * mean one rate on the map and another in the key. */
-export const PRECIP_CLASSES = buildFixedClasses(PRECIP_RATE_BREAKS, IMERG_STOPS);
+export const PRECIP_CLASSES = buildFixedClasses(PRECIP_RATE_BREAKS, RAIN_STOPS);
 
 export { CELL_SIZE_DEG };

@@ -3,7 +3,9 @@ import { Animated, Easing, PanResponder, View } from 'react-native';
 
 import type { PrecipFrame, TimelineSpan } from '../../../shared/domain/precipitationTimeline';
 import { Text } from '../../../shared/ui/Text';
-import { dwellMs, frameIndexForFraction, nowFraction, timeFraction } from './frames';
+import { dwellMs, frameIndexForFraction, nowFraction, timeFraction, timelineAxis } from './frames';
+import type { MapChrome } from './mapChrome';
+import { MAP_CHROME } from './mapChrome';
 
 type Props = {
   frames: PrecipFrame[];
@@ -13,6 +15,8 @@ type Props = {
   span: TimelineSpan;
   nowIso: string;
   onSeek: (index: number) => void;
+  /** Colours for the map's light or dark look. Dark when not given. */
+  chrome?: MapChrome;
 };
 
 const TRACK_HEIGHT = 36;
@@ -20,9 +24,22 @@ const LINE_HEIGHT = 4;
 /** At most this many times printed under the track. More than five and they
  * collide at phone width; fewer and the axis stops being readable. */
 const MAX_LABELS = 5;
+/** At most this many ticks: enough to read the scale, few enough to stay apart. */
+const MAX_TICKS = 36;
+const LABEL_WIDTH = 44;
 
 function clockTime(iso: string): string {
   return iso.slice(11, 16);
+}
+
+/** "4 PM" on the hour, "4:30" off it, as the phone's own weather app labels
+ * its timeline. Ghana keeps GMT all year, so the UTC clock is the local one. */
+export function axisLabel(atMs: number): string {
+  const date = new Date(atMs);
+  const hours = date.getUTCHours();
+  const minutes = date.getUTCMinutes();
+  const twelve = hours % 12 === 0 ? 12 : hours % 12;
+  return minutes === 0 ? `${twelve} ${hours < 12 ? 'AM' : 'PM'}` : `${twelve}:${String(minutes).padStart(2, '0')}`;
 }
 
 /**
@@ -35,7 +52,7 @@ function clockTime(iso: string): string {
  * so a gap in the satellite record reads as a gap rather than being quietly
  * closed up.
  */
-export function TimelineScrubber({ frames, index, playing, reduceMotion, span, nowIso, onSeek }: Props) {
+export function TimelineScrubber({ frames, index, playing, reduceMotion, span, nowIso, onSeek, chrome = MAP_CHROME.dark }: Props) {
   const [trackWidth, setTrackWidth] = useState(0);
   /** How far along the fill is, 0 to 1. A fraction rather than a width, so a
    * relayout does not leave it pointing at the old track. */
@@ -43,12 +60,15 @@ export function TimelineScrubber({ frames, index, playing, reduceMotion, span, n
 
   const fractions = useMemo(() => frames.map((_, i) => timeFraction(frames, i)), [frames]);
 
-  /** Evenly spaced along the axis, always including both ends, so the reader
-   * can see the range without reading every tick. */
-  const labelled = useMemo(() => {
-    if (frames.length <= MAX_LABELS) return frames.map((_, i) => i);
-    const step = (frames.length - 1) / (MAX_LABELS - 1);
-    return Array.from({ length: MAX_LABELS }, (_, i) => Math.round(i * step));
+  /** Ticks and times on a regular clock grid (see `timelineAxis`), so they sit
+   * evenly along the strip whatever the frames' own spacing. */
+  const axis = useMemo(() => timelineAxis(frames, MAX_TICKS, MAX_LABELS), [frames]);
+
+  /** The last measured moment. Ticks up to it are drawn as measured. */
+  const lastObservedMs = useMemo(() => {
+    let last = -Infinity;
+    for (const frame of frames) if (frame.kind === 'observed') last = Math.max(last, Date.parse(frame.validAt));
+    return last;
   }, [frames]);
 
   // The fill glides on the frame's own dwell so it arrives exactly as the next
@@ -89,6 +109,20 @@ export function TimelineScrubber({ frames, index, playing, reduceMotion, span, n
   const current = frames[index];
   const now = nowFraction(frames, nowIso);
 
+  /** The clock labels, with "Now" at the now marker. A clock label too close
+   * to it to fit beside it gives way, so the two never overlap. */
+  const labels = useMemo(() => {
+    const clock = axis.labels.map((label) => ({
+      key: String(label.atMs),
+      fraction: label.fraction,
+      text: axisLabel(label.atMs),
+      isNow: false,
+    }));
+    if (now === null || trackWidth <= 0) return clock;
+    const clear = LABEL_WIDTH / trackWidth;
+    return [...clock.filter((label) => Math.abs(label.fraction - now) >= clear), { key: 'now', fraction: now, text: 'Now', isNow: true }];
+  }, [axis.labels, now, trackWidth]);
+
   return (
     <View>
       <View
@@ -116,7 +150,7 @@ export function TimelineScrubber({ frames, index, playing, reduceMotion, span, n
           style={{
             height: LINE_HEIGHT,
             borderRadius: LINE_HEIGHT / 2,
-            backgroundColor: 'rgba(255,255,255,0.18)',
+            backgroundColor: chrome.track,
           }}
         />
 
@@ -133,26 +167,30 @@ export function TimelineScrubber({ frames, index, playing, reduceMotion, span, n
             transformOrigin: 'left',
             transform: [{ scaleX: progress }],
             borderRadius: LINE_HEIGHT / 2,
-            backgroundColor: '#ffffff',
+            backgroundColor: chrome.fill,
           }}
         />
 
-        {frames.map((frame, i) => (
-          <View
-            key={frame.validAt}
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              left: fractions[i] * Math.max(0, trackWidth - 1),
-              width: 1,
-              // Measured frames get a taller, brighter tick than modelled ones.
-              // The difference between a measurement and a forecast is the most
-              // important thing this strip has to say.
-              height: frame.kind === 'observed' ? 12 : 8,
-              backgroundColor: frame.kind === 'observed' ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.28)',
-            }}
-          />
-        ))}
+        {axis.ticks.map((tick) => {
+          // Measured time gets a taller, brighter tick than modelled time. The
+          // difference between a measurement and a forecast is the most
+          // important thing this strip has to say.
+          const measured = tick.atMs <= lastObservedMs;
+          return (
+            <View
+              key={tick.atMs}
+              testID="timeline-tick"
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                left: tick.fraction * Math.max(0, trackWidth - 1),
+                width: 1,
+                height: measured ? 12 : 8,
+                backgroundColor: measured ? chrome.tickMeasured : chrome.tickForecast,
+              }}
+            />
+          );
+        })}
 
         {/* Now, drawn rather than implied. On an axis that runs from measured
             through modelled to forecast, this is the reference point every
@@ -166,28 +204,28 @@ export function TimelineScrubber({ frames, index, playing, reduceMotion, span, n
               width: 2,
               height: 18,
               borderRadius: 1,
-              backgroundColor: '#ffffff',
+              backgroundColor: chrome.now,
             }}
           />
         ) : null}
       </View>
 
       <View style={{ height: 14 }}>
-        {labelled.map((i) => (
+        {labels.map((label) => (
           <Text
-            key={frames[i].validAt}
+            key={label.key}
             variant="caption"
-            color="rgba(255,255,255,0.7)"
+            color={label.isNow ? chrome.text : chrome.muted}
             style={{
               position: 'absolute',
-              // Nudged so the middle labels centre on their tick while the two
-              // ends stay inside the bar rather than hanging off it.
-              left: fractions[i] * Math.max(0, trackWidth - 34),
-              width: 34,
-              textAlign: i === 0 ? 'left' : i === frames.length - 1 ? 'right' : 'center',
+              // Centred on its tick, but kept inside the bar at either end.
+              left: Math.min(Math.max(0, label.fraction * trackWidth - LABEL_WIDTH / 2), Math.max(0, trackWidth - LABEL_WIDTH)),
+              width: LABEL_WIDTH,
+              textAlign: 'center',
+              fontWeight: label.isNow ? '700' : undefined,
             }}
           >
-            {clockTime(frames[i].validAt)}
+            {label.text}
           </Text>
         ))}
       </View>

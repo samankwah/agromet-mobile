@@ -12,6 +12,7 @@ import { Text } from '../../../shared/ui/Text';
 import { useWhenIdle } from '../../../shared/ui/useWhenIdle';
 import { formatDegrees } from '../../../shared/utils/formatTemperature';
 import { openingIndex } from '../precipitation/frames';
+import { useMapDaylight } from '../precipitation/useMapDaylight';
 import { CELL_SIZE_DEG, PRECIP_CLASSES, usePrecipitationTimeline } from '../precipitation/usePrecipitationTimeline';
 
 type Props = {
@@ -73,6 +74,8 @@ export function MapPreviewCard({ center, locationName, temperatureC }: Props) {
   const idle = useWhenIdle();
 
   const { data } = usePrecipitationTimeline('12h');
+  // The same day or night map the full screen opens on.
+  const look = useMapDaylight(center);
 
   /**
    * The single frame the card paints.
@@ -131,6 +134,7 @@ export function MapPreviewCard({ center, locationName, temperatureC }: Props) {
                     spanDeg={SPAN_DEG}
                     interactive={false}
                     radius={theme.radii.md}
+                    look={look}
                   />
                 </View>
               ) : (

@@ -10,8 +10,10 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { MapLibrePrecipitation } from '../../../shared/ui/MapLibrePrecipitation';
 import { Screen } from '../../../shared/ui/Screen';
 import { Text } from '../../../shared/ui/Text';
+import { MAP_CHROME } from './mapChrome';
 import { PlaybackBar } from './PlaybackBar';
 import { PrecipitationLegend } from './PrecipitationLegend';
+import { useMapDaylight } from './useMapDaylight';
 import { usePrecipitationPlayback } from './usePrecipitationPlayback';
 import { CELL_SIZE_DEG, PRECIP_CLASSES, usePrecipitationTimeline } from './usePrecipitationTimeline';
 
@@ -37,6 +39,10 @@ export function RainMapScreen() {
   const insets = useSafeAreaInsets();
   const { isOnline } = useNetworkStatus();
   const [span, setSpan] = useState<TimelineSpan>('12h');
+  // Esri's light map from sunrise to sunset, the dark one at night, and the
+  // floating controls with it.
+  const look = useMapDaylight();
+  const chrome = MAP_CHROME[look];
 
   /** Which satellite frames' imagery has arrived, and which failed. */
   const [ready, setReady] = useState<Set<string>>(new Set());
@@ -47,10 +53,7 @@ export function RainMapScreen() {
   // A frame whose tiles failed is dropped rather than shown blank. Done here so
   // the scrubber's ticks stay honest: a frame the reader cannot see should not
   // have a mark on the timeline.
-  const frames = useMemo(
-    () => (data?.frames ?? []).filter((frame) => !failed.has(frame.validAt)),
-    [data?.frames, failed],
-  );
+  const frames = useMemo(() => (data?.frames ?? []).filter((frame) => !failed.has(frame.validAt)), [data?.frames, failed]);
 
   const nowIso = data?.nowIso ?? new Date(0).toISOString();
 
@@ -118,15 +121,13 @@ export function RainMapScreen() {
           attributions={data?.attributions ?? []}
           onFrameReady={onFrameReady}
           onFrameFailed={onFrameFailed}
+          look={look}
         />
 
         {/* Chrome, floating. Absolutely positioned rather than laid out around
             the map, because the map is the page and everything else sits on
             top of it. */}
-        <View
-          pointerEvents="box-none"
-          style={{ position: 'absolute', top: insets.top + GUTTER, left: GUTTER, gap: 12 }}
-        >
+        <View pointerEvents="box-none" style={{ position: 'absolute', top: insets.top + GUTTER, left: GUTTER, gap: 12 }}>
           <Pressable
             onPress={close}
             accessibilityRole="button"
@@ -137,13 +138,15 @@ export function RainMapScreen() {
               borderRadius: 22,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: 'rgba(10,18,26,0.72)',
+              backgroundColor: chrome.card,
+              borderWidth: 1,
+              borderColor: chrome.border,
             }}
           >
-            <Ionicons name="close" size={22} color="#ffffff" />
+            <Ionicons name="close" size={22} color={chrome.text} />
           </Pressable>
 
-          <PrecipitationLegend />
+          <PrecipitationLegend chrome={chrome} />
         </View>
 
         <View
@@ -163,15 +166,16 @@ export function RainMapScreen() {
               onSeek={seek}
               onChangeSpan={changeSpan}
               notice={data?.notices[data.notices.length - 1]}
+              chrome={chrome}
             />
           ) : (
             <View style={{ alignItems: 'center' }}>
-              <Text variant="caption" color="rgba(255,255,255,0.75)">
+              <Text variant="caption" color={chrome.muted}>
                 {status === 'error' ? 'Rainfall could not load.' : 'Loading rainfall'}
               </Text>
               {status === 'error' ? (
                 <Pressable onPress={() => refetch()} accessibilityRole="button">
-                  <Text variant="bodyStrong" color="#ffffff">
+                  <Text variant="bodyStrong" color={chrome.text}>
                     Try again
                   </Text>
                 </Pressable>

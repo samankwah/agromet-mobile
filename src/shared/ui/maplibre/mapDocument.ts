@@ -35,38 +35,42 @@ export const ESRI_ATTRIBUTION = 'Esri, HERE, Garmin, © OpenStreetMap contributo
 export const ESRI_LABELS_LAYER = 'esri-labels';
 
 /**
- * Esri's Dark Gray Canvas, for the rain map: a quiet dark ground that the
- * bright rain colours stand out on, the same reason the CARTO dark map was
- * used before it.
+ * Esri's Canvas basemaps for the rain map: Light Gray by day and Dark Gray at
+ * night, switched at the real sunrise and sunset (`utils/sun.ts`), as the
+ * phone's own weather app does. Both are quiet grounds the rain colours stand
+ * out on.
  *
- * Two raster tile layers from Esri's public tile service, which needs no key
- * (checked): the grey base, and a transparent layer of place names and borders
- * drawn on top. Tiles have detail to zoom 16; MapLibre enlarges them past that.
- * The credit travels on the base source, so MapLibre's attribution control
- * shows it alongside the app's own credits.
+ * Two raster tile layers each from Esri's public tile service, which needs no
+ * key (checked): the grey base, and a transparent layer of place names and
+ * borders drawn on top. Tiles have detail to zoom 16; MapLibre enlarges them
+ * past that. The credit travels on the base source, so MapLibre's attribution
+ * control shows it alongside the app's own credits.
  */
-export const ESRI_DARK_GRAY_STYLE = JSON.stringify({
-  version: 8,
-  sources: {
-    'esri-base': {
-      type: 'raster',
-      tiles: [`${ESRI_CANVAS}/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`],
-      tileSize: 256,
-      maxzoom: 16,
-      attribution: ESRI_ATTRIBUTION,
+export function esriCanvasStyle(look: 'light' | 'dark'): string {
+  const name = look === 'light' ? 'World_Light_Gray' : 'World_Dark_Gray';
+  return JSON.stringify({
+    version: 8,
+    sources: {
+      'esri-base': {
+        type: 'raster',
+        tiles: [`${ESRI_CANVAS}/${name}_Base/MapServer/tile/{z}/{y}/{x}`],
+        tileSize: 256,
+        maxzoom: 16,
+        attribution: ESRI_ATTRIBUTION,
+      },
+      'esri-reference': {
+        type: 'raster',
+        tiles: [`${ESRI_CANVAS}/${name}_Reference/MapServer/tile/{z}/{y}/{x}`],
+        tileSize: 256,
+        maxzoom: 16,
+      },
     },
-    'esri-reference': {
-      type: 'raster',
-      tiles: [`${ESRI_CANVAS}/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`],
-      tileSize: 256,
-      maxzoom: 16,
-    },
-  },
-  layers: [
-    { id: 'esri-base', type: 'raster', source: 'esri-base' },
-    { id: ESRI_LABELS_LAYER, type: 'raster', source: 'esri-reference' },
-  ],
-});
+    layers: [
+      { id: 'esri-base', type: 'raster', source: 'esri-base' },
+      { id: ESRI_LABELS_LAYER, type: 'raster', source: 'esri-reference' },
+    ],
+  });
+}
 
 /** The script and stylesheet tags, so both documents load one MapLibre build. */
 export function mapLibreHeadTags(): string {

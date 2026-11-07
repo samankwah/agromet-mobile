@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { PrecipFrame, TimelineSpan } from '../../../shared/domain/precipitationTimeline';
 import { Card } from '../../../shared/ui/Card';
 import { Text } from '../../../shared/ui/Text';
+import { MAP_CHROME, type MapChrome } from './mapChrome';
 import { TimelineScrubber } from './TimelineScrubber';
 
 type Props = {
@@ -22,6 +23,8 @@ type Props = {
    * usually the satellite's lag and, when a source is down, which half of the
    * timeline is missing. */
   notice?: string;
+  /** Colours for the map's light or dark look. Dark when not given. */
+  chrome?: MapChrome;
 };
 
 /** How far ahead the timeline runs, matching the reference app's control. */
@@ -30,38 +33,23 @@ const SPANS: { id: TimelineSpan; label: string }[] = [
   { id: '12h', label: '12h' },
 ];
 
-/** What the current frame actually is. A forecast presented as a measurement is
- * the one thing this screen must never do. */
+/** What the current frame actually is, short as the phone's own weather app
+ * titles its timeline. A forecast presented as a measurement is the one thing
+ * this screen must never do. */
 const KIND_LABEL = {
-  observed: 'Measured rainfall',
-  analysis: 'Estimated rainfall',
-  forecast: 'Forecast rainfall',
+  observed: 'Measured',
+  analysis: 'Estimated',
+  forecast: 'Forecast',
 } as const;
 
-/**
- * Fixed colours, not theme tokens.
- *
- * This bar floats on dark glass over a map that may be either light or dark, so
- * it is on a backdrop in the same sense the Daily view's photograph is, and
- * `AppHeader` already carries an `onBackdrop` prop for exactly this. Reading
- * `theme.colors.text` here would turn the label near-black in light mode, on a
- * panel that stays dark in both.
- */
-const ON_MAP = {
-  text: '#ffffff',
-  muted: 'rgba(255,255,255,0.62)',
-  control: 'rgba(255,255,255,0.14)',
-  controlSelected: 'rgba(255,255,255,0.9)',
-  controlSelectedText: '#101820',
-};
-
-function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+/** "Saturday 4:44 PM": the day and the time of the frame on screen. Ghana keeps
+ * GMT all year, so the UTC clock is the local one. */
+export function formatFrameTime(iso: string): string {
+  const date = new Date(iso);
+  const day = date.toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
+  const hours = date.getUTCHours();
+  const twelve = hours % 12 === 0 ? 12 : hours % 12;
+  return `${day} ${twelve}:${String(date.getUTCMinutes()).padStart(2, '0')} ${hours < 12 ? 'AM' : 'PM'}`;
 }
 
 /**
@@ -84,11 +72,19 @@ export function PlaybackBar({
   onChangeSpan,
   nowIso,
   notice,
+  chrome = MAP_CHROME.dark,
 }: Props) {
+  const ON_MAP = {
+    text: chrome.text,
+    muted: chrome.muted,
+    control: chrome.control,
+    controlSelected: chrome.controlSelected,
+    controlSelectedText: chrome.controlSelectedText,
+  };
   const current = frames[index];
 
   return (
-    <Card translucent style={{ padding: 14, gap: 10 }}>
+    <Card translucent style={{ padding: 14, gap: 10, backgroundColor: chrome.card, borderColor: chrome.border }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <Pressable
           onPress={onToggle}
@@ -114,7 +110,7 @@ export function PlaybackBar({
             {current ? KIND_LABEL[current.kind] : 'Rainfall'}
           </Text>
           <Text variant="caption" color={ON_MAP.muted} numberOfLines={1}>
-            {current ? formatDay(current.validAt) : ''}
+            {current ? formatFrameTime(current.validAt) : ''}
           </Text>
         </View>
 
@@ -156,14 +152,14 @@ export function PlaybackBar({
         span={span}
         nowIso={nowIso}
         onSeek={onSeek}
+        chrome={chrome}
       />
 
       {notice ? (
-        <Text variant="caption" color="rgba(255,255,255,0.75)">
+        <Text variant="caption" color={chrome.muted}>
           {notice}
         </Text>
       ) : null}
-
     </Card>
   );
 }

@@ -80,6 +80,24 @@ export const IMERG_STOPS: ColorStops = [
 ];
 
 /**
+ * Rain colours in the manner of the phone's own weather app: light blue for
+ * light rain, through violet and purple, to yellow for heavy rain and a pale
+ * near-white for the extreme. Reads on both the light daytime map and the dark
+ * night one, which the old green-to-red ramp did not on a light ground.
+ *
+ * NASA's satellite tiles still arrive in `IMERG_STOPS`; the map repaints them
+ * into these as they load, so the measured and forecast hours match.
+ */
+export const RAIN_STOPS: ColorStops = [
+  [0, [79, 172, 255]],
+  [0.3, [104, 128, 246]],
+  [0.5, [152, 102, 226]],
+  [0.68, [206, 108, 196]],
+  [0.84, [250, 206, 64]],
+  [1, [255, 246, 204]],
+];
+
+/**
  * Class boundaries for rain rate, in mm/h.
  *
  * Fixed and absolute, never derived from the frame's own min and max. A

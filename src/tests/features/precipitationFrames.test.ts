@@ -8,6 +8,7 @@ import {
   openingIndex,
   PLAYBACK_RATE,
   timeFraction,
+  timelineAxis,
 } from '../../features/forecasts/precipitation/frames';
 
 function frame(validAt: string, stepMinutes: number, kind: PrecipFrame['kind'] = 'observed'): PrecipFrame {
@@ -143,5 +144,44 @@ describe('openingIndex', () => {
   it('falls back to the newest frame when now is off the axis', () => {
     expect(openingIndex(MIXED, '2026-08-25T00:00:00.000Z')).toBe(MIXED.length - 1);
     expect(openingIndex([], '2026-08-26T09:00:00.000Z')).toBe(0);
+  });
+});
+
+describe('timelineAxis', () => {
+  const frame = (validAt: string, kind: 'observed' | 'forecast') =>
+    ({ validAt, stepMinutes: 60, kind, render: { type: 'cells', valueRow: 0 } }) as const;
+
+  /* Half-hourly measured frames, then hourly forecast ones, as the rain map has. */
+  const frames = [
+    ...Array.from({ length: 19 }, (_, i) => frame(new Date(Date.UTC(2026, 10, 7, 8, 0) + i * 30 * 60_000).toISOString(), 'observed')),
+    ...Array.from({ length: 12 }, (_, i) => frame(new Date(Date.UTC(2026, 10, 7, 18, 0) + i * 60 * 60_000).toISOString(), 'forecast')),
+  ];
+
+  it('spaces ticks evenly in time, however the frames are spaced', () => {
+    const { ticks } = timelineAxis(frames);
+    const gaps = ticks.slice(1).map((tick, i) => tick.atMs - ticks[i].atMs);
+    expect(new Set(gaps).size).toBe(1);
+    expect(ticks.length).toBeLessThanOrEqual(36);
+    expect(ticks.length).toBeGreaterThan(10);
+  });
+
+  it('labels on a regular coarser interval, at most five', () => {
+    const { labels } = timelineAxis(frames);
+    const gaps = labels.slice(1).map((label, i) => label.atMs - labels[i].atMs);
+    expect(new Set(gaps).size).toBe(1);
+    expect(labels.length).toBeLessThanOrEqual(5);
+    expect(labels.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('places every mark inside the strip', () => {
+    const { ticks, labels } = timelineAxis(frames);
+    for (const mark of [...ticks, ...labels]) {
+      expect(mark.fraction).toBeGreaterThanOrEqual(0);
+      expect(mark.fraction).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('has nothing to draw for a single frame', () => {
+    expect(timelineAxis(frames.slice(0, 1))).toEqual({ ticks: [], labels: [] });
   });
 });

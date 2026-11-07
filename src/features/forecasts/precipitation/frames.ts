@@ -19,7 +19,9 @@ import type { PrecipFrame, TimelineSpan } from '../../../shared/domain/precipita
  * faster because it has more ground to cover and a reader watching a whole day
  * wants the shape of it, not every step.
  */
-export const PLAYBACK_RATE: Record<TimelineSpan, number> = { '1h': 90, '12h': 150 };
+// Slowed by about two fifths after testing: at the old 90 and 150 the rain
+// moved too fast to follow.
+export const PLAYBACK_RATE: Record<TimelineSpan, number> = { '1h': 55, '12h': 90 };
 
 /**
  * How many satellite frames the timeline reaches back for.
@@ -99,11 +101,7 @@ export function frameIndexForFraction(frames: PrecipFrame[], fraction: number): 
  * current frame is held, so the loop waits rather than flickering through
  * blanks.
  */
-export function nextPlayableIndex(
-  frames: PrecipFrame[],
-  from: number,
-  isReady: (frame: PrecipFrame) => boolean,
-): number {
+export function nextPlayableIndex(frames: PrecipFrame[], from: number, isReady: (frame: PrecipFrame) => boolean): number {
   for (let step = 1; step <= frames.length; step += 1) {
     const candidate = (from + step) % frames.length;
     if (isReady(frames[candidate])) return candidate;
@@ -138,4 +136,50 @@ export function openingIndex(frames: PrecipFrame[], nowIso: string): number {
   if (frames.length === 0) return 0;
   const fraction = nowFraction(frames, nowIso);
   return fraction === null ? frames.length - 1 : frameIndexForFraction(frames, fraction);
+}
+
+/** A point on the timeline's clock grid: where it sits along the axis (0 to 1)
+ * and the moment it stands for. */
+export type AxisMark = { fraction: number; atMs: number };
+
+const TICK_STEPS_MIN = [10, 15, 30, 60, 120, 180, 360];
+const LABEL_STEPS_MIN = [30, 60, 120, 180, 360, 720, 1440];
+
+/** Every whole multiple of `stepMin` minutes from `start` to `end`. */
+function gridMarks(start: number, end: number, stepMin: number): AxisMark[] {
+  const step = stepMin * 60_000;
+  const marks: AxisMark[] = [];
+  for (let at = Math.ceil(start / step) * step; at <= end; at += step) {
+    marks.push({ fraction: (at - start) / (end - start), atMs: at });
+  }
+  return marks;
+}
+
+function finestWithin(start: number, end: number, steps: number[], max: number): AxisMark[] {
+  for (const step of steps) {
+    const marks = gridMarks(start, end, step);
+    if (marks.length <= max) return marks;
+  }
+  return gridMarks(start, end, steps[steps.length - 1]);
+}
+
+/**
+ * Ticks and labels on a regular clock grid, independent of the frames.
+ *
+ * A tick per frame looked uneven: satellite frames come every half hour and
+ * forecast frames every hour, so the measured end of the strip was twice as
+ * dense as the forecast end. Ticks now fall on whole multiples of one interval
+ * (every hour on a twelve-hour strip, say), and labels on a coarser one (every
+ * three or six hours), both placed by time like everything else on the axis.
+ * The interval is the finest that keeps under `maxTicks` and `maxLabels`.
+ */
+export function timelineAxis(frames: PrecipFrame[], maxTicks = 36, maxLabels = 5): { ticks: AxisMark[]; labels: AxisMark[] } {
+  if (frames.length < 2) return { ticks: [], labels: [] };
+  const start = Date.parse(frames[0].validAt);
+  const end = Date.parse(frames[frames.length - 1].validAt);
+  if (!(end > start)) return { ticks: [], labels: [] };
+  return {
+    ticks: finestWithin(start, end, TICK_STEPS_MIN, maxTicks),
+    labels: finestWithin(start, end, LABEL_STEPS_MIN, maxLabels),
+  };
 }

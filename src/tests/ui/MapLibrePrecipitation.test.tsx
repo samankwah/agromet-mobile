@@ -175,6 +175,28 @@ describe('MapLibrePrecipitation', () => {
     expect(mockInject.mock.calls.some(([js]) => String(js).includes('setFrames'))).toBe(true);
   });
 
+  /* The page's script is a string to TypeScript, so a syntax error in it
+     passes every type check and only shows on a phone as a blank map. */
+  it('ships a map script that parses', () => {
+    const html = htmlOf(renderMap(0).toJSON());
+    const inline = html
+      .split('<script>')
+      .slice(1)
+      .map((part) => part.split('</script>')[0]);
+    expect(inline.length).toBeGreaterThan(0);
+    for (const code of inline) {
+      expect(() => new Function(code)).not.toThrow();
+    }
+  });
+
+  /* The rain is a smooth field, one picture per frame, not a square per cell. */
+  it('draws the forecast as a smooth image layer', () => {
+    const html = htmlOf(renderMap(0).toJSON());
+    expect(html).toContain("type: 'image'");
+    expect(html).toContain("'raster-resampling': 'linear'");
+    expect(html).not.toContain('precip-fill');
+  });
+
   /* Esri's Dark Gray Canvas, base and labels, with rain drawn between the two
      so place names stay readable over the rain. Dark in both themes. */
   it('draws on Esri Dark Gray Canvas with the rain under its labels', () => {
