@@ -1,39 +1,73 @@
 import { glyphFromWmo, type WeatherGlyph } from './weatherGlyph';
 
 /**
- * What the sky behind the forecast should show, worked out from the reading.
+ * What the sky behind the forecast should look like, worked out from the
+ * current reading.
  *
- * Kept free of React so every rule here is a plain unit test: the renderer in
- * `ui/sky/AnimatedSky.tsx` only draws what this decides. The weather comes from
- * `glyphFromWmo`, the same mapping the condition icon uses, so the icon and the
- * sky can never disagree about whether it is raining.
+ * Driven by measurements, not by a weather label: Open-Meteo's cloud cover at
+ * three heights decides how much cloud is drawn and where, the visibility
+ * decides the haze, and the time decides the light. Fifteen percent low cloud
+ * is a few scattered puffs on blue; a hundred percent is the flat grey sheet of
+ * a wet afternoon. The renderer (`ui/sky/cloudShader.ts`) only paints what this
+ * decides, so every rule is a plain unit test here.
+ *
+ * Rain and lightning still come from the WMO code through `glyphFromWmo`, the
+ * mapping the condition icon uses, so the icon and the sky agree.
  */
 export type SkyPhase = 'dawn' | 'day' | 'dusk' | 'night';
 
-export type CloudTone = 'light' | 'grey' | 'dark';
-
 export type Precipitation = 'none' | 'drizzle' | 'rain' | 'heavy';
+
+/** An RGB colour with channels from 0 to 1, as the shader takes it. */
+export type Rgb = [number, number, number];
+
+export type CloudCover = { total: number; low: number; mid: number; high: number };
+
+export type SkyReading = {
+  weatherCode: number;
+  isDay: boolean;
+  observedAt: string;
+  /** Percent, from Open-Meteo. Absent on data saved before it was fetched. */
+  cloudCover?: CloudCover;
+  /** Metres. */
+  visibilityM?: number;
+};
 
 export type SkyScene = {
   phase: SkyPhase;
   glyph: WeatherGlyph;
-  /** Top, middle and bottom of the sky. */
-  gradient: [string, string, string];
-  clouds: { count: number; tone: CloudTone };
+  /** Fraction of the sky covered at each height, 0 to 1. */
+  cover: { low: number; mid: number; high: number };
+  /** Whether `cover` came from the measurement or was estimated from the code. */
+  measured: boolean;
+  skyTop: Rgb;
+  skyBottom: Rgb;
+  /** Cloud colour where the light falls on it, and in its own shadow. */
+  cloudLit: Rgb;
+  cloudShade: Rgb;
+  /** Dust or mist over everything, 0 to 1, and its colour. */
+  haze: number;
+  hazeColour: Rgb;
+  /** Brightness of the sun's glow, 0 to 1. Zero at night and under thick cloud. */
+  sunGlow: number;
+  /** How many stars show, 0 to 1. Night only, hidden by cloud. */
+  stars: number;
   precip: Precipitation;
   lightning: boolean;
-  fog: boolean;
-  sun: boolean;
-  stars: boolean;
+  /** The see-through colour for cards over this sky, as CSS. */
+  glass: string;
 };
+
+// ---------------------------------------------------------------------------
+// Time of day
+// ---------------------------------------------------------------------------
 
 /**
  * Dawn and dusk by the clock, in minutes past midnight.
  *
  * Ghana sits between 5°N and 11°N, so sunrise stays near 06:00 and sunset near
- * 18:00 all year. `utils/classifyCondition.ts` relies on the same fact for its
- * day test. The windows straddle those times, so the warm colours show for the
- * half hour either side, which is when the real sky has them.
+ * 18:00 all year. `utils/classifyCondition.ts` relies on the same fact. The
+ * windows straddle those times, when the real sky has its warm colours.
  */
 const DAWN = { from: 5 * 60 + 30, to: 7 * 60 };
 const DUSK = { from: 17 * 60 + 30, to: 19 * 60 };
@@ -44,80 +78,29 @@ export function skyPhase(isDay: boolean, observedAt: string): SkyPhase {
 
   if (minutes >= DAWN.from && minutes < DAWN.to) return 'dawn';
   if (minutes >= DUSK.from && minutes < DUSK.to) return 'dusk';
-  // Open-Meteo's own day flag decides the rest, so a reading taken at 05:00
-  // or 20:00 is night even if the clock maths were ever off by a little.
   return isDay ? 'day' : 'night';
 }
 
-/** How heavy the cloud cover is, which picks the sky's colours. */
-type Cover = 'clear' | 'some' | 'grey' | 'rain' | 'storm' | 'fog';
-
-const COVER: Record<WeatherGlyph, Cover> = {
-  clear: 'clear',
-  'partly-cloudy': 'some',
-  cloudy: 'some',
-  overcast: 'grey',
-  fog: 'fog',
-  drizzle: 'rain',
-  rain: 'rain',
-  showers: 'rain',
-  'heavy-rain': 'storm',
-  thunderstorm: 'storm',
-};
+// ---------------------------------------------------------------------------
+// Cloud amount
+// ---------------------------------------------------------------------------
 
 /**
- * Sky colours, top to bottom.
- *
- * Every set is dark enough at the top for the white temperature and place name
- * that sit there. A light Apple-style pastel would look prettier and fail in
- * Ghanaian midday sun, which is when farmers read this.
+ * A stand-in for the measurement, from the weather code alone. Only used when
+ * the reading has no cloud cover (data saved before it was fetched), so a
+ * storm still draws a full sky rather than a clear one.
  */
-const GRADIENTS: Record<SkyPhase, Record<Cover, [string, string, string]>> = {
-  day: {
-    clear: ['#1d5ba3', '#3878bd', '#62a0d4'],
-    some: ['#295f9c', '#4a80b8', '#78a5cc'],
-    grey: ['#47586a', '#627385', '#8494a4'],
-    fog: ['#66737f', '#838f9a', '#a0aab3'],
-    rain: ['#384757', '#4d5d6d', '#687886'],
-    storm: ['#1d252e', '#2c3743', '#414d5a'],
-  },
-  dawn: {
-    clear: ['#2b4677', '#b9706c', '#eca46a'],
-    some: ['#34466e', '#9c6a72', '#d4966f'],
-    grey: ['#3d4759', '#6d6a72', '#9d8a80'],
-    fog: ['#57606e', '#857f84', '#b09d93'],
-    rain: ['#323b4a', '#555864', '#7a7276'],
-    storm: ['#1c222b', '#30353f', '#4a4a52'],
-  },
-  dusk: {
-    clear: ['#222d5b', '#874c78', '#e2855a'],
-    some: ['#29325a', '#7a5276', '#c97d5f'],
-    grey: ['#353b52', '#625a6a', '#93786f'],
-    fog: ['#4f5568', '#7a7180', '#a68b84'],
-    rain: ['#2c3244', '#4d4b5c', '#73666b'],
-    storm: ['#191d27', '#2b2d38', '#45414a'],
-  },
-  night: {
-    clear: ['#060c1d', '#0e1b37', '#1b2d52'],
-    some: ['#0b1324', '#16223a', '#26364f'],
-    grey: ['#10161f', '#1b2533', '#2a3646'],
-    fog: ['#1a2029', '#28303b', '#3a434f'],
-    rain: ['#0c1118', '#161e29', '#24303e'],
-    storm: ['#080b11', '#11161e', '#1e2530'],
-  },
-};
-
-const CLOUDS: Record<WeatherGlyph, SkyScene['clouds']> = {
-  clear: { count: 0, tone: 'light' },
-  'partly-cloudy': { count: 2, tone: 'light' },
-  cloudy: { count: 3, tone: 'light' },
-  overcast: { count: 4, tone: 'grey' },
-  fog: { count: 2, tone: 'grey' },
-  drizzle: { count: 3, tone: 'grey' },
-  rain: { count: 4, tone: 'grey' },
-  showers: { count: 3, tone: 'grey' },
-  'heavy-rain': { count: 4, tone: 'dark' },
-  thunderstorm: { count: 4, tone: 'dark' },
+const ESTIMATE: Record<WeatherGlyph, { low: number; mid: number; high: number }> = {
+  clear: { low: 0.05, mid: 0, high: 0.05 },
+  'partly-cloudy': { low: 0.2, mid: 0.05, high: 0.1 },
+  cloudy: { low: 0.45, mid: 0.2, high: 0.15 },
+  overcast: { low: 0.9, mid: 0.6, high: 0.3 },
+  fog: { low: 0.3, mid: 0.1, high: 0 },
+  drizzle: { low: 0.85, mid: 0.5, high: 0.3 },
+  rain: { low: 0.9, mid: 0.7, high: 0.4 },
+  showers: { low: 0.8, mid: 0.6, high: 0.3 },
+  'heavy-rain': { low: 1, mid: 0.85, high: 0.5 },
+  thunderstorm: { low: 1, mid: 0.9, high: 0.6 },
 };
 
 const PRECIP: Record<WeatherGlyph, Precipitation> = {
@@ -133,23 +116,117 @@ const PRECIP: Record<WeatherGlyph, Precipitation> = {
   thunderstorm: 'heavy',
 };
 
-/** The weathers light enough to see the sun, moon or stars through. */
-const SEE_THROUGH: ReadonlySet<WeatherGlyph> = new Set(['clear', 'partly-cloudy', 'cloudy']);
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
-export function skyScene(reading: { weatherCode: number; isDay: boolean; observedAt: string }): SkyScene {
+// ---------------------------------------------------------------------------
+// Colour
+// ---------------------------------------------------------------------------
+
+const hex = (value: string): Rgb => [
+  parseInt(value.slice(1, 3), 16) / 255,
+  parseInt(value.slice(3, 5), 16) / 255,
+  parseInt(value.slice(5, 7), 16) / 255,
+];
+
+const mix = (a: Rgb, b: Rgb, t: number): Rgb => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+
+type Palette = { top: string; bottom: string; lit: string; shade: string };
+
+/**
+ * Each phase has a clear sky and a grey one, and the scene sits between them
+ * by how cloudy it is. Grey because that is what thick cloud does to daylight:
+ * a blue sky with a few grey shapes on it is the look this replaced, and it
+ * read as fine weather on a day with an 88% chance of rain.
+ */
+const CLEAR: Record<SkyPhase, Palette> = {
+  day: { top: '#2560a8', bottom: '#6fa3d6', lit: '#ffffff', shade: '#aebccb' },
+  dawn: { top: '#33507f', bottom: '#e9a46e', lit: '#ffdcbc', shade: '#8f7f8f' },
+  dusk: { top: '#29315f', bottom: '#e0875c', lit: '#f8c3a0', shade: '#6f6378' },
+  night: { top: '#071022', bottom: '#1c2d4f', lit: '#56627a', shade: '#1d2433' },
+};
+
+const GREY: Record<SkyPhase, Palette> = {
+  day: { top: '#59636d', bottom: '#8c959d', lit: '#c4cad0', shade: '#737c85' },
+  dawn: { top: '#4f5562', bottom: '#8d8580', lit: '#b9b0aa', shade: '#666670' },
+  dusk: { top: '#44485a', bottom: '#7e7276', lit: '#a99c9c', shade: '#5a5664' },
+  night: { top: '#12161c', bottom: '#262c35', lit: '#3d4450', shade: '#191e26' },
+};
+
+/** A storm darkens the grey further: the underside of a cumulonimbus. */
+const STORM: Palette = { top: '#30373e', bottom: '#525a61', lit: '#858d94', shade: '#3d444a' };
+
+const HAZE_DAY = '#cdc5b6'; // harmattan dust is beige, not white
+const HAZE_NIGHT = '#3a3f47';
+
+/** Visibility at and above which the air counts as clear, and at which it is
+ * thick. Harmattan days in the north often sit at two to five kilometres. */
+const CLEAR_VISIBILITY_M = 10_000;
+const THICK_VISIBILITY_M = 1_000;
+
+function toCss([r, g, b]: Rgb, alpha: number): string {
+  return `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${alpha})`;
+}
+
+// ---------------------------------------------------------------------------
+// Scene
+// ---------------------------------------------------------------------------
+
+export function skyScene(reading: SkyReading): SkyScene {
   const phase = skyPhase(reading.isDay, reading.observedAt);
   const glyph = glyphFromWmo(reading.weatherCode);
-  const seeThrough = SEE_THROUGH.has(glyph);
+  const precip = PRECIP[glyph];
+  const lightning = glyph === 'thunderstorm';
+
+  const measured = reading.cloudCover !== undefined;
+  const cover = reading.cloudCover
+    ? {
+        low: clamp01(reading.cloudCover.low / 100),
+        mid: clamp01(reading.cloudCover.mid / 100),
+        high: clamp01(reading.cloudCover.high / 100),
+      }
+    : ESTIMATE[glyph];
+  const total = reading.cloudCover ? clamp01(reading.cloudCover.total / 100) : clamp01(Math.max(cover.low, cover.mid, cover.high * 0.6));
+
+  // How grey the light is. Thin cloud leaves the sky blue; from about 55%
+  // cover it greys, and falling rain means a thick deck whatever the figures.
+  let grey = clamp01((total - 0.55) / 0.35);
+  if (precip !== 'none') grey = Math.max(grey, 0.95);
+
+  const clear = CLEAR[phase];
+  const dull = lightning || precip === 'heavy' ? (phase === 'night' ? GREY.night : STORM) : GREY[phase];
+  const skyTop = mix(hex(clear.top), hex(dull.top), grey);
+  const skyBottom = mix(hex(clear.bottom), hex(dull.bottom), grey);
+  const cloudLit = mix(hex(clear.lit), hex(dull.lit), grey);
+  const cloudShade = mix(hex(clear.shade), hex(dull.shade), grey);
+
+  let haze = 0;
+  if (typeof reading.visibilityM === 'number') {
+    haze = clamp01((CLEAR_VISIBILITY_M - reading.visibilityM) / (CLEAR_VISIBILITY_M - THICK_VISIBILITY_M)) * 0.85;
+  }
+  if (glyph === 'fog') haze = Math.max(haze, 0.9);
+
+  const sunGlow = phase === 'night' ? 0 : Math.pow(1 - total, 1.5);
+  const stars = phase === 'night' ? Math.pow(1 - total, 2) : 0;
+
+  // Cards over the sky are a darker, see-through version of its top colour, so
+  // they take on the weather: grey glass on a grey day, blue on a clear one.
+  const glass = toCss(mix(skyTop, [0, 0, 0], 0.45), 0.42);
 
   return {
     phase,
     glyph,
-    gradient: GRADIENTS[phase][COVER[glyph]],
-    clouds: CLOUDS[glyph],
-    precip: PRECIP[glyph],
-    lightning: glyph === 'thunderstorm',
-    fog: glyph === 'fog',
-    sun: seeThrough && phase !== 'night',
-    stars: seeThrough && phase === 'night',
+    cover,
+    measured,
+    skyTop,
+    skyBottom,
+    cloudLit,
+    cloudShade,
+    haze,
+    hazeColour: hex(phase === 'night' ? HAZE_NIGHT : HAZE_DAY),
+    sunGlow,
+    stars,
+    precip,
+    lightning,
+    glass,
   };
 }

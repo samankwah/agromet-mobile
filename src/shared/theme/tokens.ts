@@ -437,6 +437,8 @@ export function sunken(tokens: NeuTokens, level: DepthLevel = 'md'): ShadowPair 
 export const fontFamily = {
   headingBold: 'SpaceGrotesk_700Bold',
   headingMedium: 'SpaceGrotesk_500Medium',
+  /** Only for the forecast's big temperature, drawn thin over the sky. */
+  headingLight: 'SpaceGrotesk_300Light',
   body: 'NotoSans_400Regular',
   bodySemiBold: 'NotoSans_600SemiBold',
 } as const;

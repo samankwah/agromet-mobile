@@ -30,4 +30,9 @@ export type CurrentWeather = {
   rainfallMm: number;
   humidityPct: number;
   windKph: number;
+  /** Percent of the sky covered, overall and by height. Draws the sky behind
+   * the forecast. Absent on data saved before it was fetched. */
+  cloudCover?: { total: number; low: number; mid: number; high: number };
+  /** Metres. Short visibility is harmattan dust or fog. Absent on old data. */
+  visibilityM?: number;
 };

@@ -3,6 +3,7 @@ import { StyleSheet, View, type ViewProps, type ViewStyle } from 'react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
 import { Surface } from './Surface';
+import { useSkyTint } from './sky/SkyTint';
 
 type Props = ViewProps & {
   /** Stands the card further forward, for one the user is meant to notice
@@ -43,6 +44,9 @@ type Props = ViewProps & {
  */
 export function Card({ raised, translucent, pressed, style, children, ...rest }: Props) {
   const theme = useTheme();
+  // Over the forecast sky a translucent card takes the weather's glass colour
+  // (grey on a grey day, blue on a clear one); elsewhere it keeps the navy.
+  const skyTint = useSkyTint();
 
   const {
     backgroundColor,
@@ -54,7 +58,7 @@ export function Card({ raised, translucent, pressed, style, children, ...rest }:
     ...passthrough
   } = (StyleSheet.flatten(style) ?? {}) as ViewStyle;
 
-  const fill = (backgroundColor as string) ?? (translucent ? 'rgba(10,22,34,0.55)' : theme.colors.surface);
+  const fill = (backgroundColor as string) ?? (translucent ? (skyTint ?? 'rgba(10,22,34,0.55)') : theme.colors.surface);
   const stroke =
     (borderColor as string) ??
     (translucent ? `rgba(255,255,255,${raised ? 0.28 : 0.16})` : raised ? theme.colors.borderStrong : theme.colors.border);

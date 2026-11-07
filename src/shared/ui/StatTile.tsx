@@ -62,7 +62,7 @@ export function StatTile({ icon, label, value, hint, onBackdrop = false }: Props
       depth={onBackdrop ? 'flat' : 'sunken'}
       level="sm"
       radius={theme.radii.md}
-      background={onBackdrop ? 'transparent' : theme.colors.bg}
+      background={onBackdrop ? 'rgba(255,255,255,0.08)' : theme.colors.bg}
       bordered={!onBackdrop}
       style={{
         flexDirection: 'row',

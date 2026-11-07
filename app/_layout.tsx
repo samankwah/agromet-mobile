@@ -1,21 +1,14 @@
 import { useCallback, useEffect } from 'react';
 import { Pressable, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import {
-  DarkTheme,
-  DefaultTheme,
-  Stack,
-  ThemeProvider as NavigationThemeProvider,
-  router,
-  type ErrorBoundaryProps,
-} from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavigationThemeProvider, router, type ErrorBoundaryProps } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
-import { SpaceGrotesk_500Medium, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
+import { SpaceGrotesk_300Light, SpaceGrotesk_500Medium, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
 import { NotoSans_400Regular, NotoSans_600SemiBold } from '@expo-google-fonts/noto-sans';
 
 import { Text } from '../src/shared/ui/Text';
@@ -49,6 +42,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     SpaceGrotesk_700Bold,
+    SpaceGrotesk_300Light,
     SpaceGrotesk_500Medium,
     NotoSans_400Regular,
     NotoSans_600SemiBold,

@@ -1,18 +1,17 @@
 import React from 'react';
 import { ScrollView, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
 import type { CurrentWeather } from '../../../shared/domain/currentWeather';
 import type { DailyForecast, HourlyForecast } from '../../../shared/domain/forecast';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { fontFamily } from '../../../shared/theme/tokens';
 import { Card } from '../../../shared/ui/Card';
 
 import { StatTile } from '../../../shared/ui/StatTile';
 import { Text } from '../../../shared/ui/Text';
 import { ON_BACKDROP_COLOR, ON_BACKDROP_MUTED } from '../../../shared/ui/WeatherBackdrop';
-import { formatTemperature } from '../../../shared/utils/formatTemperature';
+import { formatDegrees, formatTemperature } from '../../../shared/utils/formatTemperature';
 import { formatWind } from '../../../shared/utils/formatWind';
-import { LiveWeatherIcon } from '../../../shared/ui/weather/LiveWeatherIcon';
 import { describeNextHours } from '../../../shared/utils/weatherNarrative';
 import { HourlyStripItem } from './HourlyStripItem';
 import { MapPreviewCard } from './MapPreviewCard';
@@ -44,27 +43,27 @@ export function TodaySection({ conditions, today, hourly }: Props) {
   return (
     <View style={{ gap: theme.spacing.lg }}>
       <View style={{ gap: theme.spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-          <View style={{ flex: 1 }}>
-            <Text variant="h1" color={ON_BACKDROP_COLOR} style={{ fontSize: 46, lineHeight: 52 }}>
-              {formatTemperature(conditions.temperatureC)}
-            </Text>
-            <Text variant="bodyStrong" color={ON_BACKDROP_COLOR} numberOfLines={1}>
-              {conditions.condition}
-            </Text>
-            <Text variant="caption" color={ON_BACKDROP_MUTED}>
-              Feels like {formatTemperature(conditions.feelsLikeC)} · H {formatTemperature(today.tempMaxC)} · L{' '}
-              {formatTemperature(today.tempMinC)}
-            </Text>
-          </View>
-          {/* The hero animates: this is the one icon on the screen whose whole
-              job is to say what the sky is doing right now.
-
-              It used to be forced to flat white here, because a drawn glyph
-              laid over a photograph of the sky disappeared into it. The 3D
-              renders bring their own lighting and a baked shadow, so they hold
-              their edge against an image without being flattened first. */}
-          <LiveWeatherIcon weatherCode={conditions.weatherCode} isDay={conditions.isDay} size={60} animated />
+        {/* Centred, large and thin over the sky, as the phone's own weather
+            app lays it out. No condition icon here: the sky behind already
+            shows the weather, and the words say it. */}
+        <View style={{ alignItems: 'center' }}>
+          <Text
+            variant="h1"
+            color={ON_BACKDROP_COLOR}
+            style={{ fontFamily: fontFamily.headingLight, fontSize: 96, lineHeight: 104 }}
+            accessibilityLabel={formatTemperature(conditions.temperatureC)}
+          >
+            {formatDegrees(conditions.temperatureC)}
+          </Text>
+          <Text variant="h3" color={ON_BACKDROP_COLOR} numberOfLines={1}>
+            {conditions.condition}
+          </Text>
+          <Text variant="bodyStrong" color={ON_BACKDROP_COLOR}>
+            H: {formatDegrees(today.tempMaxC)} L: {formatDegrees(today.tempMinC)}
+          </Text>
+          <Text variant="caption" color={ON_BACKDROP_MUTED}>
+            Feels like {formatTemperature(conditions.feelsLikeC)}
+          </Text>
         </View>
       </View>
 
@@ -84,10 +83,10 @@ export function TodaySection({ conditions, today, hourly }: Props) {
           Today&apos;s conditions
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: theme.spacing.md, columnGap: theme.spacing.lg }}>
-          <StatTile icon="temperature" label="Feels like" value={formatTemperature(conditions.feelsLikeC)} />
-          <StatTile icon="humidity" label="Humidity" value={`${conditions.humidityPct}%`} />
-          <StatTile icon="wind" label="Wind" value={formatWind(conditions.windKph)} />
-          <StatTile icon="rainfall" label="Rain chance" value={`${today.rainfallProbabilityPct}%`} />
+          <StatTile onBackdrop icon="temperature" label="Feels like" value={formatTemperature(conditions.feelsLikeC)} />
+          <StatTile onBackdrop icon="humidity" label="Humidity" value={`${conditions.humidityPct}%`} />
+          <StatTile onBackdrop icon="wind" label="Wind" value={formatWind(conditions.windKph)} />
+          <StatTile onBackdrop icon="rainfall" label="Rain chance" value={`${today.rainfallProbabilityPct}%`} />
         </View>
       </Card>
 

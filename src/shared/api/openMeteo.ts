@@ -22,7 +22,10 @@ const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
 /** Kept in step with `backend/app/weather_runtime.py`. If you add a field
  * there, add it here, or the direct-fallback path silently returns less than
  * the proxied one. */
-const CURRENT_FIELDS = 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m';
+// The cloud cover by height and the visibility draw the sky behind the forecast
+// (domain/skyScene.ts). Kept in step with backend/app/weather_runtime.py.
+const CURRENT_FIELDS =
+  'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility';
 const DAILY_FIELDS =
   'weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,precipitation_sum,precipitation_probability_max,sunrise,sunset,wind_speed_10m_max,wind_gusts_10m_max';
 const HOURLY_FIELDS =
@@ -266,7 +269,21 @@ export function toCurrentWeather(bundle: OpenMeteoBundle, place: Place): Current
     rainfallMm: round1(num(current.precipitation)),
     humidityPct: Math.round(num(current.relative_humidity_2m)),
     windKph: Math.round(num(current.wind_speed_10m)),
+    cloudCover: cloudCoverOf(current),
+    visibilityM: typeof current.visibility === 'number' ? current.visibility : undefined,
   };
+}
+
+/**
+ * Cloud cover by height, or undefined when the bundle predates these fields
+ * (a stored server copy or a saved phone copy from before they were asked
+ * for). Undefined, not zeros: zero would draw a clear sky over a storm, and
+ * the sky falls back to an estimate from the weather code instead.
+ */
+function cloudCoverOf(current: Record<string, number | string>): CurrentWeather['cloudCover'] {
+  const { cloud_cover: total, cloud_cover_low: low, cloud_cover_mid: mid, cloud_cover_high: high } = current;
+  if (typeof low !== 'number' || typeof mid !== 'number' || typeof high !== 'number') return undefined;
+  return { total: typeof total === 'number' ? total : Math.max(low, mid, high), low, mid, high };
 }
 
 export function toDailyForecasts(bundle: OpenMeteoBundle, locationId: string): DailyForecast[] {

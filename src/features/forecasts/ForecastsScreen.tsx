@@ -155,7 +155,13 @@ export function ForecastsScreen({ requestedSegment }: Props = {}) {
     if (ready && conditions.data) {
       return (
         <Screen scroll={false} padded={false} fullBleed>
-          <WeatherBackdrop weatherCode={conditions.data.weatherCode} isDay={conditions.data.isDay} observedAt={conditions.data.observedAt}>
+          <WeatherBackdrop
+            weatherCode={conditions.data.weatherCode}
+            isDay={conditions.data.isDay}
+            observedAt={conditions.data.observedAt}
+            cloudCover={conditions.data.cloudCover}
+            visibilityM={conditions.data.visibilityM}
+          >
             <ThemeProvider forceScheme="dark">
               <ScrollView
                 contentContainerStyle={{
